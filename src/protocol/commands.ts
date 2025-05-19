@@ -7,8 +7,8 @@ import {
   CMD_SLOTS_CODE,
   CMD_UNLOCK_CODE,
   CMD_SET_LED_CODE,
-  CMD_SET_INFO,
-  CMD_SET_INFO_POWERBANK,
+  CMD_SET_INFO_PWB,
+  CMD_SET_INFO_BATTERY,
   CMD_GET_FW_VER,
   MAXIMUM_SLOT_INDEX,
 } from "./constants";
@@ -30,18 +30,18 @@ function buildCommand(command: BoardCommand): Buffer {
   let bytesWritten = 1;
   let payload: Buffer;
 
-  if (command.opCode === CMD_SET_INFO) {
+  if (command.opCode === CMD_SET_INFO_PWB) {
     payload = Buffer.alloc(18);
     payload.writeUInt8(command.opCode, 0);
     payload.writeUInt8(command.slotId!, 1);
-    payload.write(command.serialNumber || "1234567", 2, 10, "utf8");
+    payload.write(command.serialNumber!, 2, 10, "utf8");
     payload.writeUInt32LE(
       command.timestamp || Math.floor(Date.now() / 1000),
       12
     );
     payload.writeUInt16LE(command.cycles || 0, 16);
     bytesWritten = 18;
-  } else if (command.opCode === CMD_SET_INFO_POWERBANK) {
+  } else if (command.opCode === CMD_SET_INFO_BATTERY) {
     payload = Buffer.alloc(8);
     payload.writeUInt8(command.opCode, 0);
     payload.writeUInt8(command.slotId!, 1);
@@ -166,7 +166,7 @@ export class SetInfoCommandBuilder extends BaseCommandBuilder {
       );
     }
     return Buffer.from([
-      CMD_SET_INFO,
+      CMD_SET_INFO_PWB,
       message.data[0],
       ...message.data.slice(1, 18),
     ]);
@@ -182,7 +182,7 @@ export class SetBatteryInfoCommandBuilder extends BaseCommandBuilder {
       );
     }
     return Buffer.from([
-      CMD_SET_INFO_POWERBANK,
+      CMD_SET_INFO_PWB,
       message.data[0],
       ...message.data.slice(1, 8),
     ]);
@@ -206,8 +206,8 @@ export class CommandFactory {
     [CMD_SLOTS_CODE, new SlotsCommandBuilder()],
     [CMD_UNLOCK_CODE, new UnlockCommandBuilder()],
     [CMD_SET_LED_CODE, new SetLedCommandBuilder()],
-    [CMD_SET_INFO, new SetInfoCommandBuilder()],
-    [CMD_SET_INFO_POWERBANK, new SetBatteryInfoCommandBuilder()],
+    [CMD_SET_INFO_PWB, new SetInfoCommandBuilder()],
+    [CMD_SET_INFO_BATTERY, new SetBatteryInfoCommandBuilder()],
     [CMD_GET_FW_VER, new FirmwareVersionCommandBuilder()],
   ]);
 
@@ -220,12 +220,22 @@ export class CommandFactory {
   }
 
   static buildCommand(message: SerialMessage): Buffer {
-    // All commands except SLOTS and FW_VER require a slot index
     const command: BoardCommand = {
       opCode: message.command,
-      slotId: message.data?.[0],
-      param: message.data?.[1],
     };
+
+    if (message.command === CMD_SET_INFO_PWB && message.data) {
+      // For powerbank initialization, data contains: [slotIndex, serialNumber(10), timestamp(4), cycles(2)]
+      command.slotId = message.data[0];
+      command.serialNumber = message.data.slice(1, 11).toString("utf8");
+      command.timestamp = message.data.readUInt32LE(11);
+      command.cycles = message.data.readUInt16LE(15);
+    } else {
+      // For other commands
+      command.slotId = message.data?.[0];
+      command.param = message.data?.[1];
+    }
+
     return buildCommandForBoard(message.boardAddress, command);
   }
 }
@@ -265,8 +275,8 @@ export class CommandValidatorFactory {
     [CMD_SET_PDO_CODE, new SlotCommandValidator()],
     [CMD_UNLOCK_CODE, new SlotCommandValidator()],
     [CMD_SET_LED_CODE, new SlotCommandValidator()],
-    [CMD_SET_INFO, new SlotCommandValidator()],
-    [CMD_SET_INFO_POWERBANK, new SlotCommandValidator()],
+    [CMD_SET_INFO_PWB, new SlotCommandValidator()],
+    [CMD_SET_INFO_BATTERY, new SlotCommandValidator()],
   ]);
 
   static getValidator(command: number): CommandValidator {

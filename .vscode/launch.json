@@ -72,6 +72,32 @@
       "env": {
         "DEBUG": "true"
       }
+    },
+        {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Initialize Powerbank",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "initialize-powerbank",
+        "-p", "${input:port}",
+        "-b", "${input:board}",
+        "-s", "${input:slot}"
+      ],
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
     }
   ],
   "inputs": [

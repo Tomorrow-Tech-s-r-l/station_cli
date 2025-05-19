@@ -13,6 +13,7 @@ import {
   STATUS_ERR_INTERNAL,
   STATUS_ERR_INVALID_RESPONSE,
 } from "./protocol/constants";
+import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
 
 const program = new Command();
 
@@ -141,6 +142,47 @@ program
         );
       } else {
         console.error("Command failed with status:", response[1]);
+      }
+
+      await service.disconnect();
+    } catch (error) {
+      console.error("Error:", error);
+      process.exit(1);
+    }
+  });
+
+// Initialize powerbank
+program
+  .command("initialize-powerbank")
+  .description("Initialize a powerbank")
+  .requiredOption("-p, --port <path>", "Serial port path")
+  .requiredOption("-b, --board <address>", "Board address (0-4)")
+  .requiredOption("-s, --slot <index>", "Slot index (0-5)")
+  .action(async (options) => {
+    try {
+      /*TODO: Add system for creating serial number */
+      const serialNumber = "0000000000"; // 10 characters
+      const timestamp = Math.floor(Date.now() / 1000); // Convert to seconds
+      const cycles = 1;
+
+      const service = new SerialService(options.port);
+      await service.connect();
+
+      const command = new InitializePowerbankCommand(service);
+      const response = await command.execute(
+        parseInt(options.board),
+        parseInt(options.slot),
+        {
+          serialNumber,
+          timestamp,
+          cycles,
+        }
+      );
+
+      if (response.success) {
+        console.log("Powerbank initialized");
+      } else {
+        console.error("Command failed:", getStatusMessage(response.status));
       }
 
       await service.disconnect();
