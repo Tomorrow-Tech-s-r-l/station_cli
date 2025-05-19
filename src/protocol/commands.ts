@@ -224,6 +224,13 @@ export class CommandFactory {
       opCode: message.command,
     };
 
+    //TODO HERE WE ADD THE DATA REQUESTED BY THE COMMAND
+    // Extract data based on command type
+    // Each command type may have different data requirements:
+    // - CMD_SET_INFO_PWB: [slotIndex, serialNumber(10), timestamp(4), cycles(2)]
+    // - CMD_SET_INFO_BATTERY: [slotIndex, totalCharge(2), currentCharge(2), cutoffCharge(2)]
+    // - Most other commands: [slotIndex, param?]
+    // Add new command data handling here as needed
     if (message.command === CMD_SET_INFO_PWB && message.data) {
       // For powerbank initialization, data contains: [slotIndex, serialNumber(10), timestamp(4), cycles(2)]
       command.slotId = message.data[0];
