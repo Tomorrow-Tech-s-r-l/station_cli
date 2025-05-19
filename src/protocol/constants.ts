@@ -1,6 +1,7 @@
 // Protocol Constants
 export const FRAME_START_BYTE = 0xea;
 export const BAUD_RATE = 115200;
+export const CRC_ALGORITHM = "MODBUS";
 export const FRAME_RECEIVE_DELAY_MS = 5;
 
 // Command Codes

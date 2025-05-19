@@ -4,10 +4,8 @@ import { crc16 } from "easy-crc";
 import {
   FRAME_START_BYTE,
   FRAME_RECEIVE_DELAY_MS,
+  CRC_ALGORITHM,
 } from "../protocol/constants";
-
-const START_FRAME = 0xea;
-const CRC_ALGORITHM = "MODBUS";
 
 export class TransportProtocol {
   static buildFrame(payload: Buffer): Buffer {
@@ -17,7 +15,7 @@ export class TransportProtocol {
 
     // Build frame: <SF> <address + payload> <CRC16>
     const frame = Buffer.alloc(payload.length + 3);
-    frame.writeUInt8(START_FRAME, 0);
+    frame.writeUInt8(FRAME_START_BYTE, 0);
     payload.copy(frame, 1);
     frame.writeUInt16LE(crc, payload.length + 1); // MODBUS uses little-endian
 
@@ -33,7 +31,7 @@ export class TransportProtocol {
 
     // Verify start frame
     const startFrame = frame.readUInt8(0);
-    if (startFrame !== START_FRAME) {
+    if (startFrame !== FRAME_START_BYTE) {
       debug.error("Invalid start frame:", startFrame.toString(16));
       return null;
     }

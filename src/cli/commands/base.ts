@@ -10,9 +10,9 @@ export abstract class BaseCommand {
     try {
       const response = await this.serialService.sendMessage(message);
       return {
-        success: response[1] === 0,
-        status: response[1],
-        data: response.subarray(2),
+        success: response[2] === 0,
+        status: response[2],
+        data: response.subarray(3),
       };
     } catch (error) {
       console.error("Command execution failed:", error);

@@ -2,10 +2,9 @@
 
 import { Command } from "commander";
 import { SerialService } from "./services/serial";
+import { SlotsCommand } from "./cli/commands/slots";
 import { StatusCommand } from "./cli/commands/status";
 import {
-  CMD_STATUS_CODE,
-  CMD_SLOTS_CODE,
   CMD_GET_FW_VER,
   STATUS_OK,
   STATUS_TIMEOUT,
@@ -100,25 +99,16 @@ program
       const service = new SerialService(options.port);
       await service.connect();
 
-      const response = await service.sendMessage({
-        boardAddress: parseInt(options.board),
-        command: CMD_SLOTS_CODE,
-      });
+      const command = new SlotsCommand(service);
+      const response = await command.execute(parseInt(options.board));
 
-      // Response format: <boardAddr> <cmd> <status> <fill> <lock>
-      if (response.length >= 3) {
-        const status = response[2];
-        if (status === 0 && response.length >= 5) {
-          const fill = response[3];
-          const lock = response[4];
-          console.log("Slot status:");
-          console.log("Fill:", fill.toString(2).padStart(6, "0"));
-          console.log("Lock:", lock.toString(2).padStart(6, "0"));
-        } else {
-          console.error("Command failed:", getStatusMessage(status));
-        }
+      if (response.success) {
+        const slotsInfo = JSON.parse(response.data.toString());
+        console.log("Slots status:");
+        console.log("Filled slots:", slotsInfo.filledSlots);
+        console.log("Locked slots:", slotsInfo.lockedSlots);
       } else {
-        console.error("Invalid response format");
+        console.error("Command failed:", getStatusMessage(response.status));
       }
 
       await service.disconnect();
