@@ -1,0 +1,37 @@
+{
+  "name": "interfacer-core-cli",
+  "version": "1.0.0",
+  "description": "CLI tool to control station board and powerbanks",
+  "main": "src/cli.ts",
+  "bin": {
+    "station-cli": "./dist/cli.js"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npx tsc && chmod +x dist/cli.js",
+    "start": "node dist/cli.js",
+    "dev": "ts-node src/cli.ts"
+  },
+  "keywords": [
+    "cli",
+    "station",
+    "powerbank",
+    "control"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.15.19",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@types/inquirer": "^9.0.8",
+    "chalk": "^4.1.2",
+    "commander": "^14.0.0",
+    "dotenv": "^16.5.0",
+    "easy-crc": "^1.1.0",
+    "inquirer": "^12.6.1",
+    "serialport": "^13.0.0"
+  }
+}
