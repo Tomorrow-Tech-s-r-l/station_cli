@@ -1,4 +1,4 @@
-name: Build Executables
+name: Build and Release
 
 on:
   push:
@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,4 +47,60 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: executables/${{ matrix.artifact_name }}
-          if-no-files-found: error 
+          if-no-files-found: error
+
+      - name: Get version
+        id: get_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Get commit message
+        id: get_commit_message
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Get version
+        id: get_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Get commit message
+        id: get_commit_message
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release v${{ needs.build.outputs.version }}
+          body: |
+            ## What's Changed
+            
+            ${{ needs.build.outputs.commit_message }}
+            
+            ## Downloads
+            
+            ### Linux ARM
+            - [station-cli-linux-arm](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-linux-arm)
+            
+            ### macOS
+            - [station-cli-macos-x64](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-macos-x64)
+          draft: false
+          prerelease: false
+          files: |
+            station-cli-linux-arm
+            station-cli-macos-x64
+          tag_name: v${{ needs.build.outputs.version }} 
