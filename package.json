@@ -26,7 +26,8 @@
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
     "build:executable:macos": "npm run clean && npm run build && npx pkg . --targets node18-macos-x64 --output executables/station-cli-macos-x64",
-    "build:executable:linux": "npm run clean && docker run --rm -v ${PWD}:/app -w /app --platform linux/arm/v7 node:18.17.0-bullseye-slim bash -c 'apt-get update && apt-get install -y python3 make g++ git && npm install --no-optional && npm run build && NODE_OPTIONS=--no-warnings npx pkg . --targets node18-linux-arm --output executables/station-cli-linux-arm --no-bytecode --no-native-modules --public'"
+    "build:executable:linux": "npm run clean && npm run build && NODE_OPTIONS=--no-warnings npx pkg . --targets node18-linux-arm --output executables/station-cli-linux-arm --no-bytecode --no-native-modules --public",
+    "build:executable:linux:ci": "npm run clean && docker run --rm -v ${PWD}:/app -w /app --platform linux/arm/v7 node:18.17.0-bullseye-slim bash -c 'apt-get update && apt-get install -y python3 make g++ git && npm install --no-optional && npm run build && NODE_OPTIONS=--no-warnings npx pkg . --targets node18-linux-arm --output executables/station-cli-linux-arm --no-bytecode --no-native-modules --public'"
   },
   "keywords": [
     "cli",

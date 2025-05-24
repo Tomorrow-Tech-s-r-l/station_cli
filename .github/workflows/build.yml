@@ -13,7 +13,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            build_script: build:executable:linux
+            build_script: build:executable:linux:ci
             artifact_name: station-cli-linux-arm
           - os: macos-latest
             build_script: build:executable:macos
