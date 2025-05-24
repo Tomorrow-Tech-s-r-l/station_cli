@@ -9,6 +9,7 @@ import {
   SlotsResponse,
 } from "./protocol/types";
 import { debug } from "./utils/debug";
+import { selectPort } from "./utils/port_selector";
 
 const { Command } = require("commander");
 const { SerialService } = require("./services/serial");
@@ -63,22 +64,10 @@ const getStatusMessage = (status: number): string => {
   }
 };
 
-// List available ports
-program
-  .command("list-ports")
-  .description("List available serial ports")
-  .action(async () => {
-    const service = new SerialService("");
-    const ports = await service.listPorts();
-    console.log("Available ports:");
-    ports.forEach((port: string) => console.log(`- ${port}`));
-  });
-
 // Get slots status
 program
   .command("slots")
   .description("Get status of all slots")
-  .requiredOption("-p, --port <path>", "Serial port path")
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
@@ -86,7 +75,8 @@ program
       const errors: SlotErrorInfo[] = [];
       let index = 1;
 
-      const service = new SerialService(options.port);
+      const port = await selectPort();
+      const service = new SerialService(port);
       await service.connect();
 
       const command = new SlotsCommand(service);
@@ -189,12 +179,12 @@ program
 program
   .command("unlock")
   .description("Unlock a slot")
-  .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-i, --index <index>", "Slot index (1-30)")
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
-      const service = new SerialService(options.port);
+      const port = await selectPort();
+      const service = new SerialService(port);
       await service.connect();
 
       const command = new UnlockCommand(service);
@@ -247,13 +237,13 @@ program
 program
   .command("charge")
   .description("Enable or disable charging for a specific slot")
-  .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-i, --index <index>", "Slot index (1-30)")
   .requiredOption("-e, --enable <enable>", "Enable charging (true/false)")
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
-      const service = new SerialService(options.port);
+      const port = await selectPort();
+      const service = new SerialService(port);
       await service.connect();
 
       const command = new ChargeCommand(service);
@@ -313,13 +303,13 @@ program
 program
   .command("status")
   .description("Get the status of a powerbank in a slot")
-  .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .requiredOption("-s, --slot <index>", "Slot index (0-5)")
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
-      const service = new SerialService(options.port);
+      const port = await selectPort();
+      const service = new SerialService(port);
       await service.connect();
 
       const command = new StatusCommand(service);
@@ -351,12 +341,12 @@ program
 program
   .command("firmware")
   .description("Get firmware version")
-  .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
-      const service = new SerialService(options.port);
+      const port = await selectPort();
+      const service = new SerialService(port);
       await service.connect();
 
       const response = await service.sendMessage({
@@ -384,7 +374,6 @@ program
 program
   .command("initialize-powerbank")
   .description("Initialize a powerbank")
-  .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .requiredOption("-s, --slot <index>", "Slot index (0-5)")
   .action(async (options: CommandOptions) => {
@@ -395,7 +384,8 @@ program
       const timestamp = Math.floor(Date.now() / 1000); // Convert to seconds
       const cycles = 1;
 
-      const service = new SerialService(options.port);
+      const port = await selectPort();
+      const service = new SerialService(port);
       await service.connect();
 
       const command = new InitializePowerbankCommand(service);
@@ -421,28 +411,5 @@ program
       process.exit(1);
     }
   });
-
-// Toggle led
-/*program
-  .command("toggle-led")
-  .description("Toggle the led")
-  .requiredOption("-p, --port <path>", "Serial port path")
-  .requiredOption("-b, --board <address>", "Board address (0-4)")
-  .requiredOption("-s, --slot <index>", "Slot index (0-5)")
-  .action(async (options) => {
-    try {
-      const service = new SerialService(options.port);
-      await service.connect();
-
-      const command = new ToggleLedCommand(service);
-      const response = await command.execute(
-        parseInt(options.board),
-        parseInt(options.slot)
-      );
-    } catch (error) {
-      console.error("Error:", error);
-      process.exit(1);
-    }
-  });*/
 
 program.parse();

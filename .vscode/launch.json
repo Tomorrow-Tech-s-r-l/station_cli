@@ -4,33 +4,11 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: List Ports",
-      "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/src/cli.ts",
-      "args": ["list-ports"],
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
-      "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
-      "runtimeArgs": ["--nolazy"],
-      "env": {
-        "DEBUG": "true"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
       "name": "Debug: Slots",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "slots",
-        "-p", "${input:port}"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -54,7 +32,6 @@
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "unlock",
-        "-p", "${input:port}",
         "-i", "${input:index}"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
@@ -79,7 +56,6 @@
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "charge",
-        "-p", "${input:port}",
         "-i", "${input:index}",
         "-e", "${input:enable}"
       ],
@@ -105,7 +81,6 @@
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "status",
-        "-p", "${input:port}",
         "-b", "${input:board}",
         "-s", "${input:slot}"
       ],
@@ -131,7 +106,6 @@
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "initialize-powerbank",
-        "-p", "${input:port}",
         "-b", "${input:board}",
         "-s", "${input:slot}"
       ],
@@ -151,12 +125,6 @@
     }
   ],
   "inputs": [
-    {
-      "id": "port",
-      "type": "promptString",
-      "description": "Enter serial port (e.g. /dev/tty.usbserial-BG02020S)",
-      "default": "/dev/tty.usbserial-BG02020S"
-    },
     {
       "id": "board",
       "type": "promptString",
