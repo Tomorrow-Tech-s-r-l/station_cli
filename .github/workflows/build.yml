@@ -28,6 +28,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Python
+        if: matrix.os == 'ubuntu-24.04-arm'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -35,11 +41,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        if: matrix.os == 'ubuntu-24.04-arm'
         run: |
-          if [ "${{ matrix.os }}" == "ubuntu-24.04-arm" ]; then
-            sudo apt-get update
-            sudo apt-get install -y python3 make g++ git
-          fi
+          sudo apt-get update
+          sudo apt-get install -y make g++ git
           npm ci
 
       - name: Build executable
