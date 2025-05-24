@@ -15,6 +15,7 @@ const { SerialService } = require("./services/serial");
 const { SlotsCommand } = require("./cli/commands/slots");
 const { StatusCommand } = require("./cli/commands/status");
 const { UnlockCommand } = require("./cli/commands/unlock");
+const { ChargeCommand } = require("./cli/commands/charge");
 const {
   CMD_GET_FW_VER,
   STATUS_OK,
@@ -33,6 +34,7 @@ interface CommandOptions {
   board: string;
   slot: string;
   index: string;
+  enable?: boolean;
 }
 
 const program = new Command();
@@ -241,6 +243,70 @@ program
     }
   });
 
+// Enable/Disable charging
+program
+  .command("charge")
+  .description("Enable or disable charging for a specific slot")
+  .requiredOption("-p, --port <path>", "Serial port path")
+  .requiredOption("-i, --index <index>", "Slot index (1-30)")
+  .requiredOption("-e, --enable <enable>", "Enable charging (true/false)")
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      const service = new SerialService(options.port);
+      await service.connect();
+
+      const command = new ChargeCommand(service);
+      const response = await command.execute(
+        parseInt(options.index),
+        options.enable
+      );
+
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const result = {
+        success: response.success,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
+        slotInBoard: (parseInt(options.index) - 1) % 6,
+        chargingEnabled: !!options.enable,
+        error: response.success
+          ? null
+          : {
+              code: response.status,
+              message: getStatusMessage(response.status),
+            },
+      };
+
+      console.log(JSON.stringify(result, null, 2));
+
+      await service.disconnect();
+    } catch (error) {
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const result = {
+        success: false,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
+        slotInBoard: (parseInt(options.index) - 1) % 6,
+        chargingEnabled: !!options.enable,
+        error: {
+          code: -1,
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+      };
+
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+  });
+
 /// DEBUG COMMANDS ///
 
 // Status command used to get the status of a powerbank in a specific board and slot
@@ -378,7 +444,5 @@ program
       process.exit(1);
     }
   });*/
-
-// Toggle powerbank charging
 
 program.parse();

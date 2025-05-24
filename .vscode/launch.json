@@ -71,6 +71,32 @@
         "DEBUG": "true"
       }
     },
+      {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Charge",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "charge",
+        "-p", "${input:port}",
+        "-i", "${input:index}",
+        "-e", "${input:enable}"
+      ],
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
     {
       "type": "node",
       "request": "launch",
@@ -148,6 +174,12 @@
       "type": "promptString",
       "description": "Enter slot index (1-30)",
       "default": "1"
+    },
+    {
+      "id": "enable",
+      "type": "promptString",
+      "description": "Enable charging (true/false)",
+      "default": "true"
     }
   ]
 } 
