@@ -26,12 +26,17 @@ export class StatusCommand extends BaseCommand {
     if (response.success && response.data.length >= 19) {
       // Parse powerbank info from response data
       const info: PowerbankInfo = {
-        serial: response.data.slice(0, 10).toString("ascii"),
+        serial: response.data
+          .subarray(0, 10)
+          .toString("utf8")
+          .trim()
+          .replace(/\0/g, ""),
         timestamp: response.data.readUInt32LE(10),
-        totalCapacity: response.data.readUInt16LE(14),
-        remainingCapacity: response.data.readUInt16LE(16),
-        cycles: response.data.readUInt16LE(18),
-        status: response.data[20],
+        totalCharge: response.data.readUInt16LE(14),
+        currentCharge: response.data.readUInt16LE(16),
+        cutoffCharge: response.data.readUInt16LE(18),
+        cycles: response.data.readUInt16LE(20),
+        status: response.data.readUInt8(22),
       };
       return { ...response, data: Buffer.from(JSON.stringify(info)) };
     }

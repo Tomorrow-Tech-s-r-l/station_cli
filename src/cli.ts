@@ -1,9 +1,20 @@
 #!/usr/bin/env node
 
+import { MAXIMUM_BOARD_ADDRESS, SLOT_LOCKED } from "./protocol/constants";
+import {
+  SlotServer,
+  SlotState,
+  SlotError,
+  SlotErrorInfo,
+  SlotsResponse,
+} from "./protocol/types";
+import { debug } from "./utils/debug";
+
 const { Command } = require("commander");
 const { SerialService } = require("./services/serial");
 const { SlotsCommand } = require("./cli/commands/slots");
 const { StatusCommand } = require("./cli/commands/status");
+const { UnlockCommand } = require("./cli/commands/unlock");
 const {
   CMD_GET_FW_VER,
   STATUS_OK,
@@ -21,6 +32,7 @@ interface CommandOptions {
   port: string;
   board: string;
   slot: string;
+  index: string;
 }
 
 const program = new Command();
@@ -60,7 +72,178 @@ program
     ports.forEach((port: string) => console.log(`- ${port}`));
   });
 
-// Status command
+// Get slots status
+program
+  .command("slots")
+  .description("Get status of all slots")
+  .requiredOption("-p, --port <path>", "Serial port path")
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      const slots: SlotServer[] = [];
+      const errors: SlotErrorInfo[] = [];
+      let index = 1;
+
+      const service = new SerialService(options.port);
+      await service.connect();
+
+      const command = new SlotsCommand(service);
+      const statusCommand = new StatusCommand(service);
+
+      for (let i = 0; i <= MAXIMUM_BOARD_ADDRESS; i++) {
+        const response = await command.execute(i);
+
+        if (response.success) {
+          try {
+            const slotsInfo = JSON.parse(response.data.toString());
+            debug.success("Slots status: ", slotsInfo);
+
+            for (let j = 0; j < 6; j++) {
+              const isAvailable = slotsInfo.filledSlots[j] == SLOT_LOCKED;
+              let powerBankInfo = null;
+              let powerLevel = 0;
+
+              if (isAvailable) {
+                try {
+                  const statusResponse = await statusCommand.execute(i, j);
+                  if (statusResponse.success) {
+                    powerBankInfo = JSON.parse(statusResponse.data.toString());
+                    const total = parseInt(powerBankInfo?.totalCharge) || 0;
+                    const current = parseInt(powerBankInfo?.currentCharge) || 0;
+                    powerLevel =
+                      total > 0 ? Math.trunc((current / total) * 100) : 0;
+                  } else {
+                    errors.push({
+                      boardAddress: i,
+                      slotIndex: j,
+                      error: SlotError.STATUS_COMMAND_FAILED,
+                      message: getStatusMessage(statusResponse.status),
+                    });
+                  }
+                } catch (error) {
+                  errors.push({
+                    boardAddress: i,
+                    slotIndex: j,
+                    error: SlotError.CONNECTION_ERROR,
+                    message:
+                      error instanceof Error ? error.message : "Unknown error",
+                  });
+                }
+              }
+
+              slots.push({
+                powerBank: powerBankInfo
+                  ? {
+                      id: powerBankInfo?.serial,
+                      powerLevel: powerLevel,
+                    }
+                  : null,
+                isLocked: true,
+                index: index++,
+                state: isAvailable ? SlotState.available : SlotState.empty,
+                disabled: false,
+                boardAddress: i,
+                slotIndex: j,
+              });
+            }
+          } catch (error) {
+            errors.push({
+              boardAddress: i,
+              slotIndex: -1,
+              error: SlotError.INVALID_RESPONSE,
+              message: "Failed to parse slots info response",
+            });
+          }
+        } else {
+          errors.push({
+            boardAddress: i,
+            slotIndex: -1,
+            error: SlotError.STATUS_COMMAND_FAILED,
+            message: getStatusMessage(response.status),
+          });
+        }
+      }
+
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const response: SlotsResponse = {
+        slots,
+        errors,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+      };
+
+      console.log(JSON.stringify(response, null, 2));
+
+      await service.disconnect();
+    } catch (error) {
+      console.error("Error:", error);
+      process.exit(1);
+    }
+  });
+
+// Unlock slot
+program
+  .command("unlock")
+  .description("Unlock a slot")
+  .requiredOption("-p, --port <path>", "Serial port path")
+  .requiredOption("-i, --index <index>", "Slot index (1-30)")
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      const service = new SerialService(options.port);
+      await service.connect();
+
+      const command = new UnlockCommand(service);
+      const response = await command.execute(parseInt(options.index));
+
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const result = {
+        success: response.success,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
+        slotInBoard: (parseInt(options.index) - 1) % 6,
+        error: response.success
+          ? null
+          : {
+              code: response.status,
+              message: getStatusMessage(response.status),
+            },
+      };
+
+      console.log(JSON.stringify(result, null, 2));
+
+      await service.disconnect();
+    } catch (error) {
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const result = {
+        success: false,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
+        slotInBoard: (parseInt(options.index) - 1) % 6,
+        error: {
+          code: -1,
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+      };
+
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+  });
+
+/// DEBUG COMMANDS ///
+
+// Status command used to get the status of a powerbank in a specific board and slot
 program
   .command("status")
   .description("Get the status of a powerbank in a slot")
@@ -68,6 +251,7 @@ program
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .requiredOption("-s, --slot <index>", "Slot index (0-5)")
   .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
     try {
       const service = new SerialService(options.port);
       await service.connect();
@@ -97,36 +281,6 @@ program
     }
   });
 
-// Get slots status
-program
-  .command("slots")
-  .description("Get status of all slots")
-  .requiredOption("-p, --port <path>", "Serial port path")
-  .requiredOption("-b, --board <address>", "Board address (0-4)")
-  .action(async (options: CommandOptions) => {
-    try {
-      const service = new SerialService(options.port);
-      await service.connect();
-
-      const command = new SlotsCommand(service);
-      const response = await command.execute(parseInt(options.board));
-
-      if (response.success) {
-        const slotsInfo = JSON.parse(response.data.toString());
-        console.log("Slots status:");
-        console.log("Filled slots:", slotsInfo.filledSlots);
-        console.log("Locked slots:", slotsInfo.lockedSlots);
-      } else {
-        console.error("Command failed:", getStatusMessage(response.status));
-      }
-
-      await service.disconnect();
-    } catch (error) {
-      console.error("Error:", error);
-      process.exit(1);
-    }
-  });
-
 // Get firmware version
 program
   .command("firmware")
@@ -134,6 +288,7 @@ program
   .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
     try {
       const service = new SerialService(options.port);
       await service.connect();
@@ -167,6 +322,7 @@ program
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .requiredOption("-s, --slot <index>", "Slot index (0-5)")
   .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
     try {
       /*TODO: Add system for creating serial number */
       const serialNumber = "0000000000"; // 10 characters

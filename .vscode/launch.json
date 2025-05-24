@@ -25,14 +25,37 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: Status",
+      "name": "Debug: Slots",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
-        "status",
+        "slots",
+        "-p", "${input:port}"
+      ],
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+      {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Unlock",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "unlock",
         "-p", "${input:port}",
-        "-b", "${input:board}",
-        "-s", "${input:slot}"
+        "-i", "${input:index}"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -51,13 +74,14 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: Slots",
+      "name": "Debug: Status",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
-        "slots",
+        "status",
         "-p", "${input:port}",
-        "-b", "${input:board}"
+        "-b", "${input:board}",
+        "-s", "${input:slot}"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -104,8 +128,8 @@
     {
       "id": "port",
       "type": "promptString",
-      "description": "Enter serial port (e.g. /dev/tty.usbserial-BG02020H)",
-      "default": "/dev/tty.usbserial-BG02020H"
+      "description": "Enter serial port (e.g. /dev/tty.usbserial-BG02020S)",
+      "default": "/dev/tty.usbserial-BG02020S"
     },
     {
       "id": "board",
@@ -118,6 +142,12 @@
       "type": "promptString",
       "description": "Enter slot index (0-5)",
       "default": "0"
+    },
+    {
+      "id": "index",
+      "type": "promptString",
+      "description": "Enter slot index (1-30)",
+      "default": "1"
     }
   ]
 } 

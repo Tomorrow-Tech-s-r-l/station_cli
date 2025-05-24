@@ -25,14 +25,6 @@ export interface StatusResponsePayload {
   pbStatus: number;
 }
 
-// Slots command response payload
-export interface SlotsResponsePayload {
-  slots: Array<{
-    slot: number;
-    status: "Empty" | "Filled" | "Locked";
-  }>;
-}
-
 // Firmware version response payload
 export interface FirmwareResponsePayload {
   version: string;
@@ -59,13 +51,55 @@ export interface CommandHandler {
 export interface PowerbankInfo {
   serial: string;
   timestamp: number;
-  totalCapacity: number;
-  remainingCapacity: number;
+  totalCharge: number;
+  currentCharge: number;
+  cutoffCharge: number;
   cycles: number;
   status: number;
 }
 
-export interface SlotStatus {
-  fill: number; // Bitmap of filled slots
-  lock: number; // Bitmap of locked slots
+export interface PowerBankServer {
+  id: string;
+  powerLevel: number;
+}
+
+export interface SlotServer {
+  powerBank: PowerBankServer | null;
+  isLocked: boolean;
+  index: number;
+  state: string;
+  disabled: boolean;
+  boardAddress: number;
+  slotIndex: number;
+}
+
+/**
+ * Slot state
+ */
+export enum SlotState {
+  available = "available",
+  empty = "empty",
+  unlock = "unlock",
+  unknown = "unknown",
+}
+
+export enum SlotError {
+  NONE = "none",
+  STATUS_COMMAND_FAILED = "status_command_failed",
+  INVALID_RESPONSE = "invalid_response",
+  CONNECTION_ERROR = "connection_error",
+}
+
+export interface SlotErrorInfo {
+  boardAddress: number;
+  slotIndex: number;
+  error: SlotError;
+  message?: string;
+}
+
+export interface SlotsResponse {
+  slots: SlotServer[];
+  errors: SlotErrorInfo[];
+  executionTimeMs: number;
+  timestamp: string;
 }
