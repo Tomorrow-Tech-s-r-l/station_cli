@@ -10,10 +10,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest-arm64, macos-latest]
         include:
-          - os: ubuntu-latest
-            build_script: build:executable:linux:ci
+          - os: ubuntu-latest-arm64
+            build_script: build:executable:linux
             artifact_name: station-cli-linux-arm
           - os: macos-latest
             build_script: build:executable:macos
@@ -30,7 +30,12 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest-arm64" ]; then
+            sudo apt-get update
+            sudo apt-get install -y python3 make g++ git
+          fi
+          npm ci
 
       - name: Build executable
         run: npm run ${{ matrix.build_script }}
