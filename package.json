@@ -1,16 +1,31 @@
 {
-  "name": "interfacer-core-cli",
+  "name": "station-cli",
   "version": "1.0.0",
   "description": "CLI tool to control station board and powerbanks",
   "main": "src/cli.ts",
-  "bin": {
-    "station-cli": "./dist/cli.js"
+  "bin": "dist/cli.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "pkg": {
+    "assets": [
+      "dist/**/*",
+      "node_modules/@serialport/bindings-cpp/build/**/*",
+      "node_modules/@serialport/bindings-cpp/prebuilds/**/*"
+    ],
+    "targets": [
+      "node18-linux-arm",
+      "node18-macos-x64"
+    ],
+    "outputPath": "dist"
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npx tsc && chmod +x dist/cli.js",
+    "build": "tsc && chmod +x dist/cli.js",
     "start": "node dist/cli.js",
-    "dev": "ts-node src/cli.ts"
+    "dev": "ts-node src/cli.ts",
+    "build:executable:macos": "npm run clean && npm run build && npx pkg . --targets node18-macos-x64 --output executables/station-cli-macos-x64",
+    "build:executable:linux": "npm run clean && docker run --rm -v ${PWD}:/app -w /app node:18.17.0-bullseye bash -c 'npx pkg . --targets node18-linux-arm --output executables/station-cli-linux-arm'"
   },
   "keywords": [
     "cli",
@@ -21,9 +36,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^22.15.19",
+    "@types/node": "^22.15.21",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "pkg": "^5.8.1"
   },
   "dependencies": {
     "@types/inquirer": "^9.0.8",
@@ -31,7 +47,7 @@
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "easy-crc": "^1.1.0",
-    "inquirer": "^12.6.1",
+    "inquirer": "^12.6.2",
     "serialport": "^13.0.0"
   }
 }

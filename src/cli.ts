@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
-import { SerialService } from "./services/serial";
-import { SlotsCommand } from "./cli/commands/slots";
-import { StatusCommand } from "./cli/commands/status";
-import {
+const { Command } = require("commander");
+const { SerialService } = require("./services/serial");
+const { SlotsCommand } = require("./cli/commands/slots");
+const { StatusCommand } = require("./cli/commands/status");
+const {
   CMD_GET_FW_VER,
   STATUS_OK,
   STATUS_TIMEOUT,
@@ -12,8 +12,16 @@ import {
   STATUS_ERR_INVALID_ARGS,
   STATUS_ERR_INTERNAL,
   STATUS_ERR_INVALID_RESPONSE,
-} from "./protocol/constants";
-import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
+} = require("./protocol/constants");
+const {
+  InitializePowerbankCommand,
+} = require("./cli/commands/initialize_powerbank");
+
+interface CommandOptions {
+  port: string;
+  board: string;
+  slot: string;
+}
 
 const program = new Command();
 
@@ -49,7 +57,7 @@ program
     const service = new SerialService("");
     const ports = await service.listPorts();
     console.log("Available ports:");
-    ports.forEach((port) => console.log(`- ${port}`));
+    ports.forEach((port: string) => console.log(`- ${port}`));
   });
 
 // Status command
@@ -59,7 +67,7 @@ program
   .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .requiredOption("-s, --slot <index>", "Slot index (0-5)")
-  .action(async (options) => {
+  .action(async (options: CommandOptions) => {
     try {
       const service = new SerialService(options.port);
       await service.connect();
@@ -95,7 +103,7 @@ program
   .description("Get status of all slots")
   .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
-  .action(async (options) => {
+  .action(async (options: CommandOptions) => {
     try {
       const service = new SerialService(options.port);
       await service.connect();
@@ -125,7 +133,7 @@ program
   .description("Get firmware version")
   .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
-  .action(async (options) => {
+  .action(async (options: CommandOptions) => {
     try {
       const service = new SerialService(options.port);
       await service.connect();
@@ -158,7 +166,7 @@ program
   .requiredOption("-p, --port <path>", "Serial port path")
   .requiredOption("-b, --board <address>", "Board address (0-4)")
   .requiredOption("-s, --slot <index>", "Slot index (0-5)")
-  .action(async (options) => {
+  .action(async (options: CommandOptions) => {
     try {
       /*TODO: Add system for creating serial number */
       const serialNumber = "0000000000"; // 10 characters
@@ -191,5 +199,30 @@ program
       process.exit(1);
     }
   });
+
+// Toggle led
+/*program
+  .command("toggle-led")
+  .description("Toggle the led")
+  .requiredOption("-p, --port <path>", "Serial port path")
+  .requiredOption("-b, --board <address>", "Board address (0-4)")
+  .requiredOption("-s, --slot <index>", "Slot index (0-5)")
+  .action(async (options) => {
+    try {
+      const service = new SerialService(options.port);
+      await service.connect();
+
+      const command = new ToggleLedCommand(service);
+      const response = await command.execute(
+        parseInt(options.board),
+        parseInt(options.slot)
+      );
+    } catch (error) {
+      console.error("Error:", error);
+      process.exit(1);
+    }
+  });*/
+
+// Toggle powerbank charging
 
 program.parse();
