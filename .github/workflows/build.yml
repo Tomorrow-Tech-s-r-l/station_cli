@@ -8,11 +8,14 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      commit_message: ${{ steps.get_commit_message.outputs.commit_message }}
     strategy:
       matrix:
-        os: [ubuntu-latest-arm64, macos-latest]
+        os: [ubuntu-latest-arm, macos-latest]
         include:
-          - os: ubuntu-latest-arm64
+          - os: ubuntu-24.04-arm
             build_script: build:executable:linux
             artifact_name: station-cli-linux-arm
           - os: macos-latest
@@ -32,11 +35,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        if: matrix.os == 'ubuntu-latest-arm'
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest-arm64" ]; then
-            sudo apt-get update
-            sudo apt-get install -y python3 make g++ git
-          fi
+          sudo apt-get update
+          sudo apt-get install -y python3 make g++ git
           npm ci
 
       - name: Build executable
@@ -67,20 +69,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
-
-      - name: Get version
-        id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Get commit message
-        id: get_commit_message
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
