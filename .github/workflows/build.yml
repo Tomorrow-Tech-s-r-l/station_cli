@@ -17,7 +17,7 @@ jobs:
         include:
           - os: ubuntu-24.04-arm
             build_script: build:executable:linux
-            artifact_name: station-cli-linux-arm
+            artifact_name: station-cli-linux-arm64
           - os: macos-latest
             build_script: build:executable:macos
             artifact_name: station-cli-macos-x64
@@ -92,14 +92,14 @@ jobs:
             
             ## Downloads
             
-            ### Linux ARM
-            - [station-cli-linux-arm](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-linux-arm)
+            ### Linux ARM64
+            - [station-cli-linux-arm64](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-linux-arm64)
             
             ### macOS
             - [station-cli-macos-x64](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-macos-x64)
           draft: false
           prerelease: false
           files: |
-            station-cli-linux-arm
+            station-cli-linux-arm64
             station-cli-macos-x64
           tag_name: v${{ needs.build.outputs.version }} 
