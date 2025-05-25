@@ -21,12 +21,12 @@
     "outputPath": "dist"
   },
   "scripts": {
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist node_modules",
     "build": "tsc && chmod +x dist/cli.js",
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
-    "build:executable:macos": "npm run clean && npm run build && npx pkg . --targets node18-macos-x64 --output executables/station-cli-macos-x64",
-    "build:executable:linux": "npm run clean && npm run build && npx pkg . --targets node18-linux-arm --output executables/station-cli-linux-arm"
+    "build:executable:macos": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-macos-x64 --output executables/station-cli-macos-x64",
+    "build:executable:linux": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-linux-arm64 --output executables/station-cli-linux-arm64"
   },
   "keywords": [
     "cli",
