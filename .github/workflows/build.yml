@@ -87,12 +87,16 @@ jobs:
           ls -la station-cli-linux-arm64/
           ls -la station-cli-macos-arm64/
           
-          # Move the executables to the root directory (they are directly in their respective folders)
-          cp station-cli-linux-arm64/station-cli-linux-arm64 ./station-cli-linux-arm64
-          cp station-cli-macos-arm64/station-cli-macos-arm64 ./station-cli-macos-arm64
+          # The files are already in the correct location, just rename the directories
+          mv station-cli-linux-arm64/station-cli-linux-arm64 ./station-cli-linux-arm64.tmp
+          mv station-cli-macos-arm64/station-cli-macos-arm64 ./station-cli-macos-arm64.tmp
           
           # Clean up directories
           rm -rf station-cli-linux-arm64 station-cli-macos-arm64
+          
+          # Rename the files to their final names
+          mv station-cli-linux-arm64.tmp station-cli-linux-arm64
+          mv station-cli-macos-arm64.tmp station-cli-macos-arm64
           
           # Make executables executable
           chmod +x station-cli-linux-arm64 station-cli-macos-arm64
