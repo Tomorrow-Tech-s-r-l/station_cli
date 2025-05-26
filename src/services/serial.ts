@@ -192,7 +192,16 @@ export class SerialService {
         );
 
         if (attempt < this.MAX_RETRIES) {
-          // Add a small delay between retries to ensure data is sent
+          // Flush the port before retrying
+          if (this.port) {
+            await new Promise<void>((resolve, reject) => {
+              this.port!.flush((err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+          }
+          // Add a small delay between retries
           await new Promise((resolve) =>
             setTimeout(resolve, this.RETRY_DELAY_MS)
           );

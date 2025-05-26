@@ -28,6 +28,9 @@ import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
 import { mapBoardToSlot } from "./utils/slot_mapping";
 
+// Add delay utility function
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface CommandOptions {
   port: string;
   board: string;
@@ -75,6 +78,8 @@ program
 
               if (isAvailable) {
                 try {
+                  // Add a small delay before each status check to avoid race conditions
+                  await delay(100);
                   const statusResponse = await statusCommand.execute(i, j);
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
@@ -340,12 +345,18 @@ program
           powerBankInfo?.totalCharge
         );
 
+        const endTime = Date.now();
+        const executionTime = endTime - startTime;
+
         const result = {
+          success: response.success,
+          executionTimeMs: executionTime,
+          timestamp: new Date().toISOString(),
           ...powerBankInfo,
           powerLevel,
         };
 
-        console.log("Powerbank info:", result);
+        console.log(JSON.stringify(result, null, 2));
       } else {
         console.error("Command failed:", getStatusMessage(response.status));
         if (response.status === STATUS_ERR_INTERNAL) {
