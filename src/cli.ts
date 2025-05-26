@@ -133,7 +133,8 @@ program
                     message:
                       error instanceof Error ? error.message : "Unknown error",
                   });
-                  index++; // Increment after using currentIndex
+                  // Increment after using currentIndex
+                  index++;
                 }
               }
 
@@ -156,7 +157,7 @@ program
             }
           } catch (error) {
             errors.push({
-              index: -1, // Use a new index for board-level errors
+              index: -1,
               boardAddress: i,
               slotIndex: -1,
               error: SlotError.INVALID_RESPONSE,
@@ -165,10 +166,10 @@ program
           }
         } else {
           errors.push({
-            index: -1, // Use a new index for board-level errors
+            index: -1,
             boardAddress: i,
             slotIndex: -1,
-            error: SlotError.STATUS_COMMAND_FAILED,
+            error: SlotError.SLOTS_COMMAND_FAILED,
             message: getStatusMessage(response.status),
           });
         }

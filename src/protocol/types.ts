@@ -86,6 +86,7 @@ export enum SlotState {
 export enum SlotError {
   NONE = "none",
   STATUS_COMMAND_FAILED = "status_command_failed",
+  SLOTS_COMMAND_FAILED = "slots_command_failed",
   INVALID_RESPONSE = "invalid_response",
   CONNECTION_ERROR = "connection_error",
 }
