@@ -13,7 +13,7 @@ export class SerialService {
   private readonly responseTimeout = 2000; // 2 second timeout
   private readonly FRAME_RECEIVE_DELAY_MS = 5; // 5ms delay after last byte
   private readonly INTER_BYTE_TIMEOUT_MS = 5; // 5ms inter-byte timeout
-  private readonly MAX_RETRIES = 3; // Maximum number of retry attempts
+  private readonly MAX_RETRIES = 5; // Maximum number of retry attempts
 
   constructor(private portPath: string) {
     debug.info(`Initializing SerialService with port: ${portPath}`);
