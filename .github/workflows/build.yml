@@ -20,7 +20,7 @@ jobs:
             artifact_name: station-cli-linux-arm64
           - os: macos-latest
             build_script: build:executable:macos
-            artifact_name: station-cli-macos-x64
+            artifact_name: station-cli-macos-arm64
 
     steps:
       - name: Checkout code
@@ -96,10 +96,10 @@ jobs:
             - [station-cli-linux-arm64](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-linux-arm64)
             
             ### macOS
-            - [station-cli-macos-x64](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-macos-x64)
+            - [station-cli-macos-arm64](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/station-cli-macos-arm64)
           draft: false
           prerelease: false
           files: |
             station-cli-linux-arm64
-            station-cli-macos-x64
+            station-cli-macos-arm64
           tag_name: v${{ needs.build.outputs.version }} 

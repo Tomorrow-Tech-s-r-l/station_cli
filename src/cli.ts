@@ -10,6 +10,7 @@ import {
 } from "./protocol/types";
 import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
+import { getStatusMessage } from "./utils/status";
 
 const { Command } = require("commander");
 const { SerialService } = require("./services/serial");
@@ -17,15 +18,8 @@ const { SlotsCommand } = require("./cli/commands/slots");
 const { StatusCommand } = require("./cli/commands/status");
 const { UnlockCommand } = require("./cli/commands/unlock");
 const { ChargeCommand } = require("./cli/commands/charge");
-const {
-  CMD_GET_FW_VER,
-  STATUS_OK,
-  STATUS_TIMEOUT,
-  STATUS_ERR_INVALID_CMD,
-  STATUS_ERR_INVALID_ARGS,
-  STATUS_ERR_INTERNAL,
-  STATUS_ERR_INVALID_RESPONSE,
-} = require("./protocol/constants");
+const packageJson = require("../package.json");
+const { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } = require("./protocol/constants");
 const {
   InitializePowerbankCommand,
 } = require("./cli/commands/initialize_powerbank");
@@ -41,28 +35,9 @@ interface CommandOptions {
 const program = new Command();
 
 program
-  .name("station-cli")
-  .description("CLI tool to control station board and powerbanks")
-  .version("1.0.0");
-
-const getStatusMessage = (status: number): string => {
-  switch (status) {
-    case STATUS_OK:
-      return "Command successful";
-    case STATUS_TIMEOUT:
-      return "Device timeout - device not responding";
-    case STATUS_ERR_INVALID_CMD:
-      return "Invalid command - command not supported";
-    case STATUS_ERR_INVALID_ARGS:
-      return "Invalid arguments - check command parameters";
-    case STATUS_ERR_INTERNAL:
-      return "Internal device error - device may need reset";
-    case STATUS_ERR_INVALID_RESPONSE:
-      return "Invalid response format from device";
-    default:
-      return `Unknown error (code: ${status})`;
-  }
-};
+  .name(packageJson.name)
+  .description(packageJson.description)
+  .version(packageJson.version);
 
 // Get slots status
 program
