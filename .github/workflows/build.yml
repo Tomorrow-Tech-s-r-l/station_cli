@@ -87,15 +87,18 @@ jobs:
           ls -la station-cli-linux-arm64/
           ls -la station-cli-macos-arm64/
           
-          # Find and move the actual executable files
-          find station-cli-linux-arm64 -type f -exec mv {} ./station-cli-linux-arm64 \;
-          find station-cli-macos-arm64 -type f -exec mv {} ./station-cli-macos-arm64 \;
+          # Move the executables to the root directory (they are directly in their respective folders)
+          cp station-cli-linux-arm64/station-cli-linux-arm64 ./station-cli-linux-arm64
+          cp station-cli-macos-arm64/station-cli-macos-arm64 ./station-cli-macos-arm64
           
           # Clean up directories
           rm -rf station-cli-linux-arm64 station-cli-macos-arm64
           
           # Make executables executable
           chmod +x station-cli-linux-arm64 station-cli-macos-arm64
+          
+          # Verify the files exist and are executable
+          ls -la station-cli-*
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
