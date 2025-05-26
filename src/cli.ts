@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
-import { MAXIMUM_BOARD_ADDRESS, SLOT_LOCKED } from "./protocol/constants";
+import {
+  MAXIMUM_BOARD_ADDRESS,
+  MAXIMUM_SLOT_INDEX,
+  SLOT_LOCKED,
+} from "./protocol/constants";
 import {
   SlotServer,
   SlotState,
@@ -64,7 +68,8 @@ program
             const slotsInfo = JSON.parse(response.data.toString());
             debug.success("Slots status: ", slotsInfo);
 
-            for (let j = 0; j < 6; j++) {
+            for (let j = 0; j <= MAXIMUM_SLOT_INDEX; j++) {
+              const currentIndex = index;
               const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
               let powerBankInfo = null;
               let powerLevel = 0;
@@ -74,28 +79,61 @@ program
                   const statusResponse = await statusCommand.execute(i, j);
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
+                    // Validate charge values
+                    const currentCharge =
+                      parseInt(powerBankInfo?.currentCharge) || 0;
+                    const totalCharge =
+                      parseInt(powerBankInfo?.totalCharge) || 0;
+
+                    if (currentCharge < 0 || totalCharge < 0) {
+                      errors.push({
+                        index: currentIndex,
+                        boardAddress: i,
+                        slotIndex: j,
+                        error: SlotError.INVALID_RESPONSE,
+                        message: "Invalid charge values detected",
+                      });
+                      index++; // Increment after using currentIndex
+                      continue;
+                    }
+
+                    if (currentCharge > totalCharge) {
+                      errors.push({
+                        index: currentIndex,
+                        boardAddress: i,
+                        slotIndex: j,
+                        error: SlotError.INVALID_RESPONSE,
+                        message:
+                          "Current charge cannot be greater than total charge",
+                      });
+                      index++; // Increment after using currentIndex
+                      continue;
+                    }
+
                     powerLevel = calculatePowerLevel(
-                      powerBankInfo?.currentCharge,
-                      powerBankInfo?.totalCharge
+                      currentCharge,
+                      totalCharge
                     );
                   } else {
                     errors.push({
-                      index: index++,
+                      index: currentIndex,
                       boardAddress: i,
                       slotIndex: j,
                       error: SlotError.STATUS_COMMAND_FAILED,
                       message: getStatusMessage(statusResponse.status),
                     });
+                    index++; // Increment after using currentIndex
                   }
                 } catch (error) {
                   errors.push({
-                    index: index++,
+                    index: currentIndex,
                     boardAddress: i,
                     slotIndex: j,
                     error: SlotError.CONNECTION_ERROR,
                     message:
                       error instanceof Error ? error.message : "Unknown error",
                   });
+                  index++; // Increment after using currentIndex
                 }
               }
 
@@ -107,16 +145,18 @@ program
                     }
                   : null,
                 isLocked: true,
-                index: index++,
+                index: currentIndex,
                 state: isAvailable ? SlotState.available : SlotState.empty,
                 disabled: false,
                 boardAddress: i,
                 slotIndex: j,
               });
+              // Increment after using currentIndex for the slot
+              index++;
             }
           } catch (error) {
             errors.push({
-              index: index++,
+              index: -1, // Use a new index for board-level errors
               boardAddress: i,
               slotIndex: -1,
               error: SlotError.INVALID_RESPONSE,
@@ -125,7 +165,7 @@ program
           }
         } else {
           errors.push({
-            index: index++,
+            index: -1, // Use a new index for board-level errors
             boardAddress: i,
             slotIndex: -1,
             error: SlotError.STATUS_COMMAND_FAILED,
@@ -288,8 +328,22 @@ program
 program
   .command("status")
   .description("Get the status of a powerbank in a slot")
-  .requiredOption("-b, --board <address>", "Board address (0-4)")
-  .requiredOption("-s, --slot <index>", "Slot index (0-5)")
+  .requiredOption("-b, --board <address>", "Board address (0-4)", (value) => {
+    const board = parseInt(value);
+    if (isNaN(board) || board < 0 || board > MAXIMUM_BOARD_ADDRESS) {
+      throw new Error(
+        `Board address must be between 0 and ${MAXIMUM_BOARD_ADDRESS}`
+      );
+    }
+    return value;
+  })
+  .requiredOption("-s, --slot <index>", "Slot index (0-5)", (value) => {
+    const slot = parseInt(value);
+    if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_INDEX) {
+      throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`);
+    }
+    return value;
+  })
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
