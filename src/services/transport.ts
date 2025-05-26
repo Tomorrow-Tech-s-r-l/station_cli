@@ -7,6 +7,28 @@ import {
   CRC_ALGORITHM,
 } from "../protocol/constants";
 
+/**
+ * Transport Protocol Implementation
+ *
+ * This class implements the serial communication protocol for the control module.
+ *
+ * Frame Structure:
+ * <SF> <address> <payload> <CRC16>
+ * - SF: Start Frame (0xEA)
+ * - address: 1 byte for board address
+ * - payload: Variable length command payload
+ * - CRC16: MODBUS CRC16 of (address + payload)
+ *
+ * Response Format:
+ * <msgType> <status> [<payload>]
+ * - msgType: Command type
+ * - status: Command execution status
+ * - payload: Optional response data
+ *
+ * Timing:
+ * - Frame is considered complete after 5ms from last byte
+ * - Inter-byte timeout is 5ms
+ */
 export class TransportProtocol {
   static buildFrame(payload: Buffer): Buffer {
     // Calculate CRC16 of address + payload

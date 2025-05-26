@@ -14,6 +14,28 @@ import {
 } from "./constants";
 import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
 
+/**
+ * Command Protocol Implementation
+ *
+ * This module implements the command protocol for the control module.
+ *
+ * Command Types:
+ * - STATUS (0x01): Get powerbank status in slot
+ * - SET_CHARGE (0x02): Enable/disable charging
+ * - RESET (0x03): Reset powerbank
+ * - SET_PDO (0x04): Set charging profile
+ * - SLOTS (0x05): Get slot status
+ * - UNLOCK (0x06): Unlock powerbank
+ * - SET_LED (0x07): Control LED
+ * - SET_PB_INFO (0x08): Set powerbank info
+ * - SET_PB_BATT_INFO (0x09): Set battery info
+ * - FW_VER (0x50): Get firmware version
+ *
+ * Each command has:
+ * - A builder class for constructing the command payload
+ * - A validator class for validating command parameters
+ * - Proper error handling and response parsing
+ */
 export type BoardCommand = {
   opCode: number;
   slotId?: number;
