@@ -11,6 +11,7 @@ import {
 import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
 import { getStatusMessage } from "./utils/status";
+import { calculatePowerLevel } from "./utils/power_level";
 
 import { Command } from "commander";
 import { SerialService } from "./services/serial";
@@ -73,12 +74,13 @@ program
                   const statusResponse = await statusCommand.execute(i, j);
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
-                    const total = parseInt(powerBankInfo?.totalCharge) || 0;
-                    const current = parseInt(powerBankInfo?.currentCharge) || 0;
-                    powerLevel =
-                      total > 0 ? Math.trunc((current / total) * 100) : 0;
+                    powerLevel = calculatePowerLevel(
+                      powerBankInfo?.currentCharge,
+                      powerBankInfo?.totalCharge
+                    );
                   } else {
                     errors.push({
+                      index: index++,
                       boardAddress: i,
                       slotIndex: j,
                       error: SlotError.STATUS_COMMAND_FAILED,
@@ -87,6 +89,7 @@ program
                   }
                 } catch (error) {
                   errors.push({
+                    index: index++,
                     boardAddress: i,
                     slotIndex: j,
                     error: SlotError.CONNECTION_ERROR,
@@ -113,6 +116,7 @@ program
             }
           } catch (error) {
             errors.push({
+              index: index++,
               boardAddress: i,
               slotIndex: -1,
               error: SlotError.INVALID_RESPONSE,
@@ -121,6 +125,7 @@ program
           }
         } else {
           errors.push({
+            index: index++,
             boardAddress: i,
             slotIndex: -1,
             error: SlotError.STATUS_COMMAND_FAILED,
@@ -299,7 +304,18 @@ program
       );
 
       if (response.success) {
-        console.log("Powerbank info:", JSON.parse(response.data.toString()));
+        const powerBankInfo = JSON.parse(response.data.toString());
+        const powerLevel = calculatePowerLevel(
+          powerBankInfo?.currentCharge,
+          powerBankInfo?.totalCharge
+        );
+
+        const result = {
+          ...powerBankInfo,
+          powerLevel,
+        };
+
+        console.log("Powerbank info:", result);
       } else {
         console.error("Command failed:", getStatusMessage(response.status));
         if (response.status === STATUS_ERR_INTERNAL) {

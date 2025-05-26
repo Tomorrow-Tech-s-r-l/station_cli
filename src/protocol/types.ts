@@ -91,6 +91,7 @@ export enum SlotError {
 }
 
 export interface SlotErrorInfo {
+  index: number;
   boardAddress: number;
   slotIndex: number;
   error: SlotError;
