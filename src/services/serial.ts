@@ -14,6 +14,7 @@ export class SerialService {
   private readonly FRAME_RECEIVE_DELAY_MS = 5; // 5ms delay after last byte
   private readonly INTER_BYTE_TIMEOUT_MS = 5; // 5ms inter-byte timeout
   private readonly MAX_RETRIES = 5; // Maximum number of retry attempts
+  private readonly RETRY_DELAY_MS = 1000; // Delay between retries
 
   constructor(private portPath: string) {
     debug.info(`Initializing SerialService with port: ${portPath}`);
@@ -191,8 +192,10 @@ export class SerialService {
         );
 
         if (attempt < this.MAX_RETRIES) {
-          // Add a small delay between retries (100ms)
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          // Add a small delay between retries to ensure data is sent
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.RETRY_DELAY_MS)
+          );
           debug.info(
             `Retrying message... (${attempt + 1}/${this.MAX_RETRIES})`
           );
