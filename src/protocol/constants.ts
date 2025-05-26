@@ -25,7 +25,7 @@ export const STATUS_ERR_INTERNAL = 0x04;
 export const STATUS_ERR_INVALID_RESPONSE = 0x80;
 
 // Slot Status
-export const SLOT_LOCKED = 0; // 0 = locked
+export const SLOT_LOCKED = 0;
 
 // Powerbank Status
 export const PB_STATUS_IDLE = 1;

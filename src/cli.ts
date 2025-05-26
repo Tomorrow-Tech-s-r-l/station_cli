@@ -64,7 +64,7 @@ program
             debug.success("Slots status: ", slotsInfo);
 
             for (let j = 0; j < 6; j++) {
-              const isAvailable = slotsInfo.filledSlots[j] == SLOT_LOCKED;
+              const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
               let powerBankInfo = null;
               let powerLevel = 0;
 
