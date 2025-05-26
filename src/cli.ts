@@ -12,17 +12,15 @@ import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
 import { getStatusMessage } from "./utils/status";
 
-const { Command } = require("commander");
-const { SerialService } = require("./services/serial");
-const { SlotsCommand } = require("./cli/commands/slots");
-const { StatusCommand } = require("./cli/commands/status");
-const { UnlockCommand } = require("./cli/commands/unlock");
-const { ChargeCommand } = require("./cli/commands/charge");
-const packageJson = require("../package.json");
-const { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } = require("./protocol/constants");
-const {
-  InitializePowerbankCommand,
-} = require("./cli/commands/initialize_powerbank");
+import { Command } from "commander";
+import { SerialService } from "./services/serial";
+import { SlotsCommand } from "./cli/commands/slots";
+import { StatusCommand } from "./cli/commands/status";
+import { UnlockCommand } from "./cli/commands/unlock";
+import { ChargeCommand } from "./cli/commands/charge";
+import packageJson from "../package.json";
+import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
+import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
 
 interface CommandOptions {
   port: string;
@@ -213,7 +211,14 @@ program
   .command("charge")
   .description("Enable or disable charging for a specific slot")
   .requiredOption("-i, --index <index>", "Slot index (1-30)")
-  .requiredOption("-e, --enable <enable>", "Enable charging (true/false)")
+  .requiredOption(
+    "-e, --enable <enable>",
+    "Enable charging (true/false)",
+    (value) => {
+      return value === "true" || value === "false";
+    },
+    false
+  )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
@@ -224,7 +229,7 @@ program
       const command = new ChargeCommand(service);
       const response = await command.execute(
         parseInt(options.index),
-        options.enable
+        !!options.enable
       );
 
       const endTime = Date.now();
