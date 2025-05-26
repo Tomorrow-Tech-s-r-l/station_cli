@@ -26,6 +26,7 @@ import { ChargeCommand } from "./cli/commands/charge";
 import packageJson from "../package.json";
 import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
+import { mapBoardToSlot } from "./utils/slot_mapping";
 
 interface CommandOptions {
   port: string;
@@ -51,7 +52,6 @@ program
     try {
       const slots: SlotServer[] = [];
       const errors: SlotErrorInfo[] = [];
-      let index = 1;
 
       const port = await selectPort();
       const service = new SerialService(port);
@@ -69,7 +69,6 @@ program
             debug.success("Slots status: ", slotsInfo);
 
             for (let j = 0; j <= MAXIMUM_SLOT_INDEX; j++) {
-              const currentIndex = index;
               const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
               let powerBankInfo = null;
               let powerLevel = 0;
@@ -85,56 +84,28 @@ program
                     const totalCharge =
                       parseInt(powerBankInfo?.totalCharge) || 0;
 
-                    if (currentCharge < 0 || totalCharge < 0) {
-                      errors.push({
-                        index: currentIndex,
-                        boardAddress: i,
-                        slotIndex: j,
-                        error: SlotError.INVALID_RESPONSE,
-                        message: "Invalid charge values detected",
-                      });
-                      index++; // Increment after using currentIndex
-                      continue;
-                    }
-
-                    if (currentCharge > totalCharge) {
-                      errors.push({
-                        index: currentIndex,
-                        boardAddress: i,
-                        slotIndex: j,
-                        error: SlotError.INVALID_RESPONSE,
-                        message:
-                          "Current charge cannot be greater than total charge",
-                      });
-                      index++; // Increment after using currentIndex
-                      continue;
-                    }
-
                     powerLevel = calculatePowerLevel(
                       currentCharge,
                       totalCharge
                     );
                   } else {
                     errors.push({
-                      index: currentIndex,
+                      index: mapBoardToSlot(i, j),
                       boardAddress: i,
                       slotIndex: j,
                       error: SlotError.STATUS_COMMAND_FAILED,
                       message: getStatusMessage(statusResponse.status),
                     });
-                    index++; // Increment after using currentIndex
                   }
                 } catch (error) {
                   errors.push({
-                    index: currentIndex,
+                    index: mapBoardToSlot(i, j),
                     boardAddress: i,
                     slotIndex: j,
                     error: SlotError.CONNECTION_ERROR,
                     message:
                       error instanceof Error ? error.message : "Unknown error",
                   });
-                  // Increment after using currentIndex
-                  index++;
                 }
               }
 
@@ -146,14 +117,12 @@ program
                     }
                   : null,
                 isLocked: true,
-                index: currentIndex,
+                index: mapBoardToSlot(i, j),
                 state: isAvailable ? SlotState.available : SlotState.empty,
                 disabled: false,
                 boardAddress: i,
                 slotIndex: j,
               });
-              // Increment after using currentIndex for the slot
-              index++;
             }
           } catch (error) {
             errors.push({
@@ -161,7 +130,9 @@ program
               boardAddress: i,
               slotIndex: -1,
               error: SlotError.INVALID_RESPONSE,
-              message: "Failed to parse slots info response",
+              message:
+                "Failed to parse slots info response: " +
+                (error instanceof Error ? error.message : "Unknown error"),
             });
           }
         } else {
