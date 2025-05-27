@@ -303,8 +303,6 @@ program
     }
   });
 
-/// DEBUG COMMANDS ///
-
 // Status command used to get the status of a powerbank in a specific board and slot
 program
   .command("status")
