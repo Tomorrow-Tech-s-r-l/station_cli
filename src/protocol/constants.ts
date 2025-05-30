@@ -38,7 +38,7 @@ export const PB_STATUS_CUTOFF = 5;
 export const MAXIMUM_BOARD_ADDRESS = 4;
 export const MAXIMUM_SLOT_INDEX = 5;
 export const MINIMUM_POWER_LEVEL = 0;
-export const MAXIMUM_POWER_FOR_CHARGING = 100;
+export const MAXIMUM_POWER_LEVEL = 100;
 export const MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD = 1;
 
 // LED Colors

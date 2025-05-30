@@ -2,7 +2,7 @@
 
 import {
   MAXIMUM_BOARD_ADDRESS,
-  MAXIMUM_POWER_FOR_CHARGING,
+  MAXIMUM_POWER_LEVEL,
   MAXIMUM_SLOT_INDEX,
   SLOT_LOCKED,
 } from "./protocol/constants";
@@ -104,10 +104,7 @@ program
                     );
 
                     // Enable charging
-                    if (
-                      powerLevel < MAXIMUM_POWER_FOR_CHARGING &&
-                      !chargingEnabled
-                    ) {
+                    if (powerLevel < MAXIMUM_POWER_LEVEL && !chargingEnabled) {
                       await chargeCommand.execute(mapBoardToSlot(i, j), true);
                       chargingEnabled = true;
                     } else {

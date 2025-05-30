@@ -5,7 +5,7 @@ import {
   MAXIMUM_BOARD_ADDRESS,
   MAXIMUM_SLOT_INDEX,
   MINIMUM_POWER_LEVEL,
-  MAXIMUM_POWER_FOR_TURING_OFF,
+  MAXIMUM_POWER_LEVEL,
 } from "../protocol/constants";
 
 export const validateBoardAddress = (value: string) => {
@@ -31,10 +31,10 @@ export const validatePowerLevel = (value: string) => {
   if (
     isNaN(power) ||
     power < MINIMUM_POWER_LEVEL ||
-    power > MAXIMUM_POWER_FOR_TURING_OFF
+    power > MAXIMUM_POWER_LEVEL
   ) {
     throw new Error(
-      `Power level must be between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_FOR_TURING_OFF}`
+      `Power level must be between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_LEVEL}`
     );
   }
   return power;
@@ -166,15 +166,15 @@ export const promptPowerLevel = async (): Promise<number> => {
     {
       type: "input",
       name: "power",
-      message: `Enter power level (${MINIMUM_POWER_LEVEL}-${MAXIMUM_POWER_FOR_TURING_OFF}):`,
+      message: `Enter power level (${MINIMUM_POWER_LEVEL}-${MAXIMUM_POWER_LEVEL}):`,
       validate: (input: string) => {
         const value = parseInt(input);
         if (
           isNaN(value) ||
           value < MINIMUM_POWER_LEVEL ||
-          value > MAXIMUM_POWER_FOR_TURING_OFF
+          value > MAXIMUM_POWER_LEVEL
         ) {
-          return `Please enter a number between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_FOR_TURING_OFF}`;
+          return `Please enter a number between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_LEVEL}`;
         }
         return true;
       },
