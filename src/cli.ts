@@ -2,6 +2,7 @@
 
 import {
   MAXIMUM_BOARD_ADDRESS,
+  MAXIMUM_POWER_FOR_CHARGING,
   MAXIMUM_SLOT_INDEX,
   SLOT_LOCKED,
 } from "./protocol/constants";
@@ -64,6 +65,7 @@ program
       const command = new SlotsCommand(service);
       const statusCommand = new StatusCommand(service);
       const ledCommand = new LedCommand(service);
+      const chargeCommand = new ChargeCommand(service);
 
       for (let i = 0; i <= MAXIMUM_BOARD_ADDRESS; i++) {
         const response = await command.execute(i);
@@ -72,6 +74,9 @@ program
           try {
             const slotsInfo = JSON.parse(response.data.toString());
             debug.success("Slots status: ", slotsInfo);
+
+            // Charging already enabled for all slots
+            let chargingEnabled = false;
 
             for (let j = 0; j <= MAXIMUM_SLOT_INDEX; j++) {
               const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
@@ -97,6 +102,18 @@ program
                       currentCharge,
                       totalCharge
                     );
+
+                    // Enable charging
+                    if (
+                      powerLevel < MAXIMUM_POWER_FOR_CHARGING &&
+                      !chargingEnabled
+                    ) {
+                      await chargeCommand.execute(mapBoardToSlot(i, j), true);
+                      chargingEnabled = true;
+                    } else {
+                      await chargeCommand.execute(mapBoardToSlot(i, j), false);
+                      chargingEnabled = false;
+                    }
                   } else {
                     errors.push({
                       index: mapBoardToSlot(i, j),
@@ -137,6 +154,9 @@ program
                 slotIndex: j,
               });
             }
+
+            // Reset charging enabled
+            chargingEnabled = false;
           } catch (error) {
             errors.push({
               index: -1,
