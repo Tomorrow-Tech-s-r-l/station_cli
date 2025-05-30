@@ -80,7 +80,7 @@ program
 
               if (isAvailable) {
                 // Turn on led for available slot
-                await ledCommand.execute(j, true);
+                await ledCommand.execute(mapBoardToSlot(i, j), true);
 
                 // Get status of powerbank
                 try {
@@ -251,9 +251,11 @@ program
     "-e, --enable <enable>",
     "Enable charging (true/false)",
     (value) => {
-      return value === "true" || value === "false";
-    },
-    false
+      if (value !== "true" && value !== "false") {
+        throw new Error('Enable value must be either "true" or "false"');
+      }
+      return value;
+    }
   )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
@@ -278,7 +280,7 @@ program
         slotIndex: parseInt(options.index),
         boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
         slotInBoard: (parseInt(options.index) - 1) % 6,
-        chargingEnabled: !!options.enable,
+        chargingEnabled: options.enable === "true" ? true : false,
         error: response.success
           ? null
           : {
@@ -322,9 +324,11 @@ program
     "-e, --enable <enable>",
     "Enable led (true/false)",
     (value) => {
-      return value === "true" || value === "false";
-    },
-    false
+      if (value !== "true" && value !== "false") {
+        throw new Error('Enable value must be either "true" or "false"');
+      }
+      return value;
+    }
   )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
