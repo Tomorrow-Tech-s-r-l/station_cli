@@ -27,6 +27,7 @@ import packageJson from "../package.json";
 import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
 import { mapBoardToSlot } from "./utils/slot_mapping";
+import { LedCommand } from "./cli/commands/led";
 
 // Add delay utility function
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,7 +37,7 @@ interface CommandOptions {
   board: string;
   slot: string;
   index: string;
-  enable?: boolean;
+  enable?: string;
 }
 
 const program = new Command();
@@ -62,6 +63,7 @@ program
 
       const command = new SlotsCommand(service);
       const statusCommand = new StatusCommand(service);
+      const ledCommand = new LedCommand(service);
 
       for (let i = 0; i <= MAXIMUM_BOARD_ADDRESS; i++) {
         const response = await command.execute(i);
@@ -77,9 +79,11 @@ program
               let powerLevel = 0;
 
               if (isAvailable) {
+                // Turn on led for available slot
+                await ledCommand.execute(j, true);
+
+                // Get status of powerbank
                 try {
-                  // Add a small delay before each status check to avoid race conditions
-                  await delay(100);
                   const statusResponse = await statusCommand.execute(i, j);
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
@@ -192,6 +196,12 @@ program
       const endTime = Date.now();
       const executionTime = endTime - startTime;
 
+      if (response.success) {
+        // Turn off led for unlocked slot
+        const ledCommand = new LedCommand(service);
+        await ledCommand.execute(parseInt(options.index), false);
+      }
+
       const result = {
         success: response.success,
         executionTimeMs: executionTime,
@@ -255,7 +265,7 @@ program
       const command = new ChargeCommand(service);
       const response = await command.execute(
         parseInt(options.index),
-        !!options.enable
+        options.enable === "true" ? true : false
       );
 
       const endTime = Date.now();
@@ -299,6 +309,66 @@ program
       };
 
       console.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+  });
+
+// Turn on/off led for a specific slot
+program
+  .command("led")
+  .description("Turn on/off led for a specific slot")
+  .requiredOption("-i, --index <index>", "Slot index (1-30)")
+  .requiredOption(
+    "-e, --enable <enable>",
+    "Enable led (true/false)",
+    (value) => {
+      return value === "true" || value === "false";
+    },
+    false
+  )
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      const port = await selectPort();
+      const service = new SerialService(port);
+      await service.connect();
+
+      const command = new LedCommand(service);
+      console.log(
+        "Enable value:",
+        options.enable,
+        "Type:",
+        typeof options.enable
+      );
+      const response = await command.execute(
+        parseInt(options.index),
+        options.enable === "true" ? true : false
+      );
+
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const result = {
+        success: response.success,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
+        slotInBoard: (parseInt(options.index) - 1) % 6,
+        ledEnabled: !!options.enable,
+        error: response.success
+          ? null
+          : {
+              code: response.status,
+              message: getStatusMessage(response.status),
+            },
+      };
+
+      console.log(JSON.stringify(result, null, 2));
+
+      await service.disconnect();
+    } catch (error) {
+      console.error("Error:", error);
       process.exit(1);
     }
   });
