@@ -139,6 +139,7 @@ program
                       powerLevel: powerLevel,
                     }
                   : null,
+                isCharging: chargingEnabled,
                 isLocked: true,
                 index: mapBoardToSlot(i, j),
                 //TODO: Momentarily we check if the powerBankInfo is null due to error on the return of command slotsInfo.lockedSlots[j]

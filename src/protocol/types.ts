@@ -65,6 +65,7 @@ export interface PowerBankServer {
 
 export interface SlotServer {
   powerBank: PowerBankServer | null;
+  isCharging: boolean;
   isLocked: boolean;
   index: number;
   state: string;
