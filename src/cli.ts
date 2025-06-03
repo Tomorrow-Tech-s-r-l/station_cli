@@ -7,11 +7,11 @@ import {
   SLOT_LOCKED,
 } from "./protocol/constants";
 import {
-  SlotServer,
   SlotState,
   SlotError,
   SlotErrorInfo,
   SlotsResponse,
+  SlotsInfo,
 } from "./protocol/types";
 import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
@@ -55,7 +55,7 @@ program
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
-      const slots: SlotServer[] = [];
+      const slots: SlotsInfo[] = [];
       const errors: SlotErrorInfo[] = [];
 
       const port = await selectPort();

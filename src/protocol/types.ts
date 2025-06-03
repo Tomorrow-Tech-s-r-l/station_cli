@@ -63,7 +63,7 @@ export interface PowerBankServer {
   powerLevel: number;
 }
 
-export interface SlotServer {
+export interface SlotsInfo {
   powerBank: PowerBankServer | null;
   isCharging: boolean;
   isLocked: boolean;
@@ -101,7 +101,7 @@ export interface SlotErrorInfo {
 }
 
 export interface SlotsResponse {
-  slots: SlotServer[];
+  slots: SlotsInfo[];
   errors: SlotErrorInfo[];
   executionTimeMs: number;
   timestamp: string;
