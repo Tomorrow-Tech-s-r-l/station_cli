@@ -4,22 +4,27 @@ import {
   CommandResponse,
   PowerbankInfo,
 } from "../../protocol/types";
-import { CMD_STATUS_CODE, MAXIMUM_SLOT_INDEX } from "../../protocol/constants";
+import {
+  CMD_STATUS_CODE,
+  MAXIMUM_SLOT_ADDRESS,
+} from "../../protocol/constants";
 import { Buffer } from "buffer";
 
 export class StatusCommand extends BaseCommand {
   async execute(
     boardAddress: number,
-    slotIndex: number
+    slotAddress: number
   ): Promise<CommandResponse> {
-    if (slotIndex < 0 || slotIndex > MAXIMUM_SLOT_INDEX) {
-      throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`);
+    if (slotAddress < 0 || slotAddress > MAXIMUM_SLOT_ADDRESS) {
+      throw new Error(
+        `Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
+      );
     }
 
     const message: SerialMessage = {
       boardAddress,
       command: CMD_STATUS_CODE,
-      data: Buffer.from([slotIndex]),
+      data: Buffer.from([slotAddress]),
     };
 
     const response = await this.executeCommand(message);

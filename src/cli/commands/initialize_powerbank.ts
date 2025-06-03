@@ -1,6 +1,9 @@
 import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
-import { CMD_SET_INFO_PWB, MAXIMUM_SLOT_INDEX } from "../../protocol/constants";
+import {
+  CMD_SET_INFO_PWB,
+  MAXIMUM_SLOT_ADDRESS,
+} from "../../protocol/constants";
 import { Buffer } from "buffer";
 
 interface InitializePowerbankParams {
@@ -12,11 +15,13 @@ interface InitializePowerbankParams {
 export class InitializePowerbankCommand extends BaseCommand {
   async execute(
     boardAddress: number,
-    slotIndex: number,
+    slotAddress: number,
     params: InitializePowerbankParams = {}
   ): Promise<CommandResponse> {
-    if (slotIndex < 0 || slotIndex > MAXIMUM_SLOT_INDEX) {
-      throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`);
+    if (slotAddress < 0 || slotAddress > MAXIMUM_SLOT_ADDRESS) {
+      throw new Error(
+        `Slot address must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
+      );
     }
 
     if (!params.serialNumber || params.serialNumber.length !== 10) {
@@ -32,7 +37,7 @@ export class InitializePowerbankCommand extends BaseCommand {
     }
 
     const data = Buffer.concat([
-      Buffer.from([slotIndex]),
+      Buffer.from([slotAddress]),
       Buffer.from(params.serialNumber.padEnd(10, "\0"), "utf8"),
       Buffer.alloc(4), // Reserve space for timestamp
       Buffer.alloc(2), // Reserve space for cycles

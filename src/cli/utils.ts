@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { SerialService } from "../services/serial";
 import {
   MAXIMUM_BOARD_ADDRESS,
-  MAXIMUM_SLOT_INDEX,
+  MAXIMUM_SLOT_ADDRESS,
   MINIMUM_POWER_LEVEL,
   MAXIMUM_POWER_LEVEL,
 } from "../protocol/constants";
@@ -18,13 +18,14 @@ export const validateBoardAddress = (value: string) => {
   return address;
 };
 
-export const validateSlotIndex = (value: string) => {
+/*
+export const validateSlotAddress = (value: string) => {
   const slot = parseInt(value);
-  if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_INDEX) {
-    throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`);
+  if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_ADDRESS) {
+    throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`);
   }
   return slot;
-};
+};*/
 
 export const validatePowerLevel = (value: string) => {
   const power = parseInt(value);
@@ -143,7 +144,7 @@ export const promptBoardAddress = async (): Promise<number> => {
   return parseInt(board);
 };
 
-export const promptSlotIndex = async (): Promise<number> => {
+/*export const promptSlotAddress = async (): Promise<number> => {
   const { slot } = await inquirer.prompt([
     {
       type: "input",
@@ -151,15 +152,15 @@ export const promptSlotIndex = async (): Promise<number> => {
       message: "Enter slot index (0-6):",
       validate: (input: string) => {
         const value = parseInt(input);
-        if (isNaN(value) || value < 0 || value > MAXIMUM_SLOT_INDEX) {
-          return `Please enter a number between 0 and ${MAXIMUM_SLOT_INDEX}`;
+        if (isNaN(value) || value < 0 || value > MAXIMUM_SLOT_ADDRESS) {
+          return `Please enter a number between 0 and ${MAXIMUM_SLOT_ADDRESS}`;
         }
         return true;
       },
     },
   ]);
   return parseInt(slot);
-};
+};*/
 
 export const promptPowerLevel = async (): Promise<number> => {
   const { power } = await inquirer.prompt([
