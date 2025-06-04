@@ -143,6 +143,8 @@ program
                       error instanceof Error ? error.message : "Unknown error",
                   });
                 }
+              } else {
+                chargingEnabled = false;
               }
 
               slots.push({
