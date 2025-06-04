@@ -42,6 +42,7 @@ interface CommandOptions {
   slot: string;
   index: string;
   enable?: string;
+  addresses?: string;
 }
 
 const program = new Command();
@@ -55,6 +56,10 @@ program
 program
   .command("slots")
   .description("Get status of all slots")
+  .option(
+    "-a, --addresses <addresses>",
+    `Total addresses (0-${MAXIMUM_BOARD_ADDRESS})`
+  )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
@@ -70,7 +75,12 @@ program
       const ledCommand = new LedCommand(service);
       const chargeCommand = new ChargeCommand(service);
 
-      for (let i = 0; i <= MAXIMUM_BOARD_ADDRESS; i++) {
+      const totalAddresses =
+        options.addresses !== undefined
+          ? parseInt(options.addresses)
+          : MAXIMUM_BOARD_ADDRESS;
+
+      for (let i = 0; i <= totalAddresses; i++) {
         const response = await command.execute(i);
 
         if (response.success) {
