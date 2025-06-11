@@ -373,12 +373,7 @@ program
       await service.connect();
 
       const command = new LedCommand(service);
-      console.log(
-        "Enable value:",
-        options.enable,
-        "Type:",
-        typeof options.enable
-      );
+
       const response = await command.execute(
         parseInt(options.index),
         options.enable === "true" ? true : false
