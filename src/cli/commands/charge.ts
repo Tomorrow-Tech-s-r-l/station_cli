@@ -8,8 +8,6 @@ export class ChargeCommand extends BaseCommand {
   async execute(slotIndex: number, enable: boolean): Promise<CommandResponse> {
     const { boardAddress, slotInBoard } = mapSlotToBoard(slotIndex);
 
-    console.log("ChargeCommand executing with enable value:", enable);
-
     const message: SerialMessage = {
       boardAddress,
       command: CMD_SET_CHARGE_CODE,
