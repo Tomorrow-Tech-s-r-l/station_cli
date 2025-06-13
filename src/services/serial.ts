@@ -12,8 +12,6 @@ export class SerialService {
   private responseResolver: ((value: Buffer) => void) | null = null;
   private readonly responseTimeout = 2000; // 2 second timeout
   private readonly INTER_BYTE_TIMEOUT_MS = 20; // 5ms inter-byte timeout
-  private readonly MAX_RETRIES = 1; // Maximum number of retry attempts
-  private readonly RETRY_DELAY_MS = 1000; // Delay between retries
 
   constructor(private portPath: string) {
     debug.info(`Initializing SerialService with port: ${portPath}`);
@@ -173,50 +171,7 @@ export class SerialService {
   }
 
   async sendMessage(message: SerialMessage): Promise<Buffer> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
-      try {
-        debug.info(`Attempt ${attempt}/${this.MAX_RETRIES} to send message`);
-        const response = await this.attemptSendMessage(message);
-        if (attempt > 1) {
-          debug.success(`Message sent successfully on attempt ${attempt}`);
-        }
-        return response;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        debug.error(
-          `Attempt ${attempt}/${this.MAX_RETRIES} failed:`,
-          lastError
-        );
-
-        if (attempt < this.MAX_RETRIES) {
-          // Flush the port before retrying
-          if (this.port) {
-            await new Promise<void>((resolve, reject) => {
-              this.port!.flush((err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
-          }
-          // Add a small delay between retries
-          await new Promise((resolve) =>
-            setTimeout(resolve, this.RETRY_DELAY_MS)
-          );
-          debug.info(
-            `Retrying message... (${attempt + 1}/${this.MAX_RETRIES})`
-          );
-        }
-      }
-    }
-
-    // If we get here, all retries failed
-    debug.error(
-      `All ${this.MAX_RETRIES} attempts failed. Last error:`,
-      lastError
-    );
-    throw lastError || new Error("Failed to send message after all retries");
+    return await this.attemptSendMessage(message);
   }
 
   async listPorts(): Promise<string[]> {
