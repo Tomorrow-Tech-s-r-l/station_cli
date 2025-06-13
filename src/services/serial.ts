@@ -11,9 +11,8 @@ export class SerialService {
   private parser: InterByteTimeoutParser | null = null;
   private responseResolver: ((value: Buffer) => void) | null = null;
   private readonly responseTimeout = 2000; // 2 second timeout
-  private readonly FRAME_RECEIVE_DELAY_MS = 5; // 5ms delay after last byte
-  private readonly INTER_BYTE_TIMEOUT_MS = 5; // 5ms inter-byte timeout
-  private readonly MAX_RETRIES = 5; // Maximum number of retry attempts
+  private readonly INTER_BYTE_TIMEOUT_MS = 20; // 5ms inter-byte timeout
+  private readonly MAX_RETRIES = 1; // Maximum number of retry attempts
   private readonly RETRY_DELAY_MS = 1000; // Delay between retries
 
   constructor(private portPath: string) {
@@ -75,12 +74,7 @@ export class SerialService {
                 "Successfully parsed response frame:",
                 payload.toString("hex")
               );
-              // Wait 5ms after last byte as per protocol
-              setTimeout(() => {
-                if (this.responseResolver) {
-                  this.responseResolver(payload);
-                }
-              }, this.FRAME_RECEIVE_DELAY_MS);
+              this.responseResolver(payload);
             } else {
               debug.error("Failed to parse frame");
             }
@@ -156,6 +150,11 @@ export class SerialService {
         }
         const msgType = response[0];
         const status = response[1];
+        debug.info("Response:", {
+          msgType,
+          status,
+          response: response.toString("hex"),
+        });
 
         // Accept response regardless of payload presence
         resolve(response);
