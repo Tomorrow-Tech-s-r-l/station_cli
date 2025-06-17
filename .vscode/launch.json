@@ -27,12 +27,12 @@
         {
       "type": "node",
       "request": "launch",
-      "name": "Debug: Slots with 1 board",
+      "name": "Debug: Slots with 2 boards",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "slots",
-        "-a", "0"
+        "-a", "1"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],

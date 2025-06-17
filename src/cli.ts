@@ -96,10 +96,10 @@ program
               let powerBankInfo = null;
               let powerLevel = 0;
 
-              if (isAvailable) {
-                // Turn on led for available slot
-                await ledCommand.execute(mapBoardToSlot(i, j), true);
+              // Turn on led for available slot
+              await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
 
+              if (isAvailable) {
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);

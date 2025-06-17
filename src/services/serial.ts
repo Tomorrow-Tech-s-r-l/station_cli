@@ -55,7 +55,7 @@ export class SerialService {
           return;
         }
 
-        // Setup parser with 5ms inter-byte timeout (matching protocol)
+        // Setup parser with inter-byte timeout (matching protocol)
         this.parser = this.port.pipe(
           new InterByteTimeoutParser({ interval: this.INTER_BYTE_TIMEOUT_MS })
         );
