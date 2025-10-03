@@ -4,7 +4,7 @@ import {
   CMD_SET_INFO_PWB,
   MAXIMUM_SLOT_ADDRESS,
 } from "../../protocol/constants";
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 
 interface InitializePowerbankParams {
   serialNumber?: string;

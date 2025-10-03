@@ -414,7 +414,7 @@ program
   .requiredOption(
     "-b, --board <address>",
     `Board address (0-${MAXIMUM_BOARD_ADDRESS})`,
-    (value) => {
+    (value: string) => {
       const board = parseInt(value);
       if (isNaN(board) || board < 0 || board > MAXIMUM_BOARD_ADDRESS) {
         throw new Error(
@@ -427,7 +427,7 @@ program
   .requiredOption(
     "-s, --slot <address>",
     `Slot value (0-${MAXIMUM_SLOT_ADDRESS})`,
-    (value) => {
+    (value: string) => {
       const slot = parseInt(value);
       if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_ADDRESS) {
         throw new Error(

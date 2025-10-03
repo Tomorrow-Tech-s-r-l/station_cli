@@ -38,11 +38,12 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^22.15.21",
+    "pkg": "^5.8.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3",
-    "pkg": "^5.8.1"
+    "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@serialport/parser-inter-byte-timeout": "^13.0.0",
     "@types/inquirer": "^9.0.8",
     "chalk": "^4.1.2",
     "commander": "^14.0.0",

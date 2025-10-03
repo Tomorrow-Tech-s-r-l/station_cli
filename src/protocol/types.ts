@@ -1,4 +1,4 @@
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 
 // Basic message structure
 export interface SerialMessage {

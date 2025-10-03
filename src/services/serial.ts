@@ -41,7 +41,7 @@ export class SerialService {
         return;
       }
 
-      this.port.open((err) => {
+      this.port.open((err: any) => {
         if (err) {
           debug.error("Connection failed:", err);
           reject(err);
@@ -113,7 +113,7 @@ export class SerialService {
 
     // Flush any existing data before sending
     await new Promise<void>((resolve, reject) => {
-      this.port!.flush((err) => {
+      this.port!.flush((err: any) => {
         if (err) reject(err);
         else resolve();
       });
@@ -158,7 +158,7 @@ export class SerialService {
         resolve(response);
       };
 
-      this.port!.write(frame, (err) => {
+      this.port!.write(frame, (err: any) => {
         if (err) {
           cleanup();
           debug.error("Write failed:", err);
@@ -176,8 +176,8 @@ export class SerialService {
 
   async listPorts(): Promise<string[]> {
     const { SerialPort } = await import("serialport");
-    return await SerialPort.list().then((ports) =>
-      ports.map((port) => port.path)
+    return await SerialPort.list().then((ports: any[]) =>
+      ports.map((port: any) => port.path)
     );
   }
 }

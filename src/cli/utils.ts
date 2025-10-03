@@ -123,6 +123,8 @@ export const selectAndConnectPort = async (): Promise<{
       "\n  3. The device is properly connected"
     );
     process.exit(1);
+    // This line will never be reached due to process.exit(1)
+    throw error;
   }
 };
 
