@@ -3,9 +3,9 @@ import chalk from "chalk";
 import { SerialService } from "../services/serial";
 import {
   MAXIMUM_BOARD_ADDRESS,
-  MAXIMUM_SLOT_INDEX,
+  MAXIMUM_SLOT_ADDRESS,
   MINIMUM_POWER_LEVEL,
-  MAXIMUM_POWER_FOR_TURING_OFF,
+  MAXIMUM_POWER_LEVEL,
 } from "../protocol/constants";
 
 export const validateBoardAddress = (value: string) => {
@@ -18,23 +18,24 @@ export const validateBoardAddress = (value: string) => {
   return address;
 };
 
-export const validateSlotIndex = (value: string) => {
+/*
+export const validateSlotAddress = (value: string) => {
   const slot = parseInt(value);
-  if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_INDEX) {
-    throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`);
+  if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_ADDRESS) {
+    throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`);
   }
   return slot;
-};
+};*/
 
 export const validatePowerLevel = (value: string) => {
   const power = parseInt(value);
   if (
     isNaN(power) ||
     power < MINIMUM_POWER_LEVEL ||
-    power > MAXIMUM_POWER_FOR_TURING_OFF
+    power > MAXIMUM_POWER_LEVEL
   ) {
     throw new Error(
-      `Power level must be between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_FOR_TURING_OFF}`
+      `Power level must be between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_LEVEL}`
     );
   }
   return power;
@@ -122,6 +123,8 @@ export const selectAndConnectPort = async (): Promise<{
       "\n  3. The device is properly connected"
     );
     process.exit(1);
+    // This line will never be reached due to process.exit(1)
+    throw error;
   }
 };
 
@@ -143,7 +146,7 @@ export const promptBoardAddress = async (): Promise<number> => {
   return parseInt(board);
 };
 
-export const promptSlotIndex = async (): Promise<number> => {
+/*export const promptSlotAddress = async (): Promise<number> => {
   const { slot } = await inquirer.prompt([
     {
       type: "input",
@@ -151,30 +154,30 @@ export const promptSlotIndex = async (): Promise<number> => {
       message: "Enter slot index (0-6):",
       validate: (input: string) => {
         const value = parseInt(input);
-        if (isNaN(value) || value < 0 || value > MAXIMUM_SLOT_INDEX) {
-          return `Please enter a number between 0 and ${MAXIMUM_SLOT_INDEX}`;
+        if (isNaN(value) || value < 0 || value > MAXIMUM_SLOT_ADDRESS) {
+          return `Please enter a number between 0 and ${MAXIMUM_SLOT_ADDRESS}`;
         }
         return true;
       },
     },
   ]);
   return parseInt(slot);
-};
+};*/
 
 export const promptPowerLevel = async (): Promise<number> => {
   const { power } = await inquirer.prompt([
     {
       type: "input",
       name: "power",
-      message: `Enter power level (${MINIMUM_POWER_LEVEL}-${MAXIMUM_POWER_FOR_TURING_OFF}):`,
+      message: `Enter power level (${MINIMUM_POWER_LEVEL}-${MAXIMUM_POWER_LEVEL}):`,
       validate: (input: string) => {
         const value = parseInt(input);
         if (
           isNaN(value) ||
           value < MINIMUM_POWER_LEVEL ||
-          value > MAXIMUM_POWER_FOR_TURING_OFF
+          value > MAXIMUM_POWER_LEVEL
         ) {
-          return `Please enter a number between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_FOR_TURING_OFF}`;
+          return `Please enter a number between ${MINIMUM_POWER_LEVEL} and ${MAXIMUM_POWER_LEVEL}`;
         }
         return true;
       },

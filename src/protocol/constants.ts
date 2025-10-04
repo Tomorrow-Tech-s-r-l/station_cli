@@ -26,6 +26,8 @@ export const STATUS_ERR_INVALID_RESPONSE = 0x80;
 
 // Slot Status
 export const SLOT_LOCKED = 0;
+export const SLOT_INDEX_MINIMUM = 1;
+export const SLOT_INDEX_MAXIMUM = 30;
 
 // Powerbank Status
 export const PB_STATUS_IDLE = 1;
@@ -36,9 +38,10 @@ export const PB_STATUS_CUTOFF = 5;
 
 // Limits
 export const MAXIMUM_BOARD_ADDRESS = 4;
-export const MAXIMUM_SLOT_INDEX = 5;
+export const MAXIMUM_SLOT_ADDRESS = 5;
 export const MINIMUM_POWER_LEVEL = 0;
-export const MAXIMUM_POWER_FOR_TURING_OFF = 255;
+export const MAXIMUM_POWER_LEVEL = 100;
+export const MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD = 1;
 
 // LED Colors
 export const LED_COLOR_RED = 0;

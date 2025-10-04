@@ -1,4 +1,4 @@
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 import { debug } from "../utils/debug";
 import { crc16 } from "easy-crc";
 import {

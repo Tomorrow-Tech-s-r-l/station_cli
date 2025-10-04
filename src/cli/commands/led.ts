@@ -2,7 +2,7 @@ import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
 import { CMD_SET_LED_CODE } from "../../protocol/constants";
 import { mapSlotToBoard } from "../../utils/slot_mapping";
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 
 export class LedCommand extends BaseCommand {
   async execute(slotIndex: number, state: boolean): Promise<CommandResponse> {

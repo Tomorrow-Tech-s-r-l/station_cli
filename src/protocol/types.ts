@@ -1,4 +1,4 @@
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 
 // Basic message structure
 export interface SerialMessage {
@@ -63,8 +63,9 @@ export interface PowerBankServer {
   powerLevel: number;
 }
 
-export interface SlotServer {
+export interface SlotsInfo {
   powerBank: PowerBankServer | null;
+  isCharging: boolean;
   isLocked: boolean;
   index: number;
   state: string;
@@ -100,7 +101,7 @@ export interface SlotErrorInfo {
 }
 
 export interface SlotsResponse {
-  slots: SlotServer[];
+  slots: SlotsInfo[];
   errors: SlotErrorInfo[];
   executionTimeMs: number;
   timestamp: string;

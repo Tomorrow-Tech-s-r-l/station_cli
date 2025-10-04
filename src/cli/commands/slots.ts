@@ -1,7 +1,7 @@
 import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
 import { CMD_SLOTS_CODE } from "../../protocol/constants";
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 
 export class SlotsCommand extends BaseCommand {
   async execute(boardAddress: number): Promise<CommandResponse> {

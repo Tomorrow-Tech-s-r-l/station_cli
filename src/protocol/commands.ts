@@ -1,4 +1,4 @@
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 import {
   CMD_STATUS_CODE,
   CMD_SET_CHARGE_CODE,
@@ -10,7 +10,7 @@ import {
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
   CMD_GET_FW_VER,
-  MAXIMUM_SLOT_INDEX,
+  MAXIMUM_SLOT_ADDRESS,
 } from "./constants";
 import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
 
@@ -286,12 +286,12 @@ export class SlotCommandValidator extends BaseCommandValidator {
     if (!message.data || message.data.length < 1) {
       return false;
     }
-    const slotIndex = message.data[0];
-    return slotIndex >= 0 && slotIndex <= MAXIMUM_SLOT_INDEX;
+    const slotAddress = message.data[0];
+    return slotAddress >= 0 && slotAddress <= MAXIMUM_SLOT_ADDRESS;
   }
 
   getErrorMessage(): string {
-    return `Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`;
+    return `Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`;
   }
 }
 

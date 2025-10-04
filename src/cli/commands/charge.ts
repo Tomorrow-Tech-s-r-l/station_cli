@@ -2,7 +2,7 @@ import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
 import { CMD_SET_CHARGE_CODE } from "../../protocol/constants";
 import { mapSlotToBoard } from "../../utils/slot_mapping";
-import { Buffer } from "buffer";
+// Buffer is a Node.js built-in, no import needed
 
 export class ChargeCommand extends BaseCommand {
   async execute(slotIndex: number, enable: boolean): Promise<CommandResponse> {

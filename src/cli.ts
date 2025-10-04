@@ -2,15 +2,18 @@
 
 import {
   MAXIMUM_BOARD_ADDRESS,
-  MAXIMUM_SLOT_INDEX,
+  MAXIMUM_POWER_LEVEL,
+  MAXIMUM_SLOT_ADDRESS,
+  SLOT_INDEX_MAXIMUM,
+  SLOT_INDEX_MINIMUM,
   SLOT_LOCKED,
 } from "./protocol/constants";
 import {
-  SlotServer,
   SlotState,
   SlotError,
   SlotErrorInfo,
   SlotsResponse,
+  SlotsInfo,
 } from "./protocol/types";
 import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
@@ -28,9 +31,10 @@ import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
 import { mapBoardToSlot } from "./utils/slot_mapping";
 import { LedCommand } from "./cli/commands/led";
-
-// Add delay utility function
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import {
+  cliInputValidatorEnable,
+  cliInputValidatorIndex,
+} from "./utils/cli_input_validator";
 
 interface CommandOptions {
   port: string;
@@ -38,6 +42,7 @@ interface CommandOptions {
   slot: string;
   index: string;
   enable?: string;
+  addresses?: string;
 }
 
 const program = new Command();
@@ -51,10 +56,14 @@ program
 program
   .command("slots")
   .description("Get status of all slots")
+  .option(
+    "-a, --addresses <addresses>",
+    `Total addresses (0-${MAXIMUM_BOARD_ADDRESS})`
+  )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
-      const slots: SlotServer[] = [];
+      const slots: SlotsInfo[] = [];
       const errors: SlotErrorInfo[] = [];
 
       const port = await selectPort();
@@ -64,8 +73,14 @@ program
       const command = new SlotsCommand(service);
       const statusCommand = new StatusCommand(service);
       const ledCommand = new LedCommand(service);
+      const chargeCommand = new ChargeCommand(service);
 
-      for (let i = 0; i <= MAXIMUM_BOARD_ADDRESS; i++) {
+      const totalAddresses =
+        options.addresses !== undefined
+          ? parseInt(options.addresses)
+          : MAXIMUM_BOARD_ADDRESS;
+
+      for (let i = 0; i <= totalAddresses; i++) {
         const response = await command.execute(i);
 
         if (response.success) {
@@ -73,15 +88,18 @@ program
             const slotsInfo = JSON.parse(response.data.toString());
             debug.success("Slots status: ", slotsInfo);
 
-            for (let j = 0; j <= MAXIMUM_SLOT_INDEX; j++) {
+            // Charging already enabled for all slots
+            let chargingEnabled = false;
+
+            for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
               const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
               let powerBankInfo = null;
               let powerLevel = 0;
 
-              if (isAvailable) {
-                // Turn on led for available slot
-                await ledCommand.execute(mapBoardToSlot(i, j), true);
+              // Turn on led for available slot
+              await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
 
+              if (isAvailable) {
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);
@@ -97,6 +115,15 @@ program
                       currentCharge,
                       totalCharge
                     );
+
+                    // Enable charging
+                    if (powerLevel < MAXIMUM_POWER_LEVEL && !chargingEnabled) {
+                      await chargeCommand.execute(mapBoardToSlot(i, j), true);
+                      chargingEnabled = true;
+                    } else {
+                      await chargeCommand.execute(mapBoardToSlot(i, j), false);
+                      chargingEnabled = false;
+                    }
                   } else {
                     errors.push({
                       index: mapBoardToSlot(i, j),
@@ -116,6 +143,8 @@ program
                       error instanceof Error ? error.message : "Unknown error",
                   });
                 }
+              } else {
+                chargingEnabled = false;
               }
 
               slots.push({
@@ -125,6 +154,7 @@ program
                       powerLevel: powerLevel,
                     }
                   : null,
+                isCharging: chargingEnabled,
                 isLocked: true,
                 index: mapBoardToSlot(i, j),
                 //TODO: Momentarily we check if the powerBankInfo is null due to error on the return of command slotsInfo.lockedSlots[j]
@@ -137,6 +167,9 @@ program
                 slotIndex: j,
               });
             }
+
+            // Reset charging enabled
+            chargingEnabled = false;
           } catch (error) {
             errors.push({
               index: -1,
@@ -182,7 +215,11 @@ program
 program
   .command("unlock")
   .description("Unlock a slot")
-  .requiredOption("-i, --index <index>", "Slot index (1-30)")
+  .requiredOption(
+    "-i, --index <index>",
+    `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+    cliInputValidatorIndex
+  )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
@@ -246,16 +283,15 @@ program
 program
   .command("charge")
   .description("Enable or disable charging for a specific slot")
-  .requiredOption("-i, --index <index>", "Slot index (1-30)")
+  .requiredOption(
+    "-i, --index <index>",
+    `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+    cliInputValidatorIndex
+  )
   .requiredOption(
     "-e, --enable <enable>",
     "Enable charging (true/false)",
-    (value) => {
-      if (value !== "true" && value !== "false") {
-        throw new Error('Enable value must be either "true" or "false"');
-      }
-      return value;
-    }
+    cliInputValidatorEnable
   )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
@@ -319,16 +355,15 @@ program
 program
   .command("led")
   .description("Turn on/off led for a specific slot")
-  .requiredOption("-i, --index <index>", "Slot index (1-30)")
+  .requiredOption(
+    "-i, --index <index>",
+    `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+    cliInputValidatorIndex
+  )
   .requiredOption(
     "-e, --enable <enable>",
     "Enable led (true/false)",
-    (value) => {
-      if (value !== "true" && value !== "false") {
-        throw new Error('Enable value must be either "true" or "false"');
-      }
-      return value;
-    }
+    cliInputValidatorEnable
   )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
@@ -376,22 +411,32 @@ program
 program
   .command("status")
   .description("Get the status of a powerbank in a slot")
-  .requiredOption("-b, --board <address>", "Board address (0-4)", (value) => {
-    const board = parseInt(value);
-    if (isNaN(board) || board < 0 || board > MAXIMUM_BOARD_ADDRESS) {
-      throw new Error(
-        `Board address must be between 0 and ${MAXIMUM_BOARD_ADDRESS}`
-      );
+  .requiredOption(
+    "-b, --board <address>",
+    `Board address (0-${MAXIMUM_BOARD_ADDRESS})`,
+    (value: string) => {
+      const board = parseInt(value);
+      if (isNaN(board) || board < 0 || board > MAXIMUM_BOARD_ADDRESS) {
+        throw new Error(
+          `Board address must be between 0 and ${MAXIMUM_BOARD_ADDRESS}`
+        );
+      }
+      return value;
     }
-    return value;
-  })
-  .requiredOption("-s, --slot <index>", "Slot index (0-5)", (value) => {
-    const slot = parseInt(value);
-    if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_INDEX) {
-      throw new Error(`Slot index must be between 0 and ${MAXIMUM_SLOT_INDEX}`);
+  )
+  .requiredOption(
+    "-s, --slot <address>",
+    `Slot value (0-${MAXIMUM_SLOT_ADDRESS})`,
+    (value: string) => {
+      const slot = parseInt(value);
+      if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_ADDRESS) {
+        throw new Error(
+          `Slot address must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
+        );
+      }
+      return value;
     }
-    return value;
-  })
+  )
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
