@@ -81,114 +81,141 @@ program
           : MAXIMUM_BOARD_ADDRESS;
 
       for (let i = 0; i <= totalAddresses; i++) {
-        const response = await command.execute(i);
+        try {
+          const response = await command.execute(i);
 
-        if (response.success) {
-          try {
-            const slotsInfo = JSON.parse(response.data.toString());
-            debug.success("Slots status: ", slotsInfo);
+          if (response.success) {
+            try {
+              const slotsInfo = JSON.parse(response.data.toString());
+              debug.success("Slots status: ", slotsInfo);
 
-            // Charging already enabled for all slots
-            let chargingEnabled = false;
+              // Charging already enabled for all slots
+              let chargingEnabled = false;
 
-            for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
-              const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
-              let powerBankInfo = null;
-              let powerLevel = 0;
+              for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
+                const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
+                let powerBankInfo = null;
+                let powerLevel = 0;
 
-              // Turn on led for available slot
-              await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
+                // Turn on led for available slot
+                await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
 
-              if (isAvailable) {
-                // Get status of powerbank
-                try {
-                  const statusResponse = await statusCommand.execute(i, j);
-                  if (statusResponse.success) {
-                    powerBankInfo = JSON.parse(statusResponse.data.toString());
-                    // Validate charge values
-                    const currentCharge =
-                      parseInt(powerBankInfo?.currentCharge) || 0;
-                    const totalCharge =
-                      parseInt(powerBankInfo?.totalCharge) || 0;
+                if (isAvailable) {
+                  // Get status of powerbank
+                  try {
+                    const statusResponse = await statusCommand.execute(i, j);
+                    if (statusResponse.success) {
+                      powerBankInfo = JSON.parse(
+                        statusResponse.data.toString()
+                      );
+                      // Validate charge values
+                      const currentCharge =
+                        parseInt(powerBankInfo?.currentCharge) || 0;
+                      const totalCharge =
+                        parseInt(powerBankInfo?.totalCharge) || 0;
 
-                    powerLevel = calculatePowerLevel(
-                      currentCharge,
-                      totalCharge
-                    );
+                      powerLevel = calculatePowerLevel(
+                        currentCharge,
+                        totalCharge
+                      );
 
-                    // Enable charging
-                    if (powerLevel < MAXIMUM_POWER_LEVEL && !chargingEnabled) {
-                      await chargeCommand.execute(mapBoardToSlot(i, j), true);
-                      chargingEnabled = true;
+                      // Enable charging
+                      if (
+                        powerLevel < MAXIMUM_POWER_LEVEL &&
+                        !chargingEnabled
+                      ) {
+                        await chargeCommand.execute(mapBoardToSlot(i, j), true);
+                        chargingEnabled = true;
+                      } else {
+                        await chargeCommand.execute(
+                          mapBoardToSlot(i, j),
+                          false
+                        );
+                        chargingEnabled = false;
+                      }
                     } else {
-                      await chargeCommand.execute(mapBoardToSlot(i, j), false);
-                      chargingEnabled = false;
+                      errors.push({
+                        index: mapBoardToSlot(i, j),
+                        boardAddress: i,
+                        slotIndex: j,
+                        error: SlotError.STATUS_COMMAND_FAILED,
+                        message: getStatusMessage(statusResponse.status),
+                      });
                     }
-                  } else {
+                  } catch (error) {
                     errors.push({
                       index: mapBoardToSlot(i, j),
                       boardAddress: i,
                       slotIndex: j,
-                      error: SlotError.STATUS_COMMAND_FAILED,
-                      message: getStatusMessage(statusResponse.status),
+                      error: SlotError.CONNECTION_ERROR,
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : "Unknown error",
                     });
                   }
-                } catch (error) {
-                  errors.push({
-                    index: mapBoardToSlot(i, j),
-                    boardAddress: i,
-                    slotIndex: j,
-                    error: SlotError.CONNECTION_ERROR,
-                    message:
-                      error instanceof Error ? error.message : "Unknown error",
-                  });
+                } else {
+                  chargingEnabled = false;
                 }
-              } else {
-                chargingEnabled = false;
+
+                slots.push({
+                  powerBank: powerBankInfo
+                    ? {
+                        id: powerBankInfo?.serial,
+                        powerLevel: powerLevel,
+                      }
+                    : null,
+                  isCharging: chargingEnabled,
+                  isLocked: true,
+                  index: mapBoardToSlot(i, j),
+                  //TODO: Momentarily we check if the powerBankInfo is null due to error on the return of command slotsInfo.lockedSlots[j]
+                  state:
+                    powerBankInfo !== null
+                      ? SlotState.available
+                      : SlotState.empty,
+                  disabled: false,
+                  boardAddress: i,
+                  slotIndex: j,
+                });
               }
 
-              slots.push({
-                powerBank: powerBankInfo
-                  ? {
-                      id: powerBankInfo?.serial,
-                      powerLevel: powerLevel,
-                    }
-                  : null,
-                isCharging: chargingEnabled,
-                isLocked: true,
-                index: mapBoardToSlot(i, j),
-                //TODO: Momentarily we check if the powerBankInfo is null due to error on the return of command slotsInfo.lockedSlots[j]
-                state:
-                  powerBankInfo !== null
-                    ? SlotState.available
-                    : SlotState.empty,
-                disabled: false,
+              // Reset charging enabled
+              chargingEnabled = false;
+            } catch (error) {
+              errors.push({
+                index: -1,
                 boardAddress: i,
-                slotIndex: j,
+                slotIndex: -1,
+                error: SlotError.INVALID_RESPONSE,
+                message:
+                  "Failed to parse slots info response: " +
+                  (error instanceof Error ? error.message : "Unknown error"),
               });
             }
-
-            // Reset charging enabled
-            chargingEnabled = false;
-          } catch (error) {
+          } else {
             errors.push({
               index: -1,
               boardAddress: i,
               slotIndex: -1,
-              error: SlotError.INVALID_RESPONSE,
-              message:
-                "Failed to parse slots info response: " +
-                (error instanceof Error ? error.message : "Unknown error"),
+              error: SlotError.SLOTS_COMMAND_FAILED,
+              message: getStatusMessage(response.status),
             });
           }
-        } else {
+        } catch (error) {
+          // Handle timeout or connection errors for this board
+          // Log the error and continue to the next board
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
           errors.push({
             index: -1,
             boardAddress: i,
             slotIndex: -1,
-            error: SlotError.SLOTS_COMMAND_FAILED,
-            message: getStatusMessage(response.status),
+            error: SlotError.CONNECTION_ERROR,
+            message: `Board ${i} not responding: ${errorMessage}`,
           });
+          console.error(`Error communicating with board ${i}: ${errorMessage}`);
+          // Continue to next board
+          continue;
         }
       }
 
