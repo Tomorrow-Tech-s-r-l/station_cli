@@ -14,6 +14,7 @@ jobs:
       commit_message: ${{ steps.get_commit_message.outputs.commit_message }}
       is_development: ${{ steps.check_branch.outputs.is_development }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-24.04-arm, macos-latest]
         include:
