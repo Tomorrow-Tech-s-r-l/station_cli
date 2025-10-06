@@ -89,13 +89,20 @@ program
               const slotsInfo = JSON.parse(response.data.toString());
               debug.success("Slots status: ", slotsInfo);
 
-              // Charging already enabled for all slots
-              let chargingEnabled = false;
+              // Phase 1: Collect slot information for this board
+              const boardSlots: Array<{
+                slotIndex: number;
+                isAvailable: boolean;
+                powerBankInfo: any;
+                powerLevel: number;
+                needsCharging: boolean;
+              }> = [];
 
               for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
                 const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
                 let powerBankInfo = null;
                 let powerLevel = 0;
+                let needsCharging = false;
 
                 // Turn on led for available slot
                 await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
@@ -108,7 +115,6 @@ program
                       powerBankInfo = JSON.parse(
                         statusResponse.data.toString()
                       );
-                      // Validate charge values
                       const currentCharge =
                         parseInt(powerBankInfo?.currentCharge) || 0;
                       const totalCharge =
@@ -119,20 +125,7 @@ program
                         totalCharge
                       );
 
-                      // Enable charging
-                      if (
-                        powerLevel < MAXIMUM_POWER_LEVEL &&
-                        !chargingEnabled
-                      ) {
-                        await chargeCommand.execute(mapBoardToSlot(i, j), true);
-                        chargingEnabled = true;
-                      } else {
-                        await chargeCommand.execute(
-                          mapBoardToSlot(i, j),
-                          false
-                        );
-                        chargingEnabled = false;
-                      }
+                      needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
                     } else {
                       errors.push({
                         index: mapBoardToSlot(i, j),
@@ -154,33 +147,58 @@ program
                           : "Unknown error",
                     });
                   }
-                } else {
-                  chargingEnabled = false;
+                }
+
+                boardSlots.push({
+                  slotIndex: j,
+                  isAvailable,
+                  powerBankInfo,
+                  powerLevel,
+                  needsCharging,
+                });
+              }
+
+              // Phase 2: Determine which slot (if any) should charge
+              // Rule: Only ONE powerbank per board can charge at a time
+              let chargingSlotIndex = -1;
+              for (const slot of boardSlots) {
+                if (slot.needsCharging) {
+                  chargingSlotIndex = slot.slotIndex;
+                  break; // Select first powerbank that needs charging
+                }
+              }
+
+              // Phase 3: Apply charging commands and build response
+              for (const slot of boardSlots) {
+                const shouldCharge = slot.slotIndex === chargingSlotIndex;
+
+                // Send charge command for available slots
+                if (slot.isAvailable) {
+                  await chargeCommand.execute(
+                    mapBoardToSlot(i, slot.slotIndex),
+                    shouldCharge
+                  );
                 }
 
                 slots.push({
-                  powerBank: powerBankInfo
+                  powerBank: slot.powerBankInfo
                     ? {
-                        id: powerBankInfo?.serial,
-                        powerLevel: powerLevel,
+                        id: slot.powerBankInfo?.serial,
+                        powerLevel: slot.powerLevel,
                       }
                     : null,
-                  isCharging: chargingEnabled,
+                  isCharging: shouldCharge,
                   isLocked: true,
-                  index: mapBoardToSlot(i, j),
-                  //TODO: Momentarily we check if the powerBankInfo is null due to error on the return of command slotsInfo.lockedSlots[j]
+                  index: mapBoardToSlot(i, slot.slotIndex),
                   state:
-                    powerBankInfo !== null
+                    slot.powerBankInfo !== null
                       ? SlotState.available
                       : SlotState.empty,
                   disabled: false,
                   boardAddress: i,
-                  slotIndex: j,
+                  slotIndex: slot.slotIndex,
                 });
               }
-
-              // Reset charging enabled
-              chargingEnabled = false;
             } catch (error) {
               errors.push({
                 index: -1,
