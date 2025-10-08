@@ -19,6 +19,7 @@ import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
 import { getStatusMessage } from "./utils/status";
 import { calculatePowerLevel } from "./utils/power_level";
+import { logger } from "./utils/logger";
 
 import { Command } from "commander";
 import { SerialService } from "./services/serial";
@@ -50,7 +51,36 @@ const program = new Command();
 program
   .name(packageJson.name)
   .description(packageJson.description)
-  .version(packageJson.version);
+  .version(packageJson.version)
+  .option("--log", "Enable logging to file (creates timestamp-cli-logs.log)")
+  .hook("preAction", (thisCommand) => {
+    const options = thisCommand.opts();
+    if (options.log) {
+      logger.enableFileLogging();
+      logger.log(`Logging enabled. Log file: ${logger.getLogFilePath()}`);
+    }
+  });
+
+// Handle graceful shutdown
+process.on("exit", () => {
+  if (logger.isLogging()) {
+    logger.close();
+  }
+});
+
+process.on("SIGINT", () => {
+  if (logger.isLogging()) {
+    logger.close();
+  }
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  if (logger.isLogging()) {
+    logger.close();
+  }
+  process.exit(0);
+});
 
 // Get slots status
 program
@@ -231,7 +261,7 @@ program
             error: SlotError.CONNECTION_ERROR,
             message: `Board ${i} not responding: ${errorMessage}`,
           });
-          console.error(`Error communicating with board ${i}: ${errorMessage}`);
+          logger.error(`Error communicating with board ${i}: ${errorMessage}`);
           // Continue to next board
           continue;
         }
@@ -247,11 +277,11 @@ program
         timestamp: new Date().toISOString(),
       };
 
-      console.log(JSON.stringify(response, null, 2));
+      logger.log(JSON.stringify(response, null, 2));
 
       await service.disconnect();
     } catch (error) {
-      console.error("Error:", error);
+      logger.error("Error:", error);
       process.exit(1);
     }
   });
@@ -299,7 +329,7 @@ program
             },
       };
 
-      console.log(JSON.stringify(result, null, 2));
+      logger.log(JSON.stringify(result, null, 2));
 
       await service.disconnect();
     } catch (error) {
@@ -319,7 +349,7 @@ program
         },
       };
 
-      console.log(JSON.stringify(result, null, 2));
+      logger.log(JSON.stringify(result, null, 2));
       process.exit(1);
     }
   });
@@ -370,7 +400,7 @@ program
             },
       };
 
-      console.log(JSON.stringify(result, null, 2));
+      logger.log(JSON.stringify(result, null, 2));
 
       await service.disconnect();
     } catch (error) {
@@ -391,7 +421,7 @@ program
         },
       };
 
-      console.log(JSON.stringify(result, null, 2));
+      logger.log(JSON.stringify(result, null, 2));
       process.exit(1);
     }
   });
@@ -443,11 +473,11 @@ program
             },
       };
 
-      console.log(JSON.stringify(result, null, 2));
+      logger.log(JSON.stringify(result, null, 2));
 
       await service.disconnect();
     } catch (error) {
-      console.error("Error:", error);
+      logger.error("Error:", error);
       process.exit(1);
     }
   });
@@ -513,20 +543,20 @@ program
           powerLevel,
         };
 
-        console.log(JSON.stringify(result, null, 2));
+        logger.log(JSON.stringify(result, null, 2));
       } else {
-        console.error("Command failed:", getStatusMessage(response.status));
+        logger.error("Command failed:", getStatusMessage(response.status));
         if (response.status === STATUS_ERR_INTERNAL) {
-          console.error("\nPossible solutions:");
-          console.error("1. Try resetting the device");
-          console.error("2. Check if the powerbank is properly inserted");
-          console.error("3. Try a different slot");
+          logger.error("\nPossible solutions:");
+          logger.error("1. Try resetting the device");
+          logger.error("2. Check if the powerbank is properly inserted");
+          logger.error("3. Try a different slot");
         }
       }
 
       await service.disconnect();
     } catch (error) {
-      console.error("Error:", error);
+      logger.error("Error:", error);
       process.exit(1);
     }
   });
@@ -549,17 +579,17 @@ program
       });
 
       if (response[1] === 0 && response.length >= 4) {
-        console.log(
+        logger.log(
           "Firmware version:",
           `${response[2]}.${response[3]}.${response[4]}`
         );
       } else {
-        console.error("Command failed with status:", response[1]);
+        logger.error("Command failed with status:", response[1]);
       }
 
       await service.disconnect();
     } catch (error) {
-      console.error("Error:", error);
+      logger.error("Error:", error);
       process.exit(1);
     }
   });
@@ -594,14 +624,14 @@ program
       );
 
       if (response.success) {
-        console.log("Powerbank initialized");
+        logger.log("Powerbank initialized");
       } else {
-        console.error("Command failed:", getStatusMessage(response.status));
+        logger.error("Command failed:", getStatusMessage(response.status));
       }
 
       await service.disconnect();
     } catch (error) {
-      console.error("Error:", error);
+      logger.error("Error:", error);
       process.exit(1);
     }
   });

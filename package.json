@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "station-cli",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "description": "CLI tool to control station board and powerbanks",
   "main": "src/cli.ts",
   "bin": "dist/cli.js",
@@ -40,16 +40,16 @@
     "@types/node": "^22.15.21",
     "pkg": "^5.8.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@serialport/parser-inter-byte-timeout": "^13.0.0",
-    "@types/inquirer": "^9.0.8",
+    "@types/inquirer": "^9.0.9",
     "chalk": "^4.1.2",
-    "commander": "^14.0.0",
+    "commander": "^14.0.1",
     "dotenv": "^16.5.0",
     "easy-crc": "^1.1.0",
-    "inquirer": "^12.6.2",
+    "inquirer": "^12.9.6",
     "serialport": "^13.0.0"
   }
 }

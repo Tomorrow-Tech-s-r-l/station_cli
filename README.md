@@ -60,6 +60,68 @@ The CLI automatically detects and connects to the appropriate serial port. It wi
 
 If multiple devices are connected, the CLI will use the first compatible device found.
 
+## Logging
+
+The CLI supports optional file logging to help with debugging and record-keeping. When enabled, all terminal output (including commands, responses, and errors) will be saved to a timestamped log file.
+
+### Enabling Logging
+
+To enable logging, add the `--log` flag to any command:
+
+```bash
+station-cli --log slots
+station-cli --log unlock -i 1
+station-cli --log status -b 0 -s 0
+```
+
+### Log File Format
+
+When logging is enabled:
+- A log file is created with the format: `YYYY-MM-DDTHH-MM-SS-cli-logs.log`
+- The file is created in the current working directory
+- Each log entry includes a timestamp and log level (`[LOG]` or `[ERROR]`)
+- The log file includes a header and footer with session timestamps
+
+Example log file name: `2025-10-08T14-30-45-cli-logs.log`
+
+Example log file content:
+```
+=== CLI Log Started at 2025-10-08T14:30:45.123Z ===
+[LOG] 2025-10-08T14:30:45.123Z - Logging enabled. Log file: /path/to/2025-10-08T14-30-45-cli-logs.log
+[LOG] 2025-10-08T14:30:46.456Z - {"success":true,"executionTimeMs":123,...}
+[ERROR] 2025-10-08T14:30:50.789Z - Error: Connection failed
+=== CLI Log Ended at 2025-10-08T14:30:51.000Z ===
+```
+
+### Default Behavior
+
+- **Default:** Logging is **disabled** by default
+- **Terminal output:** Always displayed, regardless of logging setting
+- **Performance:** Minimal overhead when logging is enabled
+
+### Debug Messages
+
+Serial communication debug messages can be enabled by setting the `DEBUG=true` environment variable:
+
+```bash
+DEBUG=true station-cli --log slots
+```
+
+When both `DEBUG=true` and `--log` are enabled, the log file will include:
+- Command requests and responses
+- Serial frame data (TX/RX)
+- Hex dumps of raw data
+- Connection status messages
+- CRC validation details
+- All other debug information
+
+Example debug log entries:
+```
+[LOG] 2025-10-08T14:30:45.123Z - [DEBUG INFO] Connecting to port: /dev/ttyUSB0 at 115200 baud
+[LOG] 2025-10-08T14:30:45.234Z - [DEBUG FRAME TX] ea 00 01 02 a3 b4
+[LOG] 2025-10-08T14:30:45.345Z - [DEBUG FRAME RX] ea 00 00 01 c5 d6
+```
+
 ## Commands
 
 ### Get Slots Status
