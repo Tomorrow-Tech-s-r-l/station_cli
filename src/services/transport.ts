@@ -1,11 +1,7 @@
 // Buffer is a Node.js built-in, no import needed
 import { debug } from "../utils/debug";
 import { crc16 } from "easy-crc";
-import {
-  FRAME_START_BYTE,
-  FRAME_RECEIVE_DELAY_MS,
-  CRC_ALGORITHM,
-} from "../protocol/constants";
+import { FRAME_START_BYTE, CRC_ALGORITHM } from "../protocol/constants";
 
 /**
  * Transport Protocol Implementation
@@ -75,9 +71,5 @@ export class TransportProtocol {
 
     debug.log("Successfully parsed frame");
     return payload;
-  }
-
-  static async waitForFrameReceive(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, FRAME_RECEIVE_DELAY_MS));
   }
 }

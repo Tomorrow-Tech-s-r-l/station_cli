@@ -4,7 +4,7 @@ import { debug } from "../utils/debug";
 import { TransportProtocol } from "./transport";
 import { CommandFactory } from "../protocol/commands";
 import { SerialMessage } from "../protocol/types";
-import { BAUD_RATE } from "../protocol/constants";
+import { BAUD_RATE, INTER_COMMAND_DELAY_MS } from "../protocol/constants";
 
 export class SerialService {
   private port: SerialPort | null = null;
@@ -171,7 +171,10 @@ export class SerialService {
   }
 
   async sendMessage(message: SerialMessage): Promise<Buffer> {
-    return await this.attemptSendMessage(message);
+    const response = await this.attemptSendMessage(message);
+    // Add delay between commands for USB serial stability
+    await new Promise((resolve) => setTimeout(resolve, INTER_COMMAND_DELAY_MS));
+    return response;
   }
 
   async listPorts(): Promise<string[]> {
