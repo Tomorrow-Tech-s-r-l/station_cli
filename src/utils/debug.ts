@@ -75,4 +75,60 @@ export const debug = {
       }
     }
   },
+  slotRequest: (
+    commandName: string,
+    boardAddress: number,
+    slotIndex?: number
+  ) => {
+    if (DEBUG) {
+      const separator = "=".repeat(80);
+      const slotInfo = slotIndex !== undefined ? ` Slot ${slotIndex}` : "";
+      const message = `${commandName} - Board ${boardAddress}${slotInfo}`;
+      console.log(chalk.magenta.bold(`\n${separator}`));
+      console.log(chalk.magenta.bold(`[SLOT REQUEST START] ${message}`));
+      console.log(chalk.magenta.bold(separator));
+      if (logger.isLogging()) {
+        logger.log(`\n${separator}`);
+        logger.log(`[SLOT REQUEST START] ${message}`);
+        logger.log(separator);
+      }
+    }
+  },
+  payload: (label: string, data: Buffer) => {
+    if (DEBUG) {
+      console.log(
+        chalk.yellow.bold(`[PAYLOAD ${label}]`),
+        chalk.magenta(formatHex(data))
+      );
+      if (logger.isLogging()) {
+        logger.log(`[PAYLOAD ${label}]`, formatHex(data));
+      }
+    }
+  },
+  response: (label: string, data: Buffer, status: number) => {
+    if (DEBUG) {
+      const statusColor = status === 0 ? chalk.green : chalk.red;
+      console.log(
+        chalk.cyan.bold(`[RESPONSE ${label}]`),
+        "Status:",
+        statusColor(status),
+        "Data:",
+        chalk.magenta(formatHex(data))
+      );
+      if (logger.isLogging()) {
+        logger.log(
+          `[RESPONSE ${label}] Status: ${status} Data: ${formatHex(data)}`
+        );
+      }
+    }
+  },
+  slotRequestEnd: () => {
+    if (DEBUG) {
+      const separator = "=".repeat(80);
+      console.log(chalk.magenta.bold(`[SLOT REQUEST END] ${separator}\n`));
+      if (logger.isLogging()) {
+        logger.log(`[SLOT REQUEST END] ${separator}\n`);
+      }
+    }
+  },
 };

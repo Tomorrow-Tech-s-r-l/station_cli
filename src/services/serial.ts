@@ -121,6 +121,8 @@ export class SerialService {
 
     // Build command and frame
     const commandBuffer = CommandFactory.buildCommand(message);
+    debug.payload("Command Buffer", commandBuffer);
+
     const frame = TransportProtocol.buildFrame(commandBuffer);
     debug.frame("TX", frame);
 
@@ -148,11 +150,13 @@ export class SerialService {
         }
         const msgType = response[0];
         const status = response[1];
-        debug.info("Response:", {
-          msgType,
-          status,
-          response: response.toString("hex"),
-        });
+        const payload =
+          response.length > 2 ? response.subarray(2) : Buffer.alloc(0);
+
+        debug.response("Full Response", response, status);
+        if (payload.length > 0) {
+          debug.hex("Response Payload", payload);
+        }
 
         // Accept response regardless of payload presence
         resolve(response);

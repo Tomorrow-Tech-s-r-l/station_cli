@@ -115,12 +115,48 @@ When both `DEBUG=true` and `--log` are enabled, the log file will include:
 - CRC validation details
 - All other debug information
 
+#### Enhanced Slot Request Logging
+
+When debug mode is enabled, each slot request is now clearly separated and includes detailed information:
+
+**Console Output (with colors):**
+- Magenta separator lines mark the start and end of each slot request
+- Yellow payload data showing the exact bytes sent
+- Cyan response data with color-coded status (green for success, red for failure)
+- Hex-formatted data for easy debugging
+
+**Log File Output:**
+Each slot request includes:
+1. **Request Header**: Shows the command name, board address, and slot index
+2. **Payload Information**: The exact command buffer being sent (in hex format)
+3. **Transport Frame**: The complete serial frame with CRC (TX/RX)
+4. **Response Data**: Full response with status code and payload data
+5. **Request Footer**: Clear end marker for the request
+
 Example debug log entries:
 ```
-[LOG] 2025-10-08T14:30:45.123Z - [DEBUG INFO] Connecting to port: /dev/ttyUSB0 at 115200 baud
-[LOG] 2025-10-08T14:30:45.234Z - [DEBUG FRAME TX] ea 00 01 02 a3 b4
-[LOG] 2025-10-08T14:30:45.345Z - [DEBUG FRAME RX] ea 00 00 01 c5 d6
+[LOG] 2025-10-18T14:30:45.123Z - [DEBUG INFO] Connecting to port: /dev/ttyUSB0 at 115200 baud
+
+[LOG] 2025-10-18T14:30:45.234Z - 
+================================================================================
+[LOG] 2025-10-18T14:30:45.234Z - [SLOT REQUEST START] STATUS - Board 0 Slot 0
+[LOG] 2025-10-18T14:30:45.234Z - ================================================================================
+[LOG] 2025-10-18T14:30:45.235Z - [DEBUG INFO] Sending message: { boardAddress: 0, command: 1, dataLength: 1 }
+[LOG] 2025-10-18T14:30:45.236Z - [PAYLOAD Command Buffer] 00 01 00
+[LOG] 2025-10-18T14:30:45.237Z - [DEBUG HEX] Calculated CRC16: a3b4
+[LOG] 2025-10-18T14:30:45.238Z - [DEBUG FRAME TX] ea 00 01 00 a3 b4
+[LOG] 2025-10-18T14:30:45.345Z - [DEBUG HEX] Received raw data: ea 01 00 31 32 33 34 35 36 37 38 39 30 c5 d6
+[LOG] 2025-10-18T14:30:45.346Z - [RESPONSE Full Response] Status: 0 Data: 01 00 31 32 33 34 35 36 37 38 39 30
+[LOG] 2025-10-18T14:30:45.347Z - [DEBUG HEX] Response Payload: 31 32 33 34 35 36 37 38 39 30
+[LOG] 2025-10-18T14:30:45.348Z - [SLOT REQUEST END] ================================================================================
 ```
+
+This enhanced logging makes it much easier to:
+- Track individual slot operations in complex sequences
+- Debug communication issues with specific slots
+- Verify the exact data being sent and received
+- Correlate requests with responses
+- Identify which slot requests are failing or timing out
 
 ## Commands
 
