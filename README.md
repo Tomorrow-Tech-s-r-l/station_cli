@@ -262,6 +262,81 @@ Output example:
 }
 ```
 
+### Initialize Powerbank
+Initializes a powerbank in a specific slot with ID and battery gauge information. This command writes the powerbank's identification and battery management system (BMS) data to the device.
+
+**Important:** This command only writes metadata/configuration to the device - it does not physically charge the battery. To charge the powerbank, use the `charge` command separately.
+
+```bash
+station-cli initialize-powerbank -i <index> --id <serialNumber> [options]
+```
+
+Options:
+- `-i, --index <index>`: Slot index (1-30) (required)
+- `--id <serialNumber>`: Powerbank serial number - exactly 10 characters (required)
+- `--total-charge <mAh>`: Total battery capacity in mAh (default: 13925, max: 65535)
+- `--current-charge <mAh>`: Current battery charge level in mAh (default: 11625, max: 65535)
+- `--cutoff-charge <mAh>`: Cutoff battery charge in mAh (default: 10625, max: 65535)
+- `--cycles <count>`: Battery cycle count (default: 0, max: 65535)
+
+**What this command does:**
+1. **Set Powerbank Info (opcode 0x08)**: Writes the serial number, manufacturing timestamp (automatically set to current time), and cycle count to the device's memory
+2. **Set Battery Gauge Info (opcode 0x09)**: Writes the battery capacity, current charge level, and cutoff charge values to the battery management system
+
+These values are used by the device to:
+- Track and display the powerbank's charge level
+- Identify the specific powerbank unit
+- Monitor battery health and cycle count
+- Determine when to stop charging (cutoff level)
+
+Examples:
+```bash
+# Basic initialization with required parameters only (uses defaults)
+station-cli initialize-powerbank -i 1 --id ABC1234567
+
+# Full initialization with custom battery parameters
+station-cli initialize-powerbank -i 1 --id ABC1234567 --total-charge 15000 --current-charge 12000 --cutoff-charge 11000 --cycles 5
+```
+
+Output example (success):
+```json
+{
+  "success": true,
+  "executionTimeMs": 245,
+  "timestamp": "2024-03-21T10:30:45.123Z",
+  "slotIndex": 1,
+  "boardAddress": 0,
+  "slotInBoard": 0,
+  "powerbank": {
+    "serialNumber": "ABC1234567",
+    "manufacturingTimestamp": 1710931845,
+    "cycles": 0,
+    "totalCharge": 13925,
+    "currentCharge": 11625,
+    "cutoffCharge": 10625
+  }
+}
+```
+
+Output example (failure):
+```json
+{
+  "success": false,
+  "executionTimeMs": 123,
+  "timestamp": "2024-03-21T10:30:45.123Z",
+  "slotIndex": 1,
+  "boardAddress": 0,
+  "slotInBoard": 0,
+  "error": {
+    "code": 4,
+    "message": "Internal device error - device may need reset"
+  }
+}
+```
+
+Note: The serial number must be exactly 10 characters. If your ID is shorter, pad it with leading zeros or other characters.
+
+
 ## Debug Commands
 
 The following commands are intended for development and troubleshooting purposes. They provide low-level access to device functionality and should be used with caution.
@@ -313,79 +388,6 @@ Output example:
 ```
 Firmware version: 1.2.3
 ```
-
-### Initialize Powerbank
-Initializes a powerbank in a specific slot with ID and battery gauge information. This command writes the powerbank's identification and battery management system (BMS) data to the device.
-
-**Important:** This command only writes metadata/configuration to the device - it does not physically charge the battery. To charge the powerbank, use the `charge` command separately.
-
-```bash
-station-cli initialize-powerbank -b <board> -s <slot> -i <serialNumber> [options]
-```
-
-Options:
-- `-b, --board <address>`: Board address (0-4) (required)
-- `-s, --slot <index>`: Slot index (0-5) (required)
-- `-i, --id <serialNumber>`: Powerbank serial number - exactly 10 characters (required)
-- `--total-charge <mAh>`: Total battery capacity in mAh (default: 13925, max: 65535)
-- `--current-charge <mAh>`: Current battery charge level in mAh (default: 11625, max: 65535)
-- `--cutoff-charge <mAh>`: Cutoff battery charge in mAh (default: 10625, max: 65535)
-- `--cycles <count>`: Battery cycle count (default: 0, max: 65535)
-
-**What this command does:**
-1. **Set Powerbank Info (opcode 0x08)**: Writes the serial number, manufacturing timestamp (automatically set to current time), and cycle count to the device's memory
-2. **Set Battery Gauge Info (opcode 0x09)**: Writes the battery capacity, current charge level, and cutoff charge values to the battery management system
-
-These values are used by the device to:
-- Track and display the powerbank's charge level
-- Identify the specific powerbank unit
-- Monitor battery health and cycle count
-- Determine when to stop charging (cutoff level)
-
-Examples:
-```bash
-# Basic initialization with required parameters only (uses defaults)
-station-cli initialize-powerbank -b 0 -s 0 -i ABC1234567
-
-# Full initialization with custom battery parameters
-station-cli initialize-powerbank -b 0 -s 0 -i ABC1234567 --total-charge 15000 --current-charge 12000 --cutoff-charge 11000 --cycles 5
-```
-
-Output example (success):
-```json
-{
-  "success": true,
-  "executionTimeMs": 245,
-  "timestamp": "2024-03-21T10:30:45.123Z",
-  "boardAddress": 0,
-  "slotIndex": 0,
-  "powerbank": {
-    "serialNumber": "ABC1234567",
-    "manufacturingTimestamp": 1710931845,
-    "cycles": 0,
-    "totalCharge": 13925,
-    "currentCharge": 11625,
-    "cutoffCharge": 10625
-  }
-}
-```
-
-Output example (failure):
-```json
-{
-  "success": false,
-  "executionTimeMs": 123,
-  "timestamp": "2024-03-21T10:30:45.123Z",
-  "boardAddress": 0,
-  "slotIndex": 0,
-  "error": {
-    "code": 4,
-    "message": "Internal device error - device may need reset"
-  }
-}
-```
-
-Note: The serial number must be exactly 10 characters. If your ID is shorter, pad it with leading zeros or other characters.
 
 ## Error Handling
 

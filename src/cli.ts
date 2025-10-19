@@ -30,7 +30,7 @@ import { ChargeCommand } from "./cli/commands/charge";
 import packageJson from "../package.json";
 import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
-import { mapBoardToSlot } from "./utils/slot_mapping";
+import { mapBoardToSlot, mapSlotToBoard } from "./utils/slot_mapping";
 import { LedCommand } from "./cli/commands/led";
 import {
   cliInputValidatorEnable,
@@ -487,6 +487,171 @@ program
     }
   });
 
+// Initialize powerbank
+program
+  .command("initialize-powerbank")
+  .description("Initialize a powerbank with ID and battery information")
+  .requiredOption(
+    "-i, --index <index>",
+    `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+    cliInputValidatorIndex
+  )
+  .requiredOption(
+    "--id <serialNumber>",
+    "Powerbank serial number (exactly 10 characters)",
+    (value: string) => {
+      if (value.length !== 10) {
+        throw new Error("Serial number must be exactly 10 characters");
+      }
+      return value;
+    }
+  )
+  .option(
+    "--total-charge <mAh>",
+    "Total battery capacity in mAh (default: 13925)",
+    (value: string) => {
+      const charge = parseInt(value);
+      if (isNaN(charge) || charge < 0 || charge > 65535) {
+        throw new Error("Total charge must be between 0 and 65535 mAh");
+      }
+      return value;
+    }
+  )
+  .option(
+    "--current-charge <mAh>",
+    "Current battery charge in mAh (default: 11625)",
+    (value: string) => {
+      const charge = parseInt(value);
+      if (isNaN(charge) || charge < 0 || charge > 65535) {
+        throw new Error("Current charge must be between 0 and 65535 mAh");
+      }
+      return value;
+    }
+  )
+  .option(
+    "--cutoff-charge <mAh>",
+    "Cutoff battery charge in mAh (default: 10625)",
+    (value: string) => {
+      const charge = parseInt(value);
+      if (isNaN(charge) || charge < 0 || charge > 65535) {
+        throw new Error("Cutoff charge must be between 0 and 65535 mAh");
+      }
+      return value;
+    }
+  )
+  .option(
+    "--cycles <count>",
+    "Battery cycle count (default: 0)",
+    (value: string) => {
+      const cycles = parseInt(value);
+      if (isNaN(cycles) || cycles < 0 || cycles > 65535) {
+        throw new Error("Cycles must be between 0 and 65535");
+      }
+      return value;
+    }
+  )
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      if (!options.id) {
+        logger.error("Serial number (--id) is required");
+        process.exit(1);
+      }
+
+      const serialNumber = options.id;
+      const timestamp = Math.floor(Date.now() / 1000);
+      const cycles = options.cycles ? parseInt(options.cycles) : 0;
+      const totalCharge = options.totalCharge
+        ? parseInt(options.totalCharge)
+        : 13925;
+      const currentCharge = options.currentCharge
+        ? parseInt(options.currentCharge)
+        : 11625;
+      const cutoffCharge = options.cutoffCharge
+        ? parseInt(options.cutoffCharge)
+        : 10625;
+
+      const port = await selectPort();
+      const service = new SerialService(port);
+      await service.connect();
+
+      const slotMapping = mapSlotToBoard(parseInt(options.index));
+      const command = new InitializePowerbankCommand(service);
+      const response = await command.execute(
+        slotMapping.boardAddress,
+        slotMapping.slotInBoard,
+        {
+          serialNumber,
+          timestamp,
+          cycles,
+          totalCharge,
+          currentCharge,
+          cutoffCharge,
+        }
+      );
+
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      if (response.success) {
+        const result = {
+          success: true,
+          executionTimeMs: executionTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: parseInt(options.index),
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          powerbank: {
+            serialNumber,
+            manufacturingTimestamp: timestamp,
+            cycles,
+            totalCharge,
+            currentCharge,
+            cutoffCharge,
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+      } else {
+        const result = {
+          success: false,
+          executionTimeMs: executionTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: parseInt(options.index),
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: {
+            code: response.status,
+            message: getStatusMessage(response.status),
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+
+      await service.disconnect();
+    } catch (error) {
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const slotMapping = mapSlotToBoard(parseInt(options.index));
+      const result = {
+        success: false,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: slotMapping.boardAddress,
+        slotInBoard: slotMapping.slotInBoard,
+        error: {
+          code: -1,
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+      };
+
+      logger.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+  });
+
 // Status command used to get the status of a powerbank in a specific board and slot
 program
   .command("status")
@@ -595,187 +760,6 @@ program
       await service.disconnect();
     } catch (error) {
       logger.error("Error:", error);
-      process.exit(1);
-    }
-  });
-
-// Initialize powerbank
-program
-  .command("initialize-powerbank")
-  .description("Initialize a powerbank with ID and battery information")
-  .requiredOption(
-    "-b, --board <address>",
-    `Board address (0-${MAXIMUM_BOARD_ADDRESS})`,
-    (value: string) => {
-      const board = parseInt(value);
-      if (isNaN(board) || board < 0 || board > MAXIMUM_BOARD_ADDRESS) {
-        throw new Error(
-          `Board address must be between 0 and ${MAXIMUM_BOARD_ADDRESS}`
-        );
-      }
-      return value;
-    }
-  )
-  .requiredOption(
-    "-s, --slot <index>",
-    `Slot index (0-${MAXIMUM_SLOT_ADDRESS})`,
-    (value: string) => {
-      const slot = parseInt(value);
-      if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_ADDRESS) {
-        throw new Error(
-          `Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
-        );
-      }
-      return value;
-    }
-  )
-  .requiredOption(
-    "-i, --id <serialNumber>",
-    "Powerbank serial number (exactly 10 characters)",
-    (value: string) => {
-      if (value.length !== 10) {
-        throw new Error("Serial number must be exactly 10 characters");
-      }
-      return value;
-    }
-  )
-  .option(
-    "--total-charge <mAh>",
-    "Total battery capacity in mAh (default: 13925)",
-    (value: string) => {
-      const charge = parseInt(value);
-      if (isNaN(charge) || charge < 0 || charge > 65535) {
-        throw new Error("Total charge must be between 0 and 65535 mAh");
-      }
-      return value;
-    }
-  )
-  .option(
-    "--current-charge <mAh>",
-    "Current battery charge in mAh (default: 11625)",
-    (value: string) => {
-      const charge = parseInt(value);
-      if (isNaN(charge) || charge < 0 || charge > 65535) {
-        throw new Error("Current charge must be between 0 and 65535 mAh");
-      }
-      return value;
-    }
-  )
-  .option(
-    "--cutoff-charge <mAh>",
-    "Cutoff battery charge in mAh (default: 10625)",
-    (value: string) => {
-      const charge = parseInt(value);
-      if (isNaN(charge) || charge < 0 || charge > 65535) {
-        throw new Error("Cutoff charge must be between 0 and 65535 mAh");
-      }
-      return value;
-    }
-  )
-  .option(
-    "--cycles <count>",
-    "Battery cycle count (default: 0)",
-    (value: string) => {
-      const cycles = parseInt(value);
-      if (isNaN(cycles) || cycles < 0 || cycles > 65535) {
-        throw new Error("Cycles must be between 0 and 65535");
-      }
-      return value;
-    }
-  )
-  .action(async (options: CommandOptions) => {
-    const startTime = Date.now();
-    try {
-      if (!options.id) {
-        logger.error("Serial number (--id) is required");
-        process.exit(1);
-      }
-
-      const serialNumber = options.id;
-      const timestamp = Math.floor(Date.now() / 1000);
-      const cycles = options.cycles ? parseInt(options.cycles) : 0;
-      const totalCharge = options.totalCharge
-        ? parseInt(options.totalCharge)
-        : 13925;
-      const currentCharge = options.currentCharge
-        ? parseInt(options.currentCharge)
-        : 11625;
-      const cutoffCharge = options.cutoffCharge
-        ? parseInt(options.cutoffCharge)
-        : 10625;
-
-      const port = await selectPort();
-      const service = new SerialService(port);
-      await service.connect();
-
-      const command = new InitializePowerbankCommand(service);
-      const response = await command.execute(
-        parseInt(options.board),
-        parseInt(options.slot),
-        {
-          serialNumber,
-          timestamp,
-          cycles,
-          totalCharge,
-          currentCharge,
-          cutoffCharge,
-        }
-      );
-
-      const endTime = Date.now();
-      const executionTime = endTime - startTime;
-
-      if (response.success) {
-        const result = {
-          success: true,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          boardAddress: parseInt(options.board),
-          slotIndex: parseInt(options.slot),
-          powerbank: {
-            serialNumber,
-            manufacturingTimestamp: timestamp,
-            cycles,
-            totalCharge,
-            currentCharge,
-            cutoffCharge,
-          },
-        };
-        logger.log(JSON.stringify(result, null, 2));
-      } else {
-        const result = {
-          success: false,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          boardAddress: parseInt(options.board),
-          slotIndex: parseInt(options.slot),
-          error: {
-            code: response.status,
-            message: getStatusMessage(response.status),
-          },
-        };
-        logger.log(JSON.stringify(result, null, 2));
-        process.exit(1);
-      }
-
-      await service.disconnect();
-    } catch (error) {
-      const endTime = Date.now();
-      const executionTime = endTime - startTime;
-
-      const result = {
-        success: false,
-        executionTimeMs: executionTime,
-        timestamp: new Date().toISOString(),
-        boardAddress: parseInt(options.board),
-        slotIndex: parseInt(options.slot),
-        error: {
-          code: -1,
-          message: error instanceof Error ? error.message : "Unknown error",
-        },
-      };
-
-      logger.log(JSON.stringify(result, null, 2));
       process.exit(1);
     }
   });
