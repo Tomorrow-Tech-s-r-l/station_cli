@@ -182,7 +182,7 @@ export class SetLedCommandBuilder extends BaseCommandBuilder {
 // Set info command builder
 export class SetInfoCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length !== 18) {
+    if (!message.data || message.data.length !== 17) {
       throw new Error(
         "Set info command requires slot index, serial, timestamp, and cycles"
       );
@@ -190,7 +190,7 @@ export class SetInfoCommandBuilder extends BaseCommandBuilder {
     return Buffer.from([
       CMD_SET_INFO_PWB,
       message.data[0],
-      ...message.data.slice(1, 18),
+      ...message.data.slice(1, 17),
     ]);
   }
 }
@@ -198,15 +198,15 @@ export class SetInfoCommandBuilder extends BaseCommandBuilder {
 // Set battery info command builder
 export class SetBatteryInfoCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length !== 8) {
+    if (!message.data || message.data.length !== 7) {
       throw new Error(
         "Set battery info command requires slot index, total charge, current charge, and cutoff charge"
       );
     }
     return Buffer.from([
-      CMD_SET_INFO_PWB,
+      CMD_SET_INFO_BATTERY,
       message.data[0],
-      ...message.data.slice(1, 8),
+      ...message.data.slice(1, 7),
     ]);
   }
 }
@@ -259,6 +259,12 @@ export class CommandFactory {
       command.serialNumber = message.data.slice(1, 11).toString("utf8");
       command.timestamp = message.data.readUInt32LE(11);
       command.cycles = message.data.readUInt16LE(15);
+    } else if (message.command === CMD_SET_INFO_BATTERY && message.data) {
+      // For battery info, data contains: [slotIndex, totalCharge(2), currentCharge(2), cutoffCharge(2)]
+      command.slotId = message.data[0];
+      command.totalCharge = message.data.readUInt16LE(1);
+      command.currentCharge = message.data.readUInt16LE(3);
+      command.cutOffCharge = message.data.readUInt16LE(5);
     } else {
       // For other commands
       command.slotId = message.data?.[0];
