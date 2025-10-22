@@ -28,10 +28,15 @@ import { StatusCommand } from "./cli/commands/status";
 import { UnlockCommand } from "./cli/commands/unlock";
 import { ChargeCommand } from "./cli/commands/charge";
 import packageJson from "../package.json";
-import { CMD_GET_FW_VER, STATUS_ERR_INTERNAL } from "./protocol/constants";
+import {
+  CMD_GET_FW_VER,
+  CMD_MODEL,
+  STATUS_ERR_INTERNAL,
+} from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
 import { mapBoardToSlot, mapSlotToBoard } from "./utils/slot_mapping";
 import { LedCommand } from "./cli/commands/led";
+import { ModelCommand } from "./cli/commands/model";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
@@ -755,6 +760,37 @@ program
         );
       } else {
         logger.error("Command failed with status:", response[1]);
+      }
+
+      await service.disconnect();
+    } catch (error) {
+      logger.error("Error:", error);
+      process.exit(1);
+    }
+  });
+
+// Get model information
+program
+  .command("model")
+  .description("Get board model and number of boards in daisy chain")
+  .requiredOption("-b, --board <address>", "Board address (0-4)")
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      const port = await selectPort();
+      const service = new SerialService(port);
+      await service.connect();
+
+      const command = new ModelCommand(service);
+      const response = await command.execute(parseInt(options.board));
+
+      if (response.success) {
+        const modelInfo = JSON.parse(response.data.toString());
+        logger.log("Model:", modelInfo.model);
+        logger.log("Board count:", modelInfo.boardCount);
+        logger.log(`Execution time: ${Date.now() - startTime}ms`);
+      } else {
+        logger.error("Command failed with status:", response.status);
       }
 
       await service.disconnect();

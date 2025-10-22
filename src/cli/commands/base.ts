@@ -11,6 +11,7 @@ import {
   CMD_SET_LED_CODE,
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
+  CMD_MODEL,
   CMD_GET_FW_VER,
 } from "../../protocol/constants";
 
@@ -26,6 +27,7 @@ function getCommandName(commandCode: number): string {
     [CMD_SET_LED_CODE]: "SET_LED",
     [CMD_SET_INFO_PWB]: "SET_INFO_PWB",
     [CMD_SET_INFO_BATTERY]: "SET_INFO_BATTERY",
+    [CMD_MODEL]: "MODEL",
     [CMD_GET_FW_VER]: "GET_FW_VER",
   };
   return commandNames[commandCode] || `UNKNOWN(0x${commandCode.toString(16)})`;

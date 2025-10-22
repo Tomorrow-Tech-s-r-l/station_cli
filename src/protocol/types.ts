@@ -30,6 +30,12 @@ export interface FirmwareResponsePayload {
   version: string;
 }
 
+// Model response payload
+export interface ModelResponsePayload {
+  model: string;
+  boardCount: number;
+}
+
 // Command builders
 export interface CommandBuilder {
   buildCommand(message: SerialMessage): Buffer;

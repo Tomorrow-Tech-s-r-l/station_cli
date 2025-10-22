@@ -14,6 +14,7 @@ export const CMD_UNLOCK_CODE = 0x06;
 export const CMD_SET_LED_CODE = 0x07;
 export const CMD_SET_INFO_PWB = 0x08;
 export const CMD_SET_INFO_BATTERY = 0x09;
+export const CMD_MODEL = 0x0a;
 export const CMD_GET_FW_VER = 0x50;
 
 // Status Codes
