@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04-arm, macos-latest]
+        os: [ubuntu-24.04-arm, macos-latest, windows-latest]
         include:
           - os: ubuntu-24.04-arm
             build_script: build:executable:linux
@@ -24,6 +24,9 @@ jobs:
           - os: macos-latest
             build_script: build:executable:macos
             artifact_name: station-cli-macos-arm64
+          - os: windows-latest
+            build_script: build:executable:windows
+            artifact_name: station-cli-windows-x64.exe
 
     steps:
       - name: Checkout code
@@ -98,19 +101,22 @@ jobs:
           # List contents to debug
           ls -la station-cli-linux-arm64/
           ls -la station-cli-macos-arm64/
+          ls -la station-cli-windows-x64.exe/
           
           # The files are already in the correct location, just rename the directories
           mv station-cli-linux-arm64/station-cli-linux-arm64 ./station-cli-linux-arm64.tmp
           mv station-cli-macos-arm64/station-cli-macos-arm64 ./station-cli-macos-arm64.tmp
+          mv station-cli-windows-x64.exe/station-cli-windows-x64.exe ./station-cli-windows-x64.exe.tmp
           
           # Clean up directories
-          rm -rf station-cli-linux-arm64 station-cli-macos-arm64
+          rm -rf station-cli-linux-arm64 station-cli-macos-arm64 station-cli-windows-x64.exe
           
           # Rename the files to their final names
           mv station-cli-linux-arm64.tmp station-cli-linux-arm64
           mv station-cli-macos-arm64.tmp station-cli-macos-arm64
+          mv station-cli-windows-x64.exe.tmp station-cli-windows-x64.exe
           
-          # Make executables executable
+          # Make executables executable (not needed for Windows .exe)
           chmod +x station-cli-linux-arm64 station-cli-macos-arm64
           
           # Verify the files exist and are executable
@@ -132,9 +138,13 @@ jobs:
             
             ### macOS
             - [station-cli-macos-arm64](https://github.com/${{ github.repository }}/releases/download/${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}/station-cli-macos-arm64)
+            
+            ### Windows x64
+            - [station-cli-windows-x64.exe](https://github.com/${{ github.repository }}/releases/download/${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}/station-cli-windows-x64.exe)
           draft: false
           prerelease: ${{ needs.build.outputs.is_development == 'true' }}
           files: |
             station-cli-linux-arm64
             station-cli-macos-arm64
+            station-cli-windows-x64.exe
           tag_name: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }} 

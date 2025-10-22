@@ -16,7 +16,8 @@
     ],
     "targets": [
       "node18-linux-arm",
-      "node18-macos-x64"
+      "node18-macos-x64",
+      "node18-win-x64"
     ],
     "outputPath": "dist"
   },
@@ -26,7 +27,8 @@
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
     "build:executable:macos": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-macos-arm64 --output executables/station-cli-macos-arm64",
-    "build:executable:linux": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-linux-arm64 --output executables/station-cli-linux-arm64"
+    "build:executable:linux": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-linux-arm64 --output executables/station-cli-linux-arm64",
+    "build:executable:windows": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-win-x64 --output executables/station-cli-windows-x64.exe"
   },
   "keywords": [
     "cli",
