@@ -56,15 +56,28 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-24.04-arm'
         run: |
           sudo apt-get update
           sudo apt-get install -y make g++ git
           npm ci
 
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          npm ci
+        shell: bash
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          npm ci
+        shell: bash
+
       - name: Build executable
         run: npm run ${{ matrix.build_script }}
+        shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -76,6 +89,7 @@ jobs:
       - name: Get version
         id: get_version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Get commit message
         id: get_commit_message
@@ -84,6 +98,7 @@ jobs:
           echo "commit_message<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+        shell: bash
 
   release:
     needs: build
