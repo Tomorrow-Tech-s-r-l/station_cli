@@ -76,6 +76,7 @@ jobs:
       - name: Get version
         id: get_version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Get commit message
         id: get_commit_message
@@ -84,6 +85,7 @@ jobs:
           echo "commit_message<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+        shell: bash
 
   release:
     needs: build
