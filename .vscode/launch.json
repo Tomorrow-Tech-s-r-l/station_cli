@@ -100,6 +100,30 @@
       {
       "type": "node",
       "request": "launch",
+      "name": "Debug: Status",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "status",
+        "-i", "${input:index}"
+      ],
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+      {
+      "type": "node",
+      "request": "launch",
       "name": "Debug: Charge",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
@@ -132,31 +156,6 @@
         "led",
         "-i", "${input:index}",
         "-e", "${input:enable}"
-      ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
-      "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
-      "runtimeArgs": ["--nolazy"],
-      "env": {
-        "DEBUG": "true"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug: Status",
-      "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/src/cli.ts",
-      "args": [
-        "status",
-        "-b", "${input:board}",
-        "-s", "${input:slot}"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],

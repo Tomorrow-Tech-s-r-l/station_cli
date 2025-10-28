@@ -34,7 +34,12 @@ import {
   STATUS_ERR_INTERNAL,
 } from "./protocol/constants";
 import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
-import { mapBoardToSlot, mapSlotToBoard } from "./utils/slot_mapping";
+import {
+  mapBoardToSlot,
+  mapSlotToBoard,
+  SLOT_IS_DISABLED_DEFAULT_VALUE,
+  SLOT_IS_LOCKED_DEFAULT_VALUE,
+} from "./utils/slot_mapping";
 import { LedCommand } from "./cli/commands/led";
 import { ModelCommand } from "./cli/commands/model";
 import {
@@ -228,13 +233,13 @@ program
                       }
                     : null,
                   isCharging: shouldCharge,
-                  isLocked: true,
+                  isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                   index: mapBoardToSlot(i, slot.slotIndex),
                   state:
                     slot.powerBankInfo !== null
                       ? SlotState.available
                       : SlotState.empty,
-                  disabled: false,
+                  disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
                   boardAddress: i,
                   slotIndex: slot.slotIndex,
                 });
@@ -353,6 +358,156 @@ program
         slotIndex: parseInt(options.index),
         boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
         slotInBoard: (parseInt(options.index) - 1) % 6,
+        error: {
+          code: -1,
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+      };
+
+      logger.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+  });
+
+// Status command used to get the status of a powerbank in a specific board and slot
+program
+  .command("status")
+  .description("Get the status of a powerbank in a specific index")
+  .requiredOption(
+    "-i, --index <index>",
+    `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+    cliInputValidatorIndex
+  )
+  .action(async (options: CommandOptions) => {
+    const startTime = Date.now();
+    try {
+      const port = await selectPort();
+      const service = new SerialService(port);
+      await service.connect();
+
+      const command = new StatusCommand(service);
+      const slotsCommand = new SlotsCommand(service);
+      const slotMapping = mapSlotToBoard(parseInt(options.index));
+      // Check occupancy using SlotsCommand
+      let isAvailable: boolean;
+
+      const slotsResp = await slotsCommand.execute(slotMapping.boardAddress);
+
+      if (slotsResp.success) {
+        const slotsInfo = JSON.parse(slotsResp.data.toString());
+        isAvailable =
+          slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
+      } else {
+        let error = {
+          index: parseInt(options.index),
+          boardAddress: slotMapping.boardAddress,
+          slotIndex: slotMapping.slotInBoard,
+          error: SlotError.SLOTS_COMMAND_FAILED,
+          message: getStatusMessage(slotsResp.status),
+        };
+        logger.log(JSON.stringify(error, null, 2));
+        await service.disconnect();
+        process.exit(1);
+      }
+
+      // If slot is empty, return early with a clear response
+      if (!isAvailable) {
+        const endTime = Date.now();
+        const executionTime = endTime - startTime;
+        const result = {
+          success: true,
+          executionTimeMs: executionTime,
+          timestamp: new Date().toISOString(),
+          slot: {
+            powerBank: null,
+            isCharging: false,
+            isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
+            index: parseInt(options.index),
+            state: SlotState.empty,
+            disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
+            boardAddress: slotMapping.boardAddress,
+            slotIndex: slotMapping.slotInBoard,
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        await service.disconnect();
+      } else {
+        const response = await command.execute(
+          slotMapping.boardAddress,
+          slotMapping.slotInBoard
+        );
+
+        if (response.success) {
+          const powerBankInfo = JSON.parse(response.data.toString());
+          const powerLevel = calculatePowerLevel(
+            powerBankInfo?.currentCharge,
+            powerBankInfo?.totalCharge
+          );
+
+          const endTime = Date.now();
+          const executionTime = endTime - startTime;
+
+          const result = {
+            success: response.success,
+            executionTimeMs: executionTime,
+            timestamp: new Date().toISOString(),
+            slot: {
+              powerBank: {
+                id: powerBankInfo?.serial,
+                powerLevel: powerLevel,
+              },
+              isCharging: powerBankInfo?.isCharging,
+              isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
+              index: parseInt(options.index),
+              state: SlotState.available,
+              disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
+              boardAddress: slotMapping.boardAddress,
+              slotIndex: slotMapping.slotInBoard,
+            },
+          };
+
+          logger.log(JSON.stringify(result, null, 2));
+        } else {
+          const endTime = Date.now();
+          const executionTime = endTime - startTime;
+
+          const result = {
+            success: false,
+            executionTimeMs: executionTime,
+            timestamp: new Date().toISOString(),
+            slotIndex: parseInt(options.index),
+            boardAddress: slotMapping.boardAddress,
+            slotInBoard: slotMapping.slotInBoard,
+            isEmpty: !isAvailable,
+            error: {
+              code: response.status,
+              message: getStatusMessage(response.status),
+            },
+          };
+
+          logger.log(JSON.stringify(result, null, 2));
+          if (response.status === STATUS_ERR_INTERNAL) {
+            logger.error("\nPossible solutions:");
+            logger.error("1. Try resetting the device");
+            logger.error("2. Check if the powerbank is properly inserted");
+            logger.error("3. Try a different slot");
+          }
+        }
+
+        await service.disconnect();
+      }
+    } catch (error) {
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+
+      const slotMapping = mapSlotToBoard(parseInt(options.index));
+      const result = {
+        success: false,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+        slotIndex: parseInt(options.index),
+        boardAddress: slotMapping.boardAddress,
+        slotInBoard: slotMapping.slotInBoard,
         error: {
           code: -1,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -653,85 +808,6 @@ program
       };
 
       logger.log(JSON.stringify(result, null, 2));
-      process.exit(1);
-    }
-  });
-
-// Status command used to get the status of a powerbank in a specific board and slot
-program
-  .command("status")
-  .description("Get the status of a powerbank in a slot")
-  .requiredOption(
-    "-b, --board <address>",
-    `Board address (0-${MAXIMUM_BOARD_ADDRESS})`,
-    (value: string) => {
-      const board = parseInt(value);
-      if (isNaN(board) || board < 0 || board > MAXIMUM_BOARD_ADDRESS) {
-        throw new Error(
-          `Board address must be between 0 and ${MAXIMUM_BOARD_ADDRESS}`
-        );
-      }
-      return value;
-    }
-  )
-  .requiredOption(
-    "-s, --slot <address>",
-    `Slot value (0-${MAXIMUM_SLOT_ADDRESS})`,
-    (value: string) => {
-      const slot = parseInt(value);
-      if (isNaN(slot) || slot < 0 || slot > MAXIMUM_SLOT_ADDRESS) {
-        throw new Error(
-          `Slot address must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
-        );
-      }
-      return value;
-    }
-  )
-  .action(async (options: CommandOptions) => {
-    const startTime = Date.now();
-    try {
-      const port = await selectPort();
-      const service = new SerialService(port);
-      await service.connect();
-
-      const command = new StatusCommand(service);
-      const response = await command.execute(
-        parseInt(options.board),
-        parseInt(options.slot)
-      );
-
-      if (response.success) {
-        const powerBankInfo = JSON.parse(response.data.toString());
-        const powerLevel = calculatePowerLevel(
-          powerBankInfo?.currentCharge,
-          powerBankInfo?.totalCharge
-        );
-
-        const endTime = Date.now();
-        const executionTime = endTime - startTime;
-
-        const result = {
-          success: response.success,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          ...powerBankInfo,
-          powerLevel,
-        };
-
-        logger.log(JSON.stringify(result, null, 2));
-      } else {
-        logger.error("Command failed:", getStatusMessage(response.status));
-        if (response.status === STATUS_ERR_INTERNAL) {
-          logger.error("\nPossible solutions:");
-          logger.error("1. Try resetting the device");
-          logger.error("2. Check if the powerbank is properly inserted");
-          logger.error("3. Try a different slot");
-        }
-      }
-
-      await service.disconnect();
-    } catch (error) {
-      logger.error("Error:", error);
       process.exit(1);
     }
   });

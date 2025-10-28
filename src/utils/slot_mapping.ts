@@ -1,5 +1,8 @@
 import { MAXIMUM_BOARD_ADDRESS } from "../protocol/constants";
 
+export const SLOT_IS_LOCKED_DEFAULT_VALUE = true;
+export const SLOT_IS_DISABLED_DEFAULT_VALUE = false;
+
 export interface SlotMapping {
   boardAddress: number;
   slotInBoard: number;
