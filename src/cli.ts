@@ -393,11 +393,7 @@ program
 
       const slotsResp = await slotsCommand.execute(slotMapping.boardAddress);
 
-      if (slotsResp.success) {
-        const slotsInfo = JSON.parse(slotsResp.data.toString());
-        isAvailable =
-          slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
-      } else {
+      if (!slotsResp.success) {
         let error = {
           index: parseInt(options.index),
           boardAddress: slotMapping.boardAddress,
@@ -407,94 +403,98 @@ program
         };
         logger.log(JSON.stringify(error, null, 2));
         await service.disconnect();
-        process.exit(1);
-      }
-
-      // If slot is empty, return early with a clear response
-      if (!isAvailable) {
-        const endTime = Date.now();
-        const executionTime = endTime - startTime;
-        const result = {
-          success: true,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          slot: {
-            powerBank: null,
-            isCharging: false,
-            isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
-            index: parseInt(options.index),
-            state: SlotState.empty,
-            disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
-            boardAddress: slotMapping.boardAddress,
-            slotIndex: slotMapping.slotInBoard,
-          },
-        };
-        logger.log(JSON.stringify(result, null, 2));
-        await service.disconnect();
       } else {
-        const response = await command.execute(
-          slotMapping.boardAddress,
-          slotMapping.slotInBoard
-        );
+        // Check if slot is available
+        const slotsInfo = JSON.parse(slotsResp.data.toString());
+        isAvailable =
+          slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
 
-        if (response.success) {
-          const powerBankInfo = JSON.parse(response.data.toString());
-          const powerLevel = calculatePowerLevel(
-            powerBankInfo?.currentCharge,
-            powerBankInfo?.totalCharge
-          );
-
+        // If slot is empty, return early with a clear response
+        if (!isAvailable) {
           const endTime = Date.now();
           const executionTime = endTime - startTime;
-
           const result = {
-            success: response.success,
+            success: true,
             executionTimeMs: executionTime,
             timestamp: new Date().toISOString(),
             slot: {
-              powerBank: {
-                id: powerBankInfo?.serial,
-                powerLevel: powerLevel,
-              },
-              isCharging: powerBankInfo?.isCharging,
+              powerBank: null,
+              isCharging: false,
               isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
               index: parseInt(options.index),
-              state: SlotState.available,
+              state: SlotState.empty,
               disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
               boardAddress: slotMapping.boardAddress,
               slotIndex: slotMapping.slotInBoard,
             },
           };
-
           logger.log(JSON.stringify(result, null, 2));
+          await service.disconnect();
         } else {
-          const endTime = Date.now();
-          const executionTime = endTime - startTime;
+          const response = await command.execute(
+            slotMapping.boardAddress,
+            slotMapping.slotInBoard
+          );
 
-          const result = {
-            success: false,
-            executionTimeMs: executionTime,
-            timestamp: new Date().toISOString(),
-            slotIndex: parseInt(options.index),
-            boardAddress: slotMapping.boardAddress,
-            slotInBoard: slotMapping.slotInBoard,
-            isEmpty: !isAvailable,
-            error: {
-              code: response.status,
-              message: getStatusMessage(response.status),
-            },
-          };
+          if (response.success) {
+            const powerBankInfo = JSON.parse(response.data.toString());
+            const powerLevel = calculatePowerLevel(
+              powerBankInfo?.currentCharge,
+              powerBankInfo?.totalCharge
+            );
 
-          logger.log(JSON.stringify(result, null, 2));
-          if (response.status === STATUS_ERR_INTERNAL) {
-            logger.error("\nPossible solutions:");
-            logger.error("1. Try resetting the device");
-            logger.error("2. Check if the powerbank is properly inserted");
-            logger.error("3. Try a different slot");
+            const endTime = Date.now();
+            const executionTime = endTime - startTime;
+
+            const result = {
+              success: response.success,
+              executionTimeMs: executionTime,
+              timestamp: new Date().toISOString(),
+              slot: {
+                powerBank: {
+                  id: powerBankInfo?.serial,
+                  powerLevel: powerLevel,
+                },
+                isCharging: powerBankInfo?.isCharging,
+                isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
+                index: parseInt(options.index),
+                state: SlotState.available,
+                disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
+                boardAddress: slotMapping.boardAddress,
+                slotIndex: slotMapping.slotInBoard,
+              },
+            };
+
+            logger.log(JSON.stringify(result, null, 2));
+          } else {
+            const endTime = Date.now();
+            const executionTime = endTime - startTime;
+
+            const result = {
+              success: false,
+              executionTimeMs: executionTime,
+              timestamp: new Date().toISOString(),
+              slotIndex: parseInt(options.index),
+              boardAddress: slotMapping.boardAddress,
+              slotInBoard: slotMapping.slotInBoard,
+              isEmpty: !isAvailable,
+              error: {
+                code: response.status,
+                message: getStatusMessage(response.status),
+              },
+            };
+
+            logger.log(JSON.stringify(result, null, 2));
+            if (response.status === STATUS_ERR_INTERNAL) {
+              logger.error("\nPossible solutions:");
+              logger.error("1. Try resetting the device");
+              logger.error("2. Check if the powerbank is properly inserted");
+              logger.error("3. Try a different slot");
+            }
           }
-        }
 
-        await service.disconnect();
+          await service.disconnect();
+        }
       }
     } catch (error) {
       const endTime = Date.now();
