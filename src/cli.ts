@@ -849,7 +849,6 @@ program
 program
   .command("model")
   .description("Get board model and number of boards in daisy chain")
-  .requiredOption("-b, --board <address>", "Board address (0-4)")
   .action(async (options: CommandOptions) => {
     const startTime = Date.now();
     try {
@@ -857,8 +856,11 @@ program
       const service = new SerialService(port);
       await service.connect();
 
+      // Should be the board 0 the one returning the model
+      const boardAddress = 0;
+
       const command = new ModelCommand(service);
-      const response = await command.execute(parseInt(options.board));
+      const response = await command.execute(boardAddress);
 
       if (response.success) {
         const modelInfo = JSON.parse(response.data.toString());

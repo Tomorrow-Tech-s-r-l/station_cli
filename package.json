@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "station-cli",
-  "version": "0.0.22",
+  "version": "0.0.25",
   "description": "CLI tool to control station board and powerbanks",
   "main": "src/cli.ts",
   "bin": "dist/cli.js",

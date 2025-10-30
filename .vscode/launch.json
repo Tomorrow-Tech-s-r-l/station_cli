@@ -226,10 +226,6 @@
       "name": "Debug: Model",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
-      "args": [
-        "model",
-        "-b", "${input:board}"
-      ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
