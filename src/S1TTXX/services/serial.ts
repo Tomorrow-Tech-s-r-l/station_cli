@@ -1,6 +1,6 @@
 import { SerialPort } from "serialport";
 import { InterByteTimeoutParser } from "@serialport/parser-inter-byte-timeout";
-import { debug } from "../utils/debug";
+import { debug } from "../../utils/debug";
 import { TransportProtocol } from "./transport";
 import { CommandFactory } from "../protocol/commands";
 import { SerialMessage } from "../protocol/types";

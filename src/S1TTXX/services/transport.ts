@@ -1,5 +1,5 @@
 // Buffer is a Node.js built-in, no import needed
-import { debug } from "../utils/debug";
+import { debug } from "../../utils/debug";
 import { crc16 } from "easy-crc";
 import { FRAME_START_BYTE, CRC_ALGORITHM } from "../protocol/constants";
 

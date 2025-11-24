@@ -7,45 +7,45 @@ import {
   SLOT_INDEX_MAXIMUM,
   SLOT_INDEX_MINIMUM,
   SLOT_LOCKED,
-} from "./protocol/constants";
+} from "./S1TTXX/protocol/constants";
 import {
   SlotState,
   SlotError,
   SlotErrorInfo,
   SlotsResponse,
   SlotsInfo,
-} from "./protocol/types";
+} from "./S1TTXX/protocol/types";
 import { debug } from "./utils/debug";
 import { selectPort } from "./utils/port_selector";
-import { getStatusMessage } from "./utils/status";
-import { calculatePowerLevel } from "./utils/power_level";
+import { getStatusMessage } from "./S1TTXX/utils/status";
+import { calculatePowerLevel } from "./S1TTXX/utils/power_level";
 import { logger } from "./utils/logger";
 
 import { Command } from "commander";
-import { SerialService } from "./services/serial";
-import { SlotsCommand } from "./cli/commands/slots";
-import { StatusCommand } from "./cli/commands/status";
-import { UnlockCommand } from "./cli/commands/unlock";
-import { ChargeCommand } from "./cli/commands/charge";
+import { SerialService } from "./S1TTXX/services/serial";
+import { SlotsCommand } from "./S1TTXX/cli/commands/slots";
+import { StatusCommand } from "./S1TTXX/cli/commands/status";
+import { UnlockCommand } from "./S1TTXX/cli/commands/unlock";
+import { ChargeCommand } from "./S1TTXX/cli/commands/charge";
 import packageJson from "../package.json";
 import {
   CMD_GET_FW_VER,
   CMD_MODEL,
   STATUS_ERR_INTERNAL,
-} from "./protocol/constants";
-import { InitializePowerbankCommand } from "./cli/commands/initialize_powerbank";
+} from "./S1TTXX/protocol/constants";
+import { InitializePowerbankCommand } from "./S1TTXX/cli/commands/initialize_powerbank";
 import {
   mapBoardToSlot,
   mapSlotToBoard,
   SLOT_IS_DISABLED_DEFAULT_VALUE,
   SLOT_IS_LOCKED_DEFAULT_VALUE,
-} from "./utils/slot_mapping";
-import { LedCommand } from "./cli/commands/led";
-import { ModelCommand } from "./cli/commands/model";
+} from "./S1TTXX/utils/slot_mapping";
+import { LedCommand } from "./S1TTXX/cli/commands/led";
+import { ModelCommand } from "./S1TTXX/cli/commands/model";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
-} from "./utils/cli_input_validator";
+} from "./S1TTXX/utils/cli_input_validator";
 
 interface CommandOptions {
   port: string;

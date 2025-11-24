@@ -1,4 +1,4 @@
-import { SerialService } from "../services/serial";
+import { SerialService } from "../S1TTXX/services/serial";
 
 export async function selectPort(): Promise<string> {
   const service = new SerialService("");

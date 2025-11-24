@@ -1,6 +1,6 @@
 import { SerialService } from "../../services/serial";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
-import { debug } from "../../utils/debug";
+import { debug } from "../../../utils/debug";
 import {
   CMD_STATUS_CODE,
   CMD_SET_CHARGE_CODE,

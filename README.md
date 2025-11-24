@@ -6,16 +6,26 @@ A command-line interface tool for controlling station boards and powerbanks. Thi
 
 The CLI can be installed in two ways:
 
-### Global Installation (Recommended)
+### Download
+
+You can download the latest pre-built executable for your platform from the [GitHub Releases page](https://github.com/Tomorrow-Tech-s-r-l/station_cli/releases).
+Choose the appropriate asset for your operating system, download it, and follow any included instructions to run the CLI.
+
+#### macOS Quarantine Removal
+
+On macOS, downloaded executables may be quarantined by Gatekeeper, preventing them from running. To remove the quarantine attribute, run:
+
 ```bash
-npm install -g station-cli
+xattr -rd com.apple.quarantine /path/to/station-cli-macos-arm64
 ```
 
-### Development Version
-If you want to use the development version (pre-release builds), you can install it with:
+Replace `/path/to/station-cli-macos-arm64` with the actual path to your downloaded executable. For example, if you downloaded it to your Downloads folder:
+
 ```bash
-npm install -g station-cli@dev
+xattr -rd com.apple.quarantine ~/Downloads/station-cli-macos-arm64
 ```
+
+After running this command, you should be able to execute the CLI without macOS blocking it.
 
 ## Updates
 
