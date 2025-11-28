@@ -46,6 +46,7 @@ import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
 } from "./S1TTXX/utils/cli_input_validator";
+import { registerOldCommands } from "./cli/old_commands";
 
 interface CommandOptions {
   port: string;
@@ -877,5 +878,8 @@ program
       process.exit(1);
     }
   });
+
+// Register old commands for S0RUXX protocol
+registerOldCommands(program);
 
 program.parse();
