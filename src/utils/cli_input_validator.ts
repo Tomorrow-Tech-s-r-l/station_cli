@@ -1,4 +1,7 @@
-import { SLOT_INDEX_MAXIMUM, SLOT_INDEX_MINIMUM } from "../protocol/constants";
+import {
+  SLOT_INDEX_MAXIMUM,
+  SLOT_INDEX_MINIMUM,
+} from "../S1TTXX/protocol/constants";
 
 /**
  * Make validation on the enable input cli requests

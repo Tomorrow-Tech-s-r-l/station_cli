@@ -270,7 +270,8 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
-        "s0ruxx-unlock"
+        "s0ruxx-unlock",
+        "-i", "${input:index}"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],

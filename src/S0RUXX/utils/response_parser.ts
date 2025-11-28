@@ -20,6 +20,59 @@ export interface ParsedSlotData {
   status: string;
 }
 
+/**
+ * Standardized slot status format (matching S1TTXX format)
+ */
+export interface StandardizedSlotStatus {
+  available: boolean;
+  charging: boolean;
+  outputting: boolean;
+}
+
+/**
+ * Converts S0RUXX slot status string to standardized format
+ * 
+ * Status format: "ABC" where:
+ * - A: Charging (0 = not charging, 1 = charging)
+ * - B: Contact (0 = in contact, 1 = not in contact)
+ * - C: Lock (1 = lock in place, 0 = lock not in place)
+ * 
+ * @param statusString 3-character status string (e.g., "001", "101")
+ * @param serialNumber Serial number of the powerbank (null if not present)
+ * @returns Standardized slot status
+ */
+export function convertSlotStatusToStandardized(
+  statusString: string,
+  serialNumber: string | null
+): StandardizedSlotStatus {
+  if (!statusString || statusString.length < 3) {
+    return {
+      available: false,
+      charging: false,
+      outputting: false,
+    };
+  }
+
+  const chargingChar = statusString[0];
+  const contactChar = statusString[1];
+  const lockChar = statusString[2];
+
+  // Available: powerbank is in contact (contactChar === '0') AND lock is in place (lockChar === '1')
+  const available = contactChar === '0' && lockChar === '1' && serialNumber !== null;
+
+  // Charging: first character is '1'
+  const charging = chargingChar === '1';
+
+  // Outputting: available, has powerbank, and not charging (powerbank is discharging)
+  const outputting = available && !charging && serialNumber !== null;
+
+  return {
+    available,
+    charging,
+    outputting,
+  };
+}
+
 export interface ParsedACResponse {
   messageId: string;
   deviceId: string;

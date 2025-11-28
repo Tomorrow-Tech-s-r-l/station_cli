@@ -1,17 +1,27 @@
-/**
- * Simplified Commands for S0RUXX Protocol
- * 
- * Simple commands to:
- * - Query device info (CQ command)
- * - Unlock powerbank (FB command)
- */
-
 import { Command } from "commander";
-import { SerialService } from "../S0RUXX/services/serial";
-import { QueryCommand } from "../S0RUXX/cli/commands/query";
-import { UnlockCommand } from "../S0RUXX/cli/commands/unlock";
-import { logger } from "../utils/logger";
+import { SerialService } from "../services/serial";
+import { StatusCommand } from "./commands/status";
+import { UnlockCommand } from "./commands/unlock";
+import { logger } from "../../utils/logger";
+import {
+  SLOT_INDEX_MAXIMUM,
+  SLOT_INDEX_MINIMUM,
+} from "../../S1TTXX/protocol/constants";
+import { cliInputValidatorIndex } from "../../utils/cli_input_validator";
 
+interface CommandOptions {
+  port: string;
+  board: string;
+  slot: string;
+  index: string;
+  enable?: string;
+  addresses?: string;
+  id?: string;
+  totalCharge?: string;
+  currentCharge?: string;
+  cutoffCharge?: string;
+  cycles?: string;
+}
 /**
  * Select port for S0RUXX protocol
  */
@@ -31,24 +41,24 @@ async function selectPort(): Promise<string> {
 }
 
 /**
- * Register simplified commands for S0RUXX protocol
+ * Register all S0RUXX commands to the Commander program
  * @param program - Commander program instance
  */
-export function registerOldCommands(program: Command): void {
+export function registerS0RUXXCommands(program: Command): void {
   // Query command - sends CQ command to get device info
   program
     .command("s0ruxx-query")
     .alias("s0-query")
-    .description("Query device information (sends {0@CQ,0,0,0000})")
+    .description("Get the status of all slots (sends {0@CQ,0,0,0000})")
     .action(async () => {
       try {
         const port = await selectPort();
         const service = new SerialService(port);
         await service.connect();
-        
-        const command = new QueryCommand(service);
+
+        const command = new StatusCommand(service);
         await command.execute();
-        
+
         await service.disconnect();
       } catch (error) {
         logger.error("Query error:", error);
@@ -61,15 +71,22 @@ export function registerOldCommands(program: Command): void {
     .command("s0ruxx-unlock")
     .alias("s0-unlock")
     .description("Unlock powerbank (sends {0@FB,0,<timestamp>,1,0000})")
-    .action(async () => {
+    .requiredOption(
+      "-i, --index <index>",
+      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      cliInputValidatorIndex
+    )
+    .action(async (options: CommandOptions) => {
       try {
         const port = await selectPort();
         const service = new SerialService(port);
         await service.connect();
-        
+
+        const slotIndex = parseInt(options.index);
+
         const command = new UnlockCommand(service);
-        await command.execute();
-        
+        await command.execute(parseInt(options.index));
+
         await service.disconnect();
       } catch (error) {
         logger.error("Unlock error:", error);
