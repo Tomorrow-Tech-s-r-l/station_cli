@@ -4,7 +4,7 @@ import {
   BAUD_RATE,
   FRAME_START_CHAR,
   FRAME_END_CHAR,
-} from "../protocol/constants";
+} from "../../utils/constants";
 
 export class SerialService {
   private port: SerialPort | null = null;
@@ -47,19 +47,24 @@ export class SerialService {
           this.responseBuffer += text;
           debug.log("Received raw data:", JSON.stringify(text));
           debug.log("Current buffer:", JSON.stringify(this.responseBuffer));
-          
+
           // Check if we have a complete frame and a resolver waiting
           if (this.responseResolver) {
             const frameStart = this.responseBuffer.indexOf(FRAME_START_CHAR);
-            const frameEnd = this.responseBuffer.indexOf(FRAME_END_CHAR, frameStart);
-            
+            const frameEnd = this.responseBuffer.indexOf(
+              FRAME_END_CHAR,
+              frameStart
+            );
+
             if (frameStart !== -1 && frameEnd !== -1) {
-              const frame = this.responseBuffer.substring(frameStart, frameEnd + 1).trim();
+              const frame = this.responseBuffer
+                .substring(frameStart, frameEnd + 1)
+                .trim();
               debug.log("Found complete frame:", JSON.stringify(frame));
-              
+
               // Clear the frame from buffer
               this.responseBuffer = this.responseBuffer.substring(frameEnd + 1);
-              
+
               // Resolve the promise
               const resolver = this.responseResolver;
               this.responseResolver = null;
@@ -107,15 +112,25 @@ export class SerialService {
     return new Promise((resolve, reject) => {
       // Clear any previous resolver
       if (this.responseRejector) {
-        this.responseRejector(new Error("New command sent, cancelling previous"));
+        this.responseRejector(
+          new Error("New command sent, cancelling previous")
+        );
       }
 
       // Set up timeout
       const timeout = setTimeout(() => {
         this.responseResolver = null;
         this.responseRejector = null;
-        debug.error(`Response timeout. Buffer content: ${JSON.stringify(this.responseBuffer)}`);
-        reject(new Error(`Response timeout. Received: ${JSON.stringify(this.responseBuffer)}`));
+        debug.error(
+          `Response timeout. Buffer content: ${JSON.stringify(
+            this.responseBuffer
+          )}`
+        );
+        reject(
+          new Error(
+            `Response timeout. Received: ${JSON.stringify(this.responseBuffer)}`
+          )
+        );
       }, 10000);
 
       // Set up response handlers
@@ -169,7 +184,9 @@ export class SerialService {
     const frameWithCRLF = command + "\r\n";
     const frameBuffer = Buffer.from(frameWithCRLF, "ascii");
 
-    debug.log(`Sending command (no response expected): ${JSON.stringify(frameWithCRLF)}`);
+    debug.log(
+      `Sending command (no response expected): ${JSON.stringify(frameWithCRLF)}`
+    );
 
     return new Promise((resolve, reject) => {
       this.port!.write(frameBuffer, (err: any) => {

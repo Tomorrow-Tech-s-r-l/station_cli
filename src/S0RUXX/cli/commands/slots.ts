@@ -12,22 +12,17 @@ export interface StandardizedSlotInfo {
   } | null;
   available: boolean;
   charging: boolean;
-  outputting: boolean;
 }
 
 export interface StandardizedQueryResponse {
-  messageId: string;
   deviceId: string;
   firmwareVersion: string;
   slotCount: number;
-  status1: number;
-  status2: number;
-  status3: number;
   slots: StandardizedSlotInfo[];
   checksum?: string;
 }
 
-export class StatusCommand {
+export class SlotsCommand {
   constructor(private serialService: SerialService) {}
 
   async execute(): Promise<void> {
@@ -61,13 +56,9 @@ export class StatusCommand {
       if (parsed) {
         // Convert to standardized format (matching S1TTXX format)
         const standardizedResponse: StandardizedQueryResponse = {
-          messageId: parsed.messageId,
           deviceId: parsed.deviceId,
           firmwareVersion: parsed.firmwareVersion,
           slotCount: parsed.slotCount,
-          status1: parsed.status1,
-          status2: parsed.status2,
-          status3: parsed.status3,
           slots: parsed.slots.map((slot) => {
             const standardizedStatus = convertSlotStatusToStandardized(
               slot.status,
@@ -85,7 +76,6 @@ export class StatusCommand {
                   : null,
               available: standardizedStatus.available,
               charging: standardizedStatus.charging,
-              outputting: standardizedStatus.outputting,
             };
           }),
           checksum: parsed.checksum,

@@ -9,10 +9,9 @@ import {
   CMD_SET_LED_CODE,
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
-  CMD_MODEL,
   CMD_GET_FW_VER,
   MAXIMUM_SLOT_ADDRESS,
-} from "./constants";
+} from "../../utils/constants";
 import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
 
 /**
@@ -219,13 +218,6 @@ export class FirmwareVersionCommandBuilder extends BaseCommandBuilder {
   }
 }
 
-// Model command builder
-export class ModelCommandBuilder extends BaseCommandBuilder {
-  buildCommand(message: SerialMessage): Buffer {
-    return Buffer.from([CMD_MODEL]);
-  }
-}
-
 // Command factory
 export class CommandFactory {
   private static builders: Map<number, CommandBuilder> = new Map([
@@ -238,7 +230,6 @@ export class CommandFactory {
     [CMD_SET_LED_CODE, new SetLedCommandBuilder()],
     [CMD_SET_INFO_PWB, new SetInfoCommandBuilder()],
     [CMD_SET_INFO_BATTERY, new SetBatteryInfoCommandBuilder()],
-    [CMD_MODEL, new ModelCommandBuilder()],
     [CMD_GET_FW_VER, new FirmwareVersionCommandBuilder()],
   ]);
 

@@ -4,7 +4,7 @@ import {
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
   MAXIMUM_SLOT_ADDRESS,
-} from "../../protocol/constants";
+} from "../../../utils/constants";
 // Buffer is a Node.js built-in, no import needed
 
 interface InitializePowerbankParams {

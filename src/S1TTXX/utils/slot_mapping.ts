@@ -1,4 +1,4 @@
-import { MAXIMUM_BOARD_ADDRESS } from "../protocol/constants";
+import { getMaximumBoardAddress } from "../../utils/model";
 
 export const SLOT_IS_LOCKED_DEFAULT_VALUE = true;
 export const SLOT_IS_DISABLED_DEFAULT_VALUE = false;
@@ -32,9 +32,9 @@ export function mapSlotToBoard(slotIndex: number): SlotMapping {
   const boardAddress = Math.floor(zeroBasedIndex / 6); // 6 slots per board
   const slotInBoard = zeroBasedIndex % 6; // 0-5 for slots within board
 
-  if (boardAddress > MAXIMUM_BOARD_ADDRESS) {
+  if (boardAddress > getMaximumBoardAddress()) {
     throw new Error(
-      `Invalid slot index: ${slotIndex} (board ${boardAddress} exceeds maximum ${MAXIMUM_BOARD_ADDRESS})`
+      `Invalid slot index: ${slotIndex} (board ${boardAddress} exceeds maximum ${getMaximumBoardAddress()})`
     );
   }
 
@@ -57,9 +57,9 @@ export function mapBoardToSlot(
   boardAddress: number,
   slotInBoard: number
 ): number {
-  if (boardAddress < 0 || boardAddress > MAXIMUM_BOARD_ADDRESS) {
+  if (boardAddress < 0 || boardAddress > getMaximumBoardAddress()) {
     throw new Error(
-      `Board address must be between 0 and ${MAXIMUM_BOARD_ADDRESS}`
+      `Board address must be between 0 and ${getMaximumBoardAddress()}`
     );
   }
 

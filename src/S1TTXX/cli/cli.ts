@@ -1,15 +1,12 @@
 import { Command } from "commander";
 import {
-  MAXIMUM_BOARD_ADDRESS,
   MAXIMUM_POWER_LEVEL,
   MAXIMUM_SLOT_ADDRESS,
-  SLOT_INDEX_MAXIMUM,
   SLOT_INDEX_MINIMUM,
   SLOT_LOCKED,
   CMD_GET_FW_VER,
-  CMD_MODEL,
   STATUS_ERR_INTERNAL,
-} from "../protocol/constants";
+} from "../../utils/constants";
 import {
   SlotState,
   SlotError,
@@ -35,11 +32,11 @@ import {
   SLOT_IS_LOCKED_DEFAULT_VALUE,
 } from "../utils/slot_mapping";
 import { LedCommand } from "./commands/led";
-import { ModelCommand } from "./commands/model";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
 } from "../../utils/cli_input_validator";
+import { getMaximumBoardAddress, getSlotIndexMaximum } from "../../utils/model";
 
 interface CommandOptions {
   port: string;
@@ -56,283 +53,272 @@ interface CommandOptions {
 }
 
 /**
- * Register all S1TTXX commands to the Commander program
- * @param program - Commander program instance
+ * Execute S1TTXX unlock for a given slot index.
  */
-export function registerS1TTXXCommands(program: Command): void {
-  // Get slots status
-  program
-    .command("slots")
-    .description("Get status of all slots")
-    .option(
-      "-a, --addresses <addresses>",
-      `Total addresses (0-${MAXIMUM_BOARD_ADDRESS})`
-    )
-    .action(async (options: CommandOptions) => {
-      const startTime = Date.now();
+export async function runS1TTXXUnlock(index: number): Promise<void> {
+  const startTime = Date.now();
+  try {
+    const port = await selectPort();
+    const service = new SerialService(port);
+    await service.connect();
+
+    const command = new UnlockCommand(service);
+    const response = await command.execute(index);
+
+    const endTime = Date.now();
+    const executionTime = endTime - startTime;
+
+    if (response.success) {
+      // Turn off led for unlocked slot
+      const ledCommand = new LedCommand(service);
+      await ledCommand.execute(index, false);
+    }
+
+    const result = {
+      success: response.success,
+      executionTimeMs: executionTime,
+      timestamp: new Date().toISOString(),
+      slotIndex: index,
+      boardAddress: Math.floor((index - 1) / 6),
+      slotInBoard: (index - 1) % 6,
+      error: response.success
+        ? null
+        : {
+            code: response.status,
+            message: getStatusMessage(response.status),
+          },
+    };
+
+    logger.log(JSON.stringify(result, null, 2));
+
+    await service.disconnect();
+  } catch (error) {
+    const endTime = Date.now();
+    const executionTime = endTime - startTime;
+
+    const result = {
+      success: false,
+      executionTimeMs: executionTime,
+      timestamp: new Date().toISOString(),
+      slotIndex: index,
+      boardAddress: Math.floor((index - 1) / 6),
+      slotInBoard: (index - 1) % 6,
+      error: {
+        code: -1,
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+    };
+
+    logger.log(JSON.stringify(result, null, 2));
+    process.exit(1);
+  }
+}
+
+/**
+ * Execute S1TTXX for all slots.
+ */
+export async function runS1TTXXSlots(): Promise<void> {
+  const startTime = Date.now();
+  try {
+    const slots: SlotsInfo[] = [];
+    const errors: SlotErrorInfo[] = [];
+
+    const port = await selectPort();
+    const service = new SerialService(port);
+    await service.connect();
+
+    const command = new SlotsCommand(service);
+    const statusCommand = new StatusCommand(service);
+    const ledCommand = new LedCommand(service);
+    const chargeCommand = new ChargeCommand(service);
+
+    for (let i = 0; i <= getMaximumBoardAddress(); i++) {
       try {
-        const slots: SlotsInfo[] = [];
-        const errors: SlotErrorInfo[] = [];
+        const response = await command.execute(i);
 
-        const port = await selectPort();
-        const service = new SerialService(port);
-        await service.connect();
-
-        const command = new SlotsCommand(service);
-        const statusCommand = new StatusCommand(service);
-        const ledCommand = new LedCommand(service);
-        const chargeCommand = new ChargeCommand(service);
-
-        const totalAddresses =
-          options.addresses !== undefined
-            ? parseInt(options.addresses)
-            : MAXIMUM_BOARD_ADDRESS;
-
-        for (let i = 0; i <= totalAddresses; i++) {
+        if (response.success) {
           try {
-            const response = await command.execute(i);
+            const slotsInfo = JSON.parse(response.data.toString());
+            debug.success("Slots status: ", slotsInfo);
 
-            if (response.success) {
-              try {
-                const slotsInfo = JSON.parse(response.data.toString());
-                debug.success("Slots status: ", slotsInfo);
+            // Phase 1: Collect slot information for this board
+            const boardSlots: Array<{
+              slotIndex: number;
+              isAvailable: boolean;
+              powerBankInfo: any;
+              powerLevel: number;
+              needsCharging: boolean;
+            }> = [];
 
-                // Phase 1: Collect slot information for this board
-                const boardSlots: Array<{
-                  slotIndex: number;
-                  isAvailable: boolean;
-                  powerBankInfo: any;
-                  powerLevel: number;
-                  needsCharging: boolean;
-                }> = [];
+            for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
+              const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
+              let powerBankInfo = null;
+              let powerLevel = 0;
+              let needsCharging = false;
 
-                for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
-                  const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
-                  let powerBankInfo = null;
-                  let powerLevel = 0;
-                  let needsCharging = false;
+              // Turn on led for available slot
+              await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
 
-                  // Turn on led for available slot
-                  await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
+              if (isAvailable) {
+                // Get status of powerbank
+                try {
+                  const statusResponse = await statusCommand.execute(i, j);
+                  if (statusResponse.success) {
+                    powerBankInfo = JSON.parse(statusResponse.data.toString());
+                    const currentCharge =
+                      parseInt(powerBankInfo?.currentCharge) || 0;
+                    const totalCharge =
+                      parseInt(powerBankInfo?.totalCharge) || 0;
 
-                  if (isAvailable) {
-                    // Get status of powerbank
-                    try {
-                      const statusResponse = await statusCommand.execute(i, j);
-                      if (statusResponse.success) {
-                        powerBankInfo = JSON.parse(
-                          statusResponse.data.toString()
-                        );
-                        const currentCharge =
-                          parseInt(powerBankInfo?.currentCharge) || 0;
-                        const totalCharge =
-                          parseInt(powerBankInfo?.totalCharge) || 0;
-
-                        powerLevel = calculatePowerLevel(
-                          currentCharge,
-                          totalCharge
-                        );
-
-                        needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
-                      } else {
-                        errors.push({
-                          index: mapBoardToSlot(i, j),
-                          boardAddress: i,
-                          slotIndex: j,
-                          error: SlotError.STATUS_COMMAND_FAILED,
-                          message: getStatusMessage(statusResponse.status),
-                        });
-                      }
-                    } catch (error) {
-                      errors.push({
-                        index: mapBoardToSlot(i, j),
-                        boardAddress: i,
-                        slotIndex: j,
-                        error: SlotError.CONNECTION_ERROR,
-                        message:
-                          error instanceof Error
-                            ? error.message
-                            : "Unknown error",
-                      });
-                    }
-                  }
-
-                  boardSlots.push({
-                    slotIndex: j,
-                    isAvailable,
-                    powerBankInfo,
-                    powerLevel,
-                    needsCharging,
-                  });
-                }
-
-                // Phase 2: Determine which slot (if any) should charge
-                // Rule: Only ONE powerbank per board can charge at a time
-                let chargingSlotIndex = -1;
-                for (const slot of boardSlots) {
-                  if (slot.needsCharging) {
-                    chargingSlotIndex = slot.slotIndex;
-                    break; // Select first powerbank that needs charging
-                  }
-                }
-
-                // Phase 3: Apply charging commands and build response
-                for (const slot of boardSlots) {
-                  const shouldCharge = slot.slotIndex === chargingSlotIndex;
-
-                  // Send charge command for available slots
-                  if (slot.isAvailable) {
-                    await chargeCommand.execute(
-                      mapBoardToSlot(i, slot.slotIndex),
-                      shouldCharge
+                    powerLevel = calculatePowerLevel(
+                      currentCharge,
+                      totalCharge
                     );
-                  }
 
-                  slots.push({
-                    powerBank: slot.powerBankInfo
-                      ? {
-                          id: slot.powerBankInfo?.serial,
-                          powerLevel: slot.powerLevel,
-                        }
-                      : null,
-                    isCharging: shouldCharge,
-                    isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
-                    index: mapBoardToSlot(i, slot.slotIndex),
-                    state:
-                      slot.powerBankInfo !== null
-                        ? SlotState.available
-                        : SlotState.empty,
-                    disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
+                    needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
+                  } else {
+                    errors.push({
+                      index: mapBoardToSlot(i, j),
+                      boardAddress: i,
+                      slotIndex: j,
+                      error: SlotError.STATUS_COMMAND_FAILED,
+                      message: getStatusMessage(statusResponse.status),
+                    });
+                  }
+                } catch (error) {
+                  errors.push({
+                    index: mapBoardToSlot(i, j),
                     boardAddress: i,
-                    slotIndex: slot.slotIndex,
+                    slotIndex: j,
+                    error: SlotError.CONNECTION_ERROR,
+                    message:
+                      error instanceof Error ? error.message : "Unknown error",
                   });
                 }
-              } catch (error) {
-                errors.push({
-                  index: -1,
-                  boardAddress: i,
-                  slotIndex: -1,
-                  error: SlotError.INVALID_RESPONSE,
-                  message:
-                    "Failed to parse slots info response: " +
-                    (error instanceof Error ? error.message : "Unknown error"),
-                });
               }
-            } else {
-              errors.push({
-                index: -1,
+
+              boardSlots.push({
+                slotIndex: j,
+                isAvailable,
+                powerBankInfo,
+                powerLevel,
+                needsCharging,
+              });
+            }
+
+            // Phase 2: Determine which slot (if any) should charge
+            // Rule: Only ONE powerbank per board can charge at a time
+            let chargingSlotIndex = -1;
+            for (const slot of boardSlots) {
+              if (slot.needsCharging) {
+                chargingSlotIndex = slot.slotIndex;
+                break; // Select first powerbank that needs charging
+              }
+            }
+
+            // Phase 3: Apply charging commands and build response
+            for (const slot of boardSlots) {
+              const shouldCharge = slot.slotIndex === chargingSlotIndex;
+
+              // Send charge command for available slots
+              if (slot.isAvailable) {
+                await chargeCommand.execute(
+                  mapBoardToSlot(i, slot.slotIndex),
+                  shouldCharge
+                );
+              }
+
+              slots.push({
+                powerBank: slot.powerBankInfo
+                  ? {
+                      id: slot.powerBankInfo?.serial,
+                      powerLevel: slot.powerLevel,
+                    }
+                  : null,
+                isCharging: shouldCharge,
+                isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
+                index: mapBoardToSlot(i, slot.slotIndex),
+                state:
+                  slot.powerBankInfo !== null
+                    ? SlotState.available
+                    : SlotState.empty,
+                disabled: SLOT_IS_DISABLED_DEFAULT_VALUE,
                 boardAddress: i,
-                slotIndex: -1,
-                error: SlotError.SLOTS_COMMAND_FAILED,
-                message: getStatusMessage(response.status),
+                slotIndex: slot.slotIndex,
               });
             }
           } catch (error) {
-            // Handle timeout or connection errors for this board
-            // Log the error and continue to the next board
-            const errorMessage =
-              error instanceof Error ? error.message : "Unknown error";
             errors.push({
               index: -1,
               boardAddress: i,
               slotIndex: -1,
-              error: SlotError.CONNECTION_ERROR,
-              message: `Board ${i} not responding: ${errorMessage}`,
+              error: SlotError.INVALID_RESPONSE,
+              message:
+                "Failed to parse slots info response: " +
+                (error instanceof Error ? error.message : "Unknown error"),
             });
-            logger.error(
-              `Error communicating with board ${i}: ${errorMessage}`
-            );
-            // Continue to next board
-            continue;
           }
+        } else {
+          errors.push({
+            index: -1,
+            boardAddress: i,
+            slotIndex: -1,
+            error: SlotError.SLOTS_COMMAND_FAILED,
+            message: getStatusMessage(response.status),
+          });
         }
-
-        const endTime = Date.now();
-        const executionTime = endTime - startTime;
-
-        const response: SlotsResponse = {
-          slots,
-          errors,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-        };
-
-        logger.log(JSON.stringify(response, null, 2));
-
-        await service.disconnect();
       } catch (error) {
-        logger.error("Error:", error);
-        process.exit(1);
+        // Handle timeout or connection errors for this board
+        // Log the error and continue to the next board
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        errors.push({
+          index: -1,
+          boardAddress: i,
+          slotIndex: -1,
+          error: SlotError.CONNECTION_ERROR,
+          message: `Board ${i} not responding: ${errorMessage}`,
+        });
+        logger.error(`Error communicating with board ${i}: ${errorMessage}`);
+        // Continue to next board
+        continue;
       }
-    });
+    }
 
+    const endTime = Date.now();
+    const executionTime = endTime - startTime;
+
+    const response: SlotsResponse = {
+      slots,
+      errors,
+      executionTimeMs: executionTime,
+      timestamp: new Date().toISOString(),
+    };
+
+    logger.log(JSON.stringify(response, null, 2));
+
+    await service.disconnect();
+  } catch (error) {
+    logger.error("Error:", error);
+    process.exit(1);
+  }
+}
+
+/**
+ * Register all S1TTXX commands to the Commander program
+ * @param program - Commander program instance
+ */
+export function registerS1TTXXCommands(program: Command): void {
   // Unlock slot
   program
     .command("unlock")
     .description("Unlock a slot")
     .requiredOption(
       "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
-    .action(async (options: CommandOptions) => {
-      const startTime = Date.now();
-      try {
-        const port = await selectPort();
-        const service = new SerialService(port);
-        await service.connect();
-
-        const command = new UnlockCommand(service);
-        const response = await command.execute(parseInt(options.index));
-
-        const endTime = Date.now();
-        const executionTime = endTime - startTime;
-
-        if (response.success) {
-          // Turn off led for unlocked slot
-          const ledCommand = new LedCommand(service);
-          await ledCommand.execute(parseInt(options.index), false);
-        }
-
-        const result = {
-          success: response.success,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          slotIndex: parseInt(options.index),
-          boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
-          slotInBoard: (parseInt(options.index) - 1) % 6,
-          error: response.success
-            ? null
-            : {
-                code: response.status,
-                message: getStatusMessage(response.status),
-              },
-        };
-
-        logger.log(JSON.stringify(result, null, 2));
-
-        await service.disconnect();
-      } catch (error) {
-        const endTime = Date.now();
-        const executionTime = endTime - startTime;
-
-        const result = {
-          success: false,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          slotIndex: parseInt(options.index),
-          boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
-          slotInBoard: (parseInt(options.index) - 1) % 6,
-          error: {
-            code: -1,
-            message: error instanceof Error ? error.message : "Unknown error",
-          },
-        };
-
-        logger.log(JSON.stringify(result, null, 2));
-        process.exit(1);
-      }
-    });
+    .action(async (options: CommandOptions) => {});
 
   // Status command used to get the status of a powerbank in a specific board and slot
   program
@@ -340,7 +326,7 @@ export function registerS1TTXXCommands(program: Command): void {
     .description("Get the status of a powerbank in a specific index")
     .requiredOption(
       "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
     .action(async (options: CommandOptions) => {
@@ -490,7 +476,7 @@ export function registerS1TTXXCommands(program: Command): void {
     .description("Enable or disable charging for a specific slot")
     .requiredOption(
       "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
     .requiredOption(
@@ -562,7 +548,7 @@ export function registerS1TTXXCommands(program: Command): void {
     .description("Turn on/off led for a specific slot")
     .requiredOption(
       "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
     .requiredOption(
@@ -618,7 +604,7 @@ export function registerS1TTXXCommands(program: Command): void {
     .description("Initialize a powerbank with ID and battery information")
     .requiredOption(
       "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
     .requiredOption(
@@ -801,39 +787,6 @@ export function registerS1TTXXCommands(program: Command): void {
           );
         } else {
           logger.error("Command failed with status:", response[1]);
-        }
-
-        await service.disconnect();
-      } catch (error) {
-        logger.error("Error:", error);
-        process.exit(1);
-      }
-    });
-
-  // Get model information
-  program
-    .command("model")
-    .description("Get board model and number of boards in daisy chain")
-    .action(async (options: CommandOptions) => {
-      const startTime = Date.now();
-      try {
-        const port = await selectPort();
-        const service = new SerialService(port);
-        await service.connect();
-
-        // Should be the board 0 the one returning the model
-        const boardAddress = 0;
-
-        const command = new ModelCommand(service);
-        const response = await command.execute(boardAddress);
-
-        if (response.success) {
-          const modelInfo = JSON.parse(response.data.toString());
-          logger.log("Model:", modelInfo.model);
-          logger.log("Board count:", modelInfo.boardCount);
-          logger.log(`Execution time: ${Date.now() - startTime}ms`);
-        } else {
-          logger.error("Command failed with status:", response.status);
         }
 
         await service.disconnect();

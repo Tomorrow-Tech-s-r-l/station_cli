@@ -28,6 +28,30 @@
         {
       "type": "node",
       "request": "launch",
+      "name": "Debug: Slots (S1TT6)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "S1TT6",
+        "slots"
+      ],
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Debug: Slots with 1 boards",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
@@ -247,6 +271,7 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
+        "S0RU6",
         "s0ruxx-query"
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
@@ -270,6 +295,7 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
+        "S0RU6",
         "s0ruxx-unlock",
         "-i", "${input:index}"
       ],

@@ -4,7 +4,7 @@ import { debug } from "../../utils/debug";
 import { TransportProtocol } from "./transport";
 import { CommandFactory } from "../protocol/commands";
 import { SerialMessage } from "../protocol/types";
-import { BAUD_RATE, INTER_COMMAND_DELAY_MS } from "../protocol/constants";
+import { BAUD_RATE, INTER_COMMAND_DELAY_MS } from "../../utils/constants";
 
 export class SerialService {
   private port: SerialPort | null = null;

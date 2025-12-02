@@ -1,6 +1,6 @@
 import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
-import { CMD_SET_LED_CODE } from "../../protocol/constants";
+import { CMD_SET_LED_CODE } from "../../../utils/constants";
 import { mapSlotToBoard } from "../../utils/slot_mapping";
 // Buffer is a Node.js built-in, no import needed
 

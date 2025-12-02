@@ -5,7 +5,7 @@ import {
   STATUS_ERR_INTERNAL,
   STATUS_ERR_INVALID_RESPONSE,
   STATUS_ERR_INVALID_ARGS,
-} from "../protocol/constants";
+} from "../../utils/constants";
 
 export const getStatusMessage = (status: number): string => {
   switch (status) {

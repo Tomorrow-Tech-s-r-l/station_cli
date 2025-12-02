@@ -1,13 +1,12 @@
 import { Command } from "commander";
 import { SerialService } from "../services/serial";
-import { StatusCommand } from "./commands/status";
+import { SlotsCommand } from "./commands/slots";
 import { UnlockCommand } from "./commands/unlock";
 import { logger } from "../../utils/logger";
-import {
-  SLOT_INDEX_MAXIMUM,
-  SLOT_INDEX_MINIMUM,
-} from "../../S1TTXX/protocol/constants";
+import { SLOT_INDEX_MINIMUM } from "../../utils/constants";
 import { cliInputValidatorIndex } from "../../utils/cli_input_validator";
+import { getSlotIndexMaximum } from "../../utils/model";
+import { selectPort } from "../../utils/port_selector";
 
 interface CommandOptions {
   port: string;
@@ -23,21 +22,41 @@ interface CommandOptions {
   cycles?: string;
 }
 /**
- * Select port for S0RUXX protocol
+ * Execute S0RUXX status (CQ query for all slots).
  */
-async function selectPort(): Promise<string> {
-  const service = new SerialService("");
-  const ports = await service.listPorts();
-  const filteredPorts = ports.filter(
-    (p) =>
-      p.includes("usbserial") ||
-      p.includes("ttyUSB0") ||
-      p.includes("tty.usbserial")
-  );
-  if (filteredPorts.length === 0) {
-    throw new Error("No compatible serial port found");
+export async function runS0RUXXSlots(): Promise<void> {
+  try {
+    const port = await selectPort();
+    const service = new SerialService(port);
+    await service.connect();
+
+    const command = new SlotsCommand(service);
+    await command.execute();
+
+    await service.disconnect();
+  } catch (error) {
+    logger.error("Slots error:", error);
+    process.exit(1);
   }
-  return filteredPorts[0];
+}
+
+/**
+ * Execute S0RUXX unlock for a given slot index.
+ */
+export async function runS0RUXXUnlock(index: number): Promise<void> {
+  try {
+    const port = await selectPort();
+    const service = new SerialService(port);
+    await service.connect();
+
+    const command = new UnlockCommand(service);
+    await command.execute(index);
+
+    await service.disconnect();
+  } catch (error) {
+    logger.error("Unlock error:", error);
+    process.exit(1);
+  }
 }
 
 /**
@@ -51,19 +70,7 @@ export function registerS0RUXXCommands(program: Command): void {
     .alias("s0-query")
     .description("Get the status of all slots (sends {0@CQ,0,0,0000})")
     .action(async () => {
-      try {
-        const port = await selectPort();
-        const service = new SerialService(port);
-        await service.connect();
-
-        const command = new StatusCommand(service);
-        await command.execute();
-
-        await service.disconnect();
-      } catch (error) {
-        logger.error("Query error:", error);
-        process.exit(1);
-      }
+      await runS0RUXXSlots();
     });
 
   // Unlock command - sends FB command to unlock powerbank
@@ -73,24 +80,11 @@ export function registerS0RUXXCommands(program: Command): void {
     .description("Unlock powerbank (sends {0@FB,0,<timestamp>,1,0000})")
     .requiredOption(
       "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${SLOT_INDEX_MAXIMUM})`,
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
     .action(async (options: CommandOptions) => {
-      try {
-        const port = await selectPort();
-        const service = new SerialService(port);
-        await service.connect();
-
-        const slotIndex = parseInt(options.index);
-
-        const command = new UnlockCommand(service);
-        await command.execute(parseInt(options.index));
-
-        await service.disconnect();
-      } catch (error) {
-        logger.error("Unlock error:", error);
-        process.exit(1);
-      }
+      const slotIndex = parseInt(options.index);
+      await runS0RUXXUnlock(slotIndex);
     });
 }

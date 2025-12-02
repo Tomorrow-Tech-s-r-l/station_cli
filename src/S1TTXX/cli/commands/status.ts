@@ -7,7 +7,7 @@ import {
 import {
   CMD_STATUS_CODE,
   MAXIMUM_SLOT_ADDRESS,
-} from "../../protocol/constants";
+} from "../../../utils/constants";
 // Buffer is a Node.js built-in, no import needed
 
 export class StatusCommand extends BaseCommand {

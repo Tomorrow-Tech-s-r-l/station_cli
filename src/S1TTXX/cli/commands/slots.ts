@@ -1,6 +1,6 @@
 import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
-import { CMD_SLOTS_CODE } from "../../protocol/constants";
+import { CMD_SLOTS_CODE } from "../../../utils/constants";
 // Buffer is a Node.js built-in, no import needed
 
 export class SlotsCommand extends BaseCommand {

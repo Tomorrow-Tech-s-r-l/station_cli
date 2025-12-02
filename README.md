@@ -2,6 +2,26 @@
 
 A command-line interface tool for controlling station boards and powerbanks. This tool provides a set of commands to manage powerbank stations, including slot management, powerbank status monitoring, and device initialization.
 
+## Model Selection
+
+The CLI accepts an optional positional model token before any command to adapt limits and behavior:
+
+- S1TT30: default (5 boards: 0-4, 30 slots: 1-30)
+- S1TT6:  single board (0), 6 slots (1-6)
+- S0RU6:  legacy S0RUXX protocol, 6 slots (1-6)
+
+Usage:
+
+```bash
+# Default model (S1TT30)
+station-cli slots
+
+# Explicit model
+station-cli S1TT30 slots
+station-cli S1TT6 slots
+station-cli S0RU6 s0ruxx-query
+```
+
 ## Installation
 
 The CLI can be installed in two ways:
@@ -82,6 +102,9 @@ To enable logging, add the `--log` flag to any command:
 station-cli --log slots
 station-cli --log unlock -i 1
 station-cli --log status -b 0 -s 0
+# With explicit model
+station-cli --log S1TT6 slots
+station-cli --log S0RU6 s0ruxx-query
 ```
 
 ### Log File Format
@@ -171,12 +194,18 @@ This enhanced logging makes it much easier to:
 ## Commands
 
 ### Get Slots Status
-Retrieves the status of all slots across all boards, including powerbank information for available slots. The command will scan all boards (0-4) and all slots (0-5) on each board.
+Retrieves the status of all slots across all boards, including powerbank information for available slots. The scanned range depends on the selected model:
+- S1TT30: boards 0-4, slots 0-5 on each board
+- S1TT6: board 0 only, slots 0-5
 
 **Automatic Charging Management:** This command also actively manages charging by enabling charging for powerbanks that need it (power level < 95%). Only ONE powerbank per board can charge at a time - the first powerbank found that needs charging will be selected and enabled, while others are disabled.
 
 ```bash
+# Default model (S1TT30)
 station-cli slots
+
+# Single-board model (S1TT6)
+station-cli S1TT6 slots
 ```
 
 Output example:
@@ -218,10 +247,12 @@ Unlocks a specific slot to allow powerbank removal. The slot index is automatica
 
 ```bash
 station-cli unlock -i <index>
+# or
+station-cli S1TT6 unlock -i <index>
 ```
 
 Options:
-- `-i, --index <index>`: Slot index (1-30) (required)
+- `-i, --index <index>`: Slot index (1-30 for S1TT30, 1-6 for S1TT6/S0RU6) (required)
 
 Slot to board mapping:
 - Slots 1-6   → Board 0, Slots 0-5
@@ -252,10 +283,13 @@ station-cli charge -i 1 -e true
 
 # Disable charging for slot 30
 station-cli charge -i 30 -e false
+
+# Single-board model usage
+station-cli S1TT6 charge -i 1 -e true
 ```
 
 Options:
-- `-i, --index <index>`: Slot index (1-30) (required)
+- `-i, --index <index>`: Slot index (1-30 for S1TT30, 1-6 for S1TT6/S0RU6) (required)
 - `-e, --enable <enable>`: Enable charging (true/false) (required)
 
 Output example:
@@ -279,10 +313,12 @@ Initializes a powerbank in a specific slot with ID and battery gauge information
 
 ```bash
 station-cli initialize-powerbank -i <index> --id <serialNumber> [options]
+# or
+station-cli S1TT6 initialize-powerbank -i <index> --id <serialNumber> [options]
 ```
 
 Options:
-- `-i, --index <index>`: Slot index (1-30) (required)
+- `-i, --index <index>`: Slot index (1-30 for S1TT30, 1-6 for S1TT6/S0RU6) (required)
 - `--id <serialNumber>`: Powerbank serial number - exactly 10 characters (required)
 - `--total-charge <mAh>`: Total battery capacity in mAh (default: 13925, max: 65535)
 - `--current-charge <mAh>`: Current battery charge level in mAh (default: 11625, max: 65535)
@@ -306,6 +342,9 @@ station-cli initialize-powerbank -i 1 --id ABC1234567
 
 # Full initialization with custom battery parameters
 station-cli initialize-powerbank -i 1 --id ABC1234567 --total-charge 15000 --current-charge 12000 --cutoff-charge 11000 --cycles 5
+
+# Single-board model
+station-cli S1TT6 initialize-powerbank -i 1 --id ABC1234567
 ```
 
 Output example (success):
@@ -350,6 +389,14 @@ Note: The serial number must be exactly 10 characters. If your ID is shorter, pa
 ## Debug Commands
 
 The following commands are intended for development and troubleshooting purposes. They provide low-level access to device functionality and should be used with caution.
+
+### S0RUXX Commands (Legacy)
+When using the S0RU6 model, use the S0-prefixed commands:
+
+```bash
+station-cli S0RU6 s0ruxx-query
+station-cli S0RU6 s0ruxx-unlock -i 1
+```
 
 ### Get Powerbank Status
 Retrieves detailed information about a powerbank in a specific slot, including power level calculation.
@@ -450,8 +497,8 @@ These errors occur when command arguments don't meet the required criteria:
 
 | Validation | Error Message | Valid Range/Values |
 |------------|---------------|-------------------|
-| Slot Index | `Index value must be between minimum 1 and maximum 30` | 1-30 (maps to boards 0-4, slots 0-5) |
-| Board Address | `Board address must be between 0 and 4` | 0-4 |
+| Slot Index | `Index value must be between minimum 1 and maximum <X>` | 1-30 (S1TT30) or 1-6 (S1TT6/S0RU6) |
+| Board Address | `Board address must be between 0 and <X>` | 0-4 (S1TT30), 0 (S1TT6/S0RU6) |
 | Slot Address | `Slot index must be between 0 and 5` | 0-5 |
 | Enable Flag | `Enable value must be either "true" or "false"` | `true` or `false` |
 | Power Level | `Power level must be between 0 and 100` | 0-100 |
