@@ -23,10 +23,10 @@ import {
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 
 // Parse optional positional mode token before any command.
-// Accepted: S1TT30 (default), S1TT6, S0RU6
+// Accepted: S1TT30 (default), S1TT6, S0RU6, S0RU30
 (() => {
   const token = process.argv[2];
-  const allowed: StationModel[] = ["S1TT30", "S1TT6", "S0RU6"];
+  const allowed: StationModel[] = ["S1TT30", "S1TT6", "S0RU6", "S0RU30"];
   if (allowed.includes(token as StationModel)) {
     setModel(token as StationModel);
     // Remove the token so Commander sees the command next
@@ -89,7 +89,7 @@ program
   .description("Get slots information")
   .action(async (options: RoutedOptions) => {
     const model = getModel();
-    if (model === "S0RU6") {
+    if (model === "S0RU6" || model === "S0RU30") {
       await runS0RUXXSlots();
     } else {
       await runS1TTXXSlots();
@@ -108,7 +108,7 @@ program
   .action(async (options: RoutedOptions) => {
     const model = getModel();
     const index = parseInt(options.index as string);
-    if (model === "S0RU6") {
+    if (model === "S0RU6" || model === "S0RU30") {
       await runS0RUXXUnlock(index);
     } else {
       await runS1TTXXUnlock(index);

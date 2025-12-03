@@ -32,6 +32,7 @@ export const SLOT_INDEX_MINIMUM = 1;
 
 export const SLOT_INDEX_MAXIMUM_S1TT6 = 6;
 export const SLOT_INDEX_MAXIMUM_S0RU6 = 6;
+export const SLOT_INDEX_MAXIMUM_S0RU30 = 30;
 export const SLOT_INDEX_MAXIMUM_S1TT30 = 30;
 
 // Powerbank Status
@@ -42,7 +43,9 @@ export const PB_STATUS_DISCHARGING = 4;
 export const PB_STATUS_CUTOFF = 5;
 
 // Limits
+export const MINIMUM_BOARD_ADDRESS = 0;
 export const MAXIMUM_BOARD_ADDRESS_S0RU6 = 0;
+export const MAXIMUM_BOARD_ADDRESS_S0RU30 = 1; // Two boards: 0 and 1
 
 export const MAXIMUM_BOARD_ADDRESS_S1TT6 = 0;
 export const MAXIMUM_BOARD_ADDRESS_S1TT30 = 4;
