@@ -309,17 +309,6 @@ export async function runS1TTXXSlots(): Promise<void> {
  * @param program - Commander program instance
  */
 export function registerS1TTXXCommands(program: Command): void {
-  // Unlock slot
-  program
-    .command("unlock")
-    .description("Unlock a slot")
-    .requiredOption(
-      "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
-      cliInputValidatorIndex
-    )
-    .action(async (options: CommandOptions) => {});
-
   // Status command used to get the status of a powerbank in a specific board and slot
   program
     .command("status")
