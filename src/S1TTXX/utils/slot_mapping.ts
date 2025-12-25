@@ -1,4 +1,8 @@
-import { getMaximumBoardAddress } from "../../utils/model";
+import { getMaximumBoardAddress, getSlotIndexMaximum } from "../../utils/model";
+import {
+  SLOT_INDEX_MINIMUM,
+  MINIMUM_BOARD_ADDRESS,
+} from "../../utils/constants";
 
 export const SLOT_IS_LOCKED_DEFAULT_VALUE = true;
 export const SLOT_IS_DISABLED_DEFAULT_VALUE = false;
@@ -24,8 +28,10 @@ export interface SlotMapping {
  * @throws Error if slot index is invalid
  */
 export function mapSlotToBoard(slotIndex: number): SlotMapping {
-  if (slotIndex < 1 || slotIndex > 30) {
-    throw new Error("Slot index must be between 1 and 30");
+  if (slotIndex < SLOT_INDEX_MINIMUM || slotIndex > getSlotIndexMaximum()) {
+    throw new Error(
+      `Slot index must be between 1 and ${getSlotIndexMaximum()}`
+    );
   }
 
   const zeroBasedIndex = slotIndex - 1;
@@ -57,7 +63,10 @@ export function mapBoardToSlot(
   boardAddress: number,
   slotInBoard: number
 ): number {
-  if (boardAddress < 0 || boardAddress > getMaximumBoardAddress()) {
+  if (
+    boardAddress < MINIMUM_BOARD_ADDRESS ||
+    boardAddress > getMaximumBoardAddress()
+  ) {
     throw new Error(
       `Board address must be between 0 and ${getMaximumBoardAddress()}`
     );

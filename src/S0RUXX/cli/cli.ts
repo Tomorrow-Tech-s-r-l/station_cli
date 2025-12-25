@@ -1,12 +1,13 @@
 import { Command } from "commander";
 import { SerialService } from "../services/serial";
+import { DualPortSerialService } from "../services/dual_port_serial";
 import { SlotsCommand } from "./commands/slots";
 import { UnlockCommand } from "./commands/unlock";
 import { logger } from "../../utils/logger";
 import { SLOT_INDEX_MINIMUM } from "../../utils/constants";
 import { cliInputValidatorIndex } from "../../utils/cli_input_validator";
-import { getSlotIndexMaximum } from "../../utils/model";
-import { selectPort } from "../../utils/port_selector";
+import { getSlotIndexMaximum, getModel } from "../../utils/model";
+import { selectPort, selectPorts } from "../../utils/port_selector";
 
 interface CommandOptions {
   port: string;
@@ -26,14 +27,29 @@ interface CommandOptions {
  */
 export async function runS0RUXXSlots(): Promise<void> {
   try {
-    const port = await selectPort();
-    const service = new SerialService(port);
-    await service.connect();
+    const model = getModel();
+    
+    if (model === "S0RU30") {
+      // S0RU30 uses two ports
+      const [port0, port1] = await selectPorts();
+      const dualService = new DualPortSerialService(port0, port1);
+      await dualService.connect();
 
-    const command = new SlotsCommand(service);
-    await command.execute();
+      const command = new SlotsCommand(dualService);
+      await command.execute();
 
-    await service.disconnect();
+      await dualService.disconnect();
+    } else {
+      // S0RU6 uses single port
+      const port = await selectPort();
+      const service = new SerialService(port);
+      await service.connect();
+
+      const command = new SlotsCommand(service);
+      await command.execute();
+
+      await service.disconnect();
+    }
   } catch (error) {
     logger.error("Slots error:", error);
     process.exit(1);
@@ -45,14 +61,34 @@ export async function runS0RUXXSlots(): Promise<void> {
  */
 export async function runS0RUXXUnlock(index: number): Promise<void> {
   try {
-    const port = await selectPort();
-    const service = new SerialService(port);
-    await service.connect();
+    const model = getModel();
+    
+    if (model === "S0RU30") {
+      // S0RU30 uses two ports - route to correct board and map slot index
+      const [port0, port1] = await selectPorts();
+      const dualService = new DualPortSerialService(port0, port1);
+      await dualService.connect();
 
-    const command = new UnlockCommand(service);
-    await command.execute(index);
+      // Get the service for the board handling this slot
+      const service = dualService.getServiceForSlot(index);
+      // Map global slot index (1-30) to local board slot index (1-18 or 1-12)
+      const localSlotIndex = DualPortSerialService.mapToLocalSlotIndex(index);
 
-    await service.disconnect();
+      const command = new UnlockCommand(service);
+      await command.execute(localSlotIndex);
+
+      await dualService.disconnect();
+    } else {
+      // S0RU6 uses single port
+      const port = await selectPort();
+      const service = new SerialService(port);
+      await service.connect();
+
+      const command = new UnlockCommand(service);
+      await command.execute(index);
+
+      await service.disconnect();
+    }
   } catch (error) {
     logger.error("Unlock error:", error);
     process.exit(1);
