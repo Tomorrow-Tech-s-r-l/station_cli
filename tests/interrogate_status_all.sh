@@ -41,12 +41,47 @@ delay_ms() {
     sleep 0.005
 }
 
-# Ask for number of times
+# Ask for slot range
+read_input "Enter starting slot index ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM): " start_slot
+start_slot=$(echo "$start_slot" | tr -d '[:space:]')
+
+# Validate start slot
+if ! [[ "$start_slot" =~ ^[0-9]+$ ]] || [ "$start_slot" -lt "$SLOT_INDEX_MINIMUM" ] || [ "$start_slot" -gt "$SLOT_INDEX_MAXIMUM" ]; then
+    echo "Error: Invalid starting slot. Must be between $SLOT_INDEX_MINIMUM and $SLOT_INDEX_MAXIMUM" >&2
+    exit 1
+fi
+
+read_input "Enter ending slot index ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM): " end_slot
+end_slot=$(echo "$end_slot" | tr -d '[:space:]')
+
+# Validate end slot
+if ! [[ "$end_slot" =~ ^[0-9]+$ ]] || [ "$end_slot" -lt "$SLOT_INDEX_MINIMUM" ] || [ "$end_slot" -gt "$SLOT_INDEX_MAXIMUM" ]; then
+    echo "Error: Invalid ending slot. Must be between $SLOT_INDEX_MINIMUM and $SLOT_INDEX_MAXIMUM" >&2
+    exit 1
+fi
+
+# Validate that start <= end
+if [ "$start_slot" -gt "$end_slot" ]; then
+    echo "Error: Starting slot ($start_slot) must be less than or equal to ending slot ($end_slot)" >&2
+    exit 1
+fi
+
+# Ask for number of times to interrogate each slot
 read_input "Enter number of times to interrogate each slot: " times
 times=$(echo "$times" | tr -d '[:space:]')
 
 # Validate times
 if ! [[ "$times" =~ ^[0-9]+$ ]] || [ "$times" -lt 1 ]; then
+    echo "Error: Invalid number. Must be at least 1" >&2
+    exit 1
+fi
+
+# Ask for number of times to repeat the entire slot range loop
+read_input "Enter number of times to repeat the entire slot range loop: " loop_times
+loop_times=$(echo "$loop_times" | tr -d '[:space:]')
+
+# Validate loop_times
+if ! [[ "$loop_times" =~ ^[0-9]+$ ]] || [ "$loop_times" -lt 1 ]; then
     echo "Error: Invalid number. Must be at least 1" >&2
     exit 1
 fi
@@ -73,82 +108,97 @@ else
 fi
 
 echo ""
-echo "Interrogating status for all slots ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM), $times time(s) per slot with ${delay_ms_value}ms delay..."
+echo "Interrogating status for slots ($start_slot-$end_slot), $times time(s) per slot, repeating the entire range $loop_times time(s) with ${delay_ms_value}ms delay..."
 echo ""
 
 # Initialize counters
 total_success_count=0
 total_timeout_failure_count=0
 
-# Loop through all slots
-for ((slot=$SLOT_INDEX_MINIMUM; slot<=$SLOT_INDEX_MAXIMUM; slot++)); do
-    echo "=========================================="
-    echo "Slot $slot"
-    echo "=========================================="
+# Outer loop: repeat the entire slot range
+for ((loop=1; loop<=loop_times; loop++)); do
+    echo "##########################################################################"
+    echo "Loop iteration $loop of $loop_times"
+    echo "##########################################################################"
+    echo ""
     
-    # Initialize per-slot counters
-    slot_success_count=0
-    slot_timeout_failure_count=0
-    
-    # Execute status command multiple times with delay
-    for ((i=1; i<=times; i++)); do
-        echo "[$i/$times] Executing status command..."
+    # Loop through selected slot range
+    for ((slot=$start_slot; slot<=$end_slot; slot++)); do
+        echo "=========================================="
+        echo "Slot $slot"
+        echo "=========================================="
         
-        # Execute the command and capture output
-        output=$("$EXECUTABLE" status -i "$slot" 2>&1)
-        exit_code=$?
+        # Initialize per-slot counters
+        slot_success_count=0
+        slot_timeout_failure_count=0
         
-        if [ $exit_code -eq 0 ]; then
-            echo "Output:"
-            echo "$output"
+        # Execute status command multiple times with delay
+        for ((i=1; i<=times; i++)); do
+            echo "[$i/$times] Executing status command..."
             
-            # Check if output contains JSON and parse it
-            # Try to parse the output as JSON (it should be valid JSON)
-            if command -v jq &> /dev/null; then
-                # Try to parse the entire output as JSON
-                if echo "$output" | jq empty 2>/dev/null; then
-                    # Valid JSON, parse it
-                    success=$(echo "$output" | jq -r '.success // false' 2>/dev/null)
-                    error_code=$(echo "$output" | jq -r '.error.code // 0' 2>/dev/null)
-                    error_message=$(echo "$output" | jq -r '.error.message // ""' 2>/dev/null)
-                    
-                    if [ "$success" = "true" ]; then
+            # Execute the command and capture output
+            output=$("$EXECUTABLE" status -i "$slot" 2>&1)
+            exit_code=$?
+            
+            if [ $exit_code -eq 0 ]; then
+                echo "Output:"
+                echo "$output"
+                
+                # Check if output contains JSON and parse it
+                # Try to parse the output as JSON (it should be valid JSON)
+                if command -v jq &> /dev/null; then
+                    # Try to parse the entire output as JSON
+                    if echo "$output" | jq empty 2>/dev/null; then
+                        # Valid JSON, parse it
+                        success=$(echo "$output" | jq -r '.success // false' 2>/dev/null)
+                        error_code=$(echo "$output" | jq -r '.error.code // 0' 2>/dev/null)
+                        error_message=$(echo "$output" | jq -r '.error.message // ""' 2>/dev/null)
+                        
+                        if [ "$success" = "true" ]; then
+                            ((slot_success_count++))
+                            ((total_success_count++))
+                        elif [ "$success" = "false" ] && [ "$error_code" = "1" ] && [ "$error_message" = "Device timeout - device not responding" ]; then
+                            ((slot_timeout_failure_count++))
+                            ((total_timeout_failure_count++))
+                        fi
+                    fi
+                else
+                    # Fallback: use grep to check for patterns (works with single-line or multi-line JSON)
+                    if echo "$output" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
                         ((slot_success_count++))
                         ((total_success_count++))
-                    elif [ "$success" = "false" ] && [ "$error_code" = "1" ] && [ "$error_message" = "Device timeout - device not responding" ]; then
+                    elif echo "$output" | grep -q '"success"[[:space:]]*:[[:space:]]*false' && \
+                         echo "$output" | grep -q '"code"[[:space:]]*:[[:space:]]*1' && \
+                         echo "$output" | grep -q 'Device timeout - device not responding'; then
                         ((slot_timeout_failure_count++))
                         ((total_timeout_failure_count++))
                     fi
                 fi
             else
-                # Fallback: use grep to check for patterns (works with single-line or multi-line JSON)
-                if echo "$output" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
-                    ((slot_success_count++))
-                    ((total_success_count++))
-                elif echo "$output" | grep -q '"success"[[:space:]]*:[[:space:]]*false' && \
-                     echo "$output" | grep -q '"code"[[:space:]]*:[[:space:]]*1' && \
-                     echo "$output" | grep -q 'Device timeout - device not responding'; then
-                    ((slot_timeout_failure_count++))
-                    ((total_timeout_failure_count++))
-                fi
+                echo "Error:"
+                echo "$output"
             fi
-        else
-            echo "Error:"
-            echo "$output"
-        fi
+            
+            # Add delay between calls (except after the last one)
+            if [ $i -lt $times ]; then
+                delay_ms "$delay_ms_value"
+            fi
+            
+            echo "" # Empty line for readability
+        done
         
-        # Add delay between calls (except after the last one)
-        if [ $i -lt $times ]; then
-            delay_ms "$delay_ms_value"
-        fi
-        
-        echo "" # Empty line for readability
+        echo "Slot $slot summary:"
+        echo "  Successful: $slot_success_count"
+        echo "  Timeout failures: $slot_timeout_failure_count"
+        echo ""
     done
     
-    echo "Slot $slot summary:"
-    echo "  Successful: $slot_success_count"
-    echo "  Timeout failures: $slot_timeout_failure_count"
-    echo ""
+    # Add separator between loop iterations (except after the last one)
+    if [ $loop -lt $loop_times ]; then
+        echo ""
+        echo "Completed loop iteration $loop of $loop_times"
+        echo ""
+    fi
 done
 
 echo "=========================================="
