@@ -21,6 +21,7 @@ import {
   getSlotIndexMaximum,
 } from "./utils/model";
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
+import { convertFrame } from "./S1TTXX/cli/commands/convert";
 
 // Parse optional positional mode token before any command.
 // Accepted: S1TT30 (default), S1TT6, S0RU6, S0RU30
@@ -113,6 +114,20 @@ program
     } else {
       await runS1TTXXUnlock(index);
     }
+  });
+
+// Convert command (available globally, works with S1TTXX protocol)
+program
+  .command("convert")
+  .description("Convert hex frame to human-readable command information")
+  .argument(
+    "[hex...]",
+    "Hex frame string (with or without spaces, e.g., 'ea 01 05 c0 23' or 'ea0105c023')"
+  )
+  .action((hexParts: string[]) => {
+    // Join all arguments together (handles both quoted and unquoted input)
+    const hex = hexParts.join(" ");
+    convertFrame(hex);
   });
 
 program.parse();

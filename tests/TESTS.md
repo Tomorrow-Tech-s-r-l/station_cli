@@ -25,6 +25,21 @@ You will be prompted for:
 - Number of times to interrogate
 - Delay in milliseconds between attempts (default: 5)
 
+### `interrogate_slots_all.sh`
+
+Interrogate the `slots` command multiple times and summarize successes, errors, and timeout failures.
+
+Usage:
+```bash
+./interrogate_slots_all.sh
+```
+
+You will be prompted for:
+- Platform (macOS, Linux, Windows)
+- Model (S1TT30 or S1TT6)
+- Number of times to call `slots`
+- Delay in milliseconds between attempts (default: 5)
+
 ### `interrogate_status_all.sh`
 
 Interrogate all slots (1-30) multiple times and summarize per-slot and overall results.
@@ -37,6 +52,15 @@ Usage:
 You will be prompted for:
 - Number of times to interrogate each slot
 - Delay in milliseconds between attempts (default: 5)
+
+### `test_convert.sh`
+
+Run a suite of `convert` command tests (valid frames plus invalid input checks).
+
+Usage:
+```bash
+./test_convert.sh
+```
 
 ### `unlock_all.sh`
 
