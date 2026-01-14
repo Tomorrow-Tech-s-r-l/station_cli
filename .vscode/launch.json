@@ -179,8 +179,9 @@
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
         "initialize-powerbank",
-        "-b", "${input:board}",
-        "-s", "${input:slot}"
+        "-i", "${input:index}",
+        "--id", "1234567890",
+
       ],
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],

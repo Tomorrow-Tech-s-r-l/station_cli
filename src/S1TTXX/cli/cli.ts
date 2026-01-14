@@ -6,6 +6,9 @@ import {
   SLOT_LOCKED,
   CMD_GET_FW_VER,
   STATUS_ERR_INTERNAL,
+  PB_STATUS_CHARGING,
+  PB_STATUS_PLUGGED_IN,
+  PB_STATUS_IDLE,
 } from "../../utils/constants";
 import {
   SlotState,
@@ -169,10 +172,13 @@ export async function runS1TTXXSlots(): Promise<void> {
                       parseInt(powerBankInfo?.currentCharge) || 0;
                     const totalCharge =
                       parseInt(powerBankInfo?.totalCharge) || 0;
+                    const cutoffCharge =
+                      parseInt(powerBankInfo?.cutoffCharge) || 0;
 
                     powerLevel = calculatePowerLevel(
                       currentCharge,
-                      totalCharge
+                      totalCharge,
+                      cutoffCharge
                     );
 
                     needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
@@ -195,6 +201,8 @@ export async function runS1TTXXSlots(): Promise<void> {
                       error instanceof Error ? error.message : "Unknown error",
                   });
                 }
+                // Wait 500ms before reading next powerbank information to avoid race conditions
+                //await new Promise((resolve) => setTimeout(resolve, 1000));
               }
 
               boardSlots.push({
@@ -208,11 +216,52 @@ export async function runS1TTXXSlots(): Promise<void> {
 
             // Phase 2: Determine which slot (if any) should charge
             // Rule: Only ONE powerbank per board can charge at a time
+            // Priority 1: Keep powerbanks that are already charging (PB_STATUS_CHARGING)
+            // Priority 2: If no powerbank is charging, charge the one with lowest currentCharge among PB_STATUS_PLUGGED_IN
+            // Note: Powerbanks in PB_STATUS_IDLE (finished charging) are excluded from charging
             let chargingSlotIndex = -1;
+
+            // First, check if any powerbank is currently charging - keep it charging
             for (const slot of boardSlots) {
-              if (slot.needsCharging) {
+              if (
+                slot.isAvailable &&
+                slot.powerBankInfo &&
+                slot.powerBankInfo.status === PB_STATUS_CHARGING
+              ) {
                 chargingSlotIndex = slot.slotIndex;
-                break; // Select first powerbank that needs charging
+                break;
+              }
+            }
+
+            // If no powerbank is charging, find the one with lowest currentCharge among PB_STATUS_PLUGGED_IN
+            // Exclude powerbanks that are in PB_STATUS_IDLE (finished charging) - they should not be charged again
+            if (chargingSlotIndex === -1) {
+              let lowestChargeSlot: {
+                slotIndex: number;
+                currentCharge: number;
+              } | null = null;
+
+              for (const slot of boardSlots) {
+                if (
+                  slot.isAvailable &&
+                  slot.powerBankInfo &&
+                  slot.powerBankInfo.status === PB_STATUS_PLUGGED_IN
+                ) {
+                  const currentCharge = slot.powerBankInfo.currentCharge || 0;
+                  if (
+                    lowestChargeSlot === null ||
+                    currentCharge < lowestChargeSlot.currentCharge
+                  ) {
+                    lowestChargeSlot = {
+                      slotIndex: slot.slotIndex,
+                      currentCharge: currentCharge,
+                    };
+                  }
+                }
+              }
+
+              if (lowestChargeSlot !== null) {
+                chargingSlotIndex = lowestChargeSlot.slotIndex;
               }
             }
 
@@ -380,7 +429,8 @@ export function registerS1TTXXCommands(program: Command): void {
               const powerBankInfo = JSON.parse(response.data.toString());
               const powerLevel = calculatePowerLevel(
                 powerBankInfo?.currentCharge,
-                powerBankInfo?.totalCharge
+                powerBankInfo?.totalCharge,
+                powerBankInfo?.cutoffCharge
               );
 
               const endTime = Date.now();

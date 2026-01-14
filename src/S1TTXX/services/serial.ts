@@ -10,8 +10,8 @@ export class SerialService {
   private port: SerialPort | null = null;
   private parser: InterByteTimeoutParser | null = null;
   private responseResolver: ((value: Buffer) => void) | null = null;
-  private readonly responseTimeout = 2000; // 2 second timeout
-  private readonly INTER_BYTE_TIMEOUT_MS = 20; // 5ms inter-byte timeout
+  private readonly responseTimeout = 5000; // 5 second timeout
+  private readonly INTER_BYTE_TIMEOUT_MS = 50; // 5ms inter-byte timeout
 
   constructor(private portPath: string) {
     debug.info(`Initializing SerialService with port: ${portPath}`);
