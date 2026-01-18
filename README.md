@@ -47,6 +47,27 @@ xattr -rd com.apple.quarantine ~/Downloads/station-cli-macos-arm64
 
 After running this command, you should be able to execute the CLI without macOS blocking it.
 
+### Source Code
+
+These steps use NVM to keep Node.js 20 consistent across Windows/macOS/Linux. The VS Code launch configs run `Prepare: Debug`, which calls `scripts/ensure-node.*` to install Node 20 via NVM if needed.
+
+#### Windows (nvm-windows)
+1. Install nvm-windows:
+   - `winget install -e --id CoreyButler.NVMforWindows`
+   - or download from https://github.com/coreybutler/nvm-windows/releases
+2. Restart VS Code/terminal so PATH updates.
+   - If the VS Code task fails with `pwsh` not found, install PowerShell 7 or let it use the built-in `powershell.exe`.
+3. `nvm install 20`
+4. `nvm use 20`
+5. `npm install --global typescript`
+
+#### macOS / Linux (nvm)
+1. `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash`
+2. `source ~/.nvm/nvm.sh`
+3. `nvm install 20`
+4. `nvm use 20`
+5. `npm install --global typescript`
+
 ## Updates
 
 The CLI automatically checks for updates when you run any command. By default, it will:

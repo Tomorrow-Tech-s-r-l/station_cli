@@ -10,7 +10,7 @@
       "args": [
         "slots"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -18,7 +18,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -35,7 +36,7 @@
         "S1TT6",
         "slots"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -43,7 +44,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -59,7 +61,7 @@
         "slots",
         "-a", "1"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -67,7 +69,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -83,7 +86,7 @@
         "unlock",
         "-i", "${input:index}"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -91,7 +94,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -107,7 +111,7 @@
         "status",
         "-i", "${input:index}"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -115,7 +119,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -132,7 +137,7 @@
         "-i", "${input:index}",
         "-e", "${input:enable}"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -140,7 +145,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -157,7 +163,7 @@
         "-i", "${input:index}",
         "-e", "${input:enable}"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -165,7 +171,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -183,7 +190,7 @@
         "--id", "1234567890",
 
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -191,7 +198,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -207,7 +215,7 @@
         "firmware",
         "-b", "${input:board}"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -215,7 +223,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -227,7 +236,7 @@
       "name": "Debug: Model",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -235,7 +244,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -251,7 +261,7 @@
         "S0RU6",
         "s0ruxx-query"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -259,7 +269,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
@@ -276,7 +287,7 @@
         "s0ruxx-unlock",
         "-i", "${input:index}"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json",
+      "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
@@ -284,7 +295,8 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v20.11.1/bin/node",
+      "runtimeExecutable": "node",
+      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
