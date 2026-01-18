@@ -6,7 +6,7 @@
       "request": "launch",
       "name": "Debug: Slots",
       "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/src/cli.ts",
+      "program": "${workspaceFolder}/dist/cli.js",
       "args": [
         "slots"
       ],
@@ -19,7 +19,6 @@
       ],
       "console": "integratedTerminal",
       "runtimeExecutable": "node",
-      "runtimeVersion": "20",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"

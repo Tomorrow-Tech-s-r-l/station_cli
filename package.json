@@ -17,7 +17,7 @@
     "url": "https://github.com/Tomorrow-Tech-s-r-l/station_cli.git"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "pkg": {
     "assets": [
@@ -33,8 +33,8 @@
     "outputPath": "dist"
   },
   "scripts": {
-    "clean": "rm -rf dist node_modules",
-    "build": "tsc && chmod +x dist/cli.js",
+    "clean": "node scripts/clean.js",
+    "build": "tsc && node scripts/mark-executable.js",
     "prepublishOnly": "npm run build",
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
