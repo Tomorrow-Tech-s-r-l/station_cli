@@ -7,6 +7,7 @@ export async function selectPort(): Promise<string> {
   );
   const filteredPorts = ports.filter(
     (p) =>
+      /^COM\d+$/i.test(p) || // Windows
       p.includes("usbserial") || // generic substring
       p.includes("tty.usbserial") || // macOS
       p.includes("ttyUSB0") // Linux
@@ -28,6 +29,7 @@ export async function selectPorts(): Promise<[string, string]> {
   );
   const filteredPorts = ports.filter(
     (p) =>
+      /^COM\d+$/i.test(p) || // Windows
       p.includes("usbserial") || // generic substring
       p.includes("tty.usbserial") || // macOS
       p.includes("ttyUSB0") // Linux
