@@ -147,22 +147,22 @@ export async function runS1TTXXSlots(): Promise<void> {
             // Phase 1: Collect slot information for this board
             const boardSlots: Array<{
               slotIndex: number;
-              isAvailable: boolean;
+              isPowerbankPresent: boolean;
               powerBankInfo: any;
               powerLevel: number;
               needsCharging: boolean;
             }> = [];
 
             for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
-              const isAvailable = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
+              const isPowerbankPresent = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
               let powerBankInfo = null;
               let powerLevel = 0;
               let needsCharging = false;
 
               // Turn on led for available slot
-              await ledCommand.execute(mapBoardToSlot(i, j), isAvailable);
+              await ledCommand.execute(mapBoardToSlot(i, j), isPowerbankPresent);
 
-              if (isAvailable) {
+              if (isPowerbankPresent) {
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);
@@ -207,7 +207,7 @@ export async function runS1TTXXSlots(): Promise<void> {
 
               boardSlots.push({
                 slotIndex: j,
-                isAvailable,
+                isPowerbankPresent,
                 powerBankInfo,
                 powerLevel,
                 needsCharging,
@@ -224,7 +224,7 @@ export async function runS1TTXXSlots(): Promise<void> {
             // First, check if any powerbank is currently charging - keep it charging
             for (const slot of boardSlots) {
               if (
-                slot.isAvailable &&
+                slot.isPowerbankPresent &&
                 slot.powerBankInfo &&
                 slot.powerBankInfo.status === PB_STATUS_CHARGING
               ) {
@@ -243,7 +243,7 @@ export async function runS1TTXXSlots(): Promise<void> {
 
               for (const slot of boardSlots) {
                 if (
-                  slot.isAvailable &&
+                  slot.isPowerbankPresent &&
                   slot.powerBankInfo &&
                   slot.powerBankInfo.status === PB_STATUS_PLUGGED_IN
                 ) {
@@ -270,7 +270,7 @@ export async function runS1TTXXSlots(): Promise<void> {
               const shouldCharge = slot.slotIndex === chargingSlotIndex;
 
               // Send charge command for available slots
-              if (slot.isAvailable) {
+              if (slot.isPowerbankPresent) {
                 await chargeCommand.execute(
                   mapBoardToSlot(i, slot.slotIndex),
                   shouldCharge
@@ -284,6 +284,7 @@ export async function runS1TTXXSlots(): Promise<void> {
                       powerLevel: slot.powerLevel,
                     }
                   : null,
+                isPowerbankPresent: slot.isPowerbankPresent,
                 isCharging: shouldCharge,
                 isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                 index: mapBoardToSlot(i, slot.slotIndex),
@@ -397,6 +398,8 @@ export function registerS1TTXXCommands(program: Command): void {
           const slotsInfo = JSON.parse(slotsResp.data.toString());
           isAvailable =
             slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
+          const isPowerbankPresent =
+            slotsInfo.filledSlots[slotMapping.slotInBoard] === 1;
 
           // If slot is empty, return early with a clear response
           if (!isAvailable) {
@@ -408,6 +411,7 @@ export function registerS1TTXXCommands(program: Command): void {
               timestamp: new Date().toISOString(),
               slot: {
                 powerBank: null,
+                isPowerbankPresent,
                 isCharging: false,
                 isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                 index: parseInt(options.index),
@@ -445,6 +449,7 @@ export function registerS1TTXXCommands(program: Command): void {
                     id: powerBankInfo?.serial,
                     powerLevel: powerLevel,
                   },
+                  isPowerbankPresent,
                   isCharging: powerBankInfo?.isCharging,
                   isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                   index: parseInt(options.index),

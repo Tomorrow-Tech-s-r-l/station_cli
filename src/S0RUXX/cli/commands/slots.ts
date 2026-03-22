@@ -11,6 +11,7 @@ export interface StandardizedSlotInfo {
     id: string;
     powerLevel: number;
   } | null;
+  isPowerbankPresent: boolean;
   available: boolean;
   charging: boolean;
 }
@@ -79,6 +80,7 @@ export class SlotsCommand {
                       powerLevel: slot.powerLevel,
                     }
                   : null,
+              isPowerbankPresent: slot.fillStatus === 1,
               available: standardizedStatus.available,
               charging: standardizedStatus.charging,
             };
