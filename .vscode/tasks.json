@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ensure Node 20 (nvm)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/ensure-node.sh"
+      ],
+      "problemMatcher": [],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}/scripts/ensure-node.ps1"
+        ]
+      },
+      "linux": {
+        "command": "bash",
+        "args": [
+          "${workspaceFolder}/scripts/ensure-node.sh"
+        ]
+      },
+      "osx": {
+        "command": "bash",
+        "args": [
+          "${workspaceFolder}/scripts/ensure-node.sh"
+        ]
+      }
+    },
+    {
+      "label": "Prepare: Debug",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Ensure Node 20 (nvm)",
+        "tsc: build - tsconfig.json"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,12 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "station-cli",
-  "version": "0.0.25",
+  "version": "0.0.27",
   "description": "CLI tool to control station board and powerbanks",
-  "main": "src/cli.ts",
-  "bin": "dist/cli.js",
+  "main": "dist/cli.js",
+  "bin": {
+    "station-cli": "dist/cli.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tomorrow-Tech-s-r-l/station_cli.git"
+  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "pkg": {
     "assets": [
@@ -22,8 +33,9 @@
     "outputPath": "dist"
   },
   "scripts": {
-    "clean": "rm -rf dist node_modules",
-    "build": "tsc && chmod +x dist/cli.js",
+    "clean": "node scripts/clean.js",
+    "build": "tsc && node scripts/mark-executable.js",
+    "prepublishOnly": "npm run build",
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
     "build:executable:macos": "npm run clean && npm ci && npm run build && npx pkg . --targets node18-macos-arm64 --output executables/station-cli-macos-arm64",

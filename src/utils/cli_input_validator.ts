@@ -1,4 +1,5 @@
-import { SLOT_INDEX_MAXIMUM, SLOT_INDEX_MINIMUM } from "../protocol/constants";
+import { SLOT_INDEX_MINIMUM } from "./constants";
+import { getSlotIndexMaximum } from "./model";
 
 /**
  * Make validation on the enable input cli requests
@@ -11,10 +12,10 @@ export function cliInputValidatorIndex(value: string): string {
   if (
     isNaN(index) ||
     index < SLOT_INDEX_MINIMUM ||
-    index > SLOT_INDEX_MAXIMUM
+    index > getSlotIndexMaximum()
   ) {
     throw new Error(
-      `Index value must be between minimum ${SLOT_INDEX_MINIMUM} and maximum ${SLOT_INDEX_MAXIMUM}`
+      `Index value must be between minimum ${SLOT_INDEX_MINIMUM} and maximum ${getSlotIndexMaximum()}`
     );
   }
   return value;
