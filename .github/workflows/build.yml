@@ -138,6 +138,21 @@ jobs:
           # Verify the files exist and are executable
           ls -la station-cli-*
 
+      - name: Generate metadata.json
+        run: |
+          python3 -c "
+          import json
+          with open('package.json') as f:
+              pkg = json.load(f)
+          meta = {
+              'cli_version': pkg['version'],
+              'min_kiosk_app_version': pkg.get('minKioskAppVersion', '1.0.0')
+          }
+          with open('metadata.json', 'w') as f:
+              json.dump(meta, f, indent=2)
+          print('Generated metadata.json:', meta)
+          "
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -163,4 +178,5 @@ jobs:
             station-cli-linux-arm64
             station-cli-macos-arm64
             station-cli-windows-x64.exe
+            metadata.json 
           tag_name: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }} 
