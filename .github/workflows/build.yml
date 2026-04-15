@@ -140,18 +140,11 @@ jobs:
 
       - name: Generate metadata.json
         run: |
-          python3 -c "
-          import json
-          with open('package.json') as f:
-              pkg = json.load(f)
-          meta = {
-              'cli_version': pkg['version'],
-              'min_kiosk_app_version': pkg.get('minKioskAppVersion', '1.0.0')
-          }
-          with open('metadata.json', 'w') as f:
-              json.dump(meta, f, indent=2)
-          print('Generated metadata.json:', meta)
-          "
+          VERSION=$(node -p "require('./package.json').version")
+          MIN_KIOSK=$(node -p "require('./package.json').minKioskAppVersion || '1.0.0'")
+          printf '{\n  "cli_version": "%s",\n  "min_kiosk_app_version": "%s"\n}\n' "$VERSION" "$MIN_KIOSK" > metadata.json
+          echo "Generated metadata.json:"
+          cat metadata.json
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
