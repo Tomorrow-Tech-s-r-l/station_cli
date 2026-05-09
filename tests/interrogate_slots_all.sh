@@ -140,6 +140,10 @@ total_failure_count=0
 total_timeout_failure_count=0
 total_error_count=0
 
+# Temp file to log every individual error as: boardAddress|slotIndex|error|message|callIndex
+ERRORS_FILE=$(mktemp -t interrogate_slots_errors.XXXXXX)
+trap 'rm -f "$ERRORS_FILE"' EXIT
+
 # Execute slots command multiple times with delay
 for ((i=1; i<=times; i++)); do
     echo "[$i/$times] Executing slots command..."
@@ -182,7 +186,11 @@ for ((i=1; i<=times; i++)); do
                         call_has_errors=true
                         call_failed=true
                         ((total_error_count+=$error_count_in_call))
-                        
+
+                        # Append every error from this call to the errors log
+                        # Format: boardAddress|slotIndex|error|message|callIndex
+                        echo "$output" | jq -r --arg call "$i" '.errors[]? | "\(.boardAddress // "N/A")|\(.slotIndex // "N/A")|\(.error // "unknown_error")|\(.message // "")|\($call)"' >> "$ERRORS_FILE" 2>/dev/null
+
                         # Check for timeout errors specifically
                         # Look for errors with message containing "timeout" or "not responding" (case-insensitive)
                         # Also check for connection_error type which often indicates timeout
@@ -280,11 +288,93 @@ done
 echo "=========================================="
 echo "Interrogation complete!"
 echo "=========================================="
+
+# Build the results log file (named with a timestamp so multiple runs don't overwrite each other)
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+LOG_FILE="$SCRIPT_DIR/interrogate_slots_all_results_${TIMESTAMP}.log"
+
+{
+    echo "Interrogation results - $(date)"
+    echo "Platform: $platform"
+    echo "Model: $model"
+    echo "Calls: $times"
+    echo "Delay: ${delay_ms_value}ms"
+    echo ""
+    echo "=========================================="
+    echo "Overall Summary"
+    echo "=========================================="
+    echo "  Total calls: $times"
+    echo "  Successful calls: $total_success_count"
+    echo "  Failed calls: $total_failure_count"
+    echo "  Total errors detected: $total_error_count"
+    echo "  Total timeout errors: $total_timeout_failure_count"
+
+    # Detailed failure breakdown (only when we have logged structured errors via jq)
+    if [ -s "$ERRORS_FILE" ]; then
+        echo ""
+        echo "=========================================="
+        echo "Failure breakdown"
+        echo "=========================================="
+
+        # Per-slot statistics: how many times each (boardAddress, slotIndex) failed
+        echo ""
+        echo "Failures per slot (boardAddress, slotIndex):"
+        awk -F'|' '{print $1"|"$2}' "$ERRORS_FILE" \
+            | sort \
+            | uniq -c \
+            | sort -rn \
+            | awk '{
+                count=$1
+                $1=""
+                sub(/^ /, "")
+                split($0, a, "|")
+                printf "  Board %s, Slot %s: %d failure(s)\n", a[1], a[2], count
+            }'
+
+        # Per-error-type statistics
+        echo ""
+        echo "Failures per error type:"
+        awk -F'|' '{print $3}' "$ERRORS_FILE" \
+            | sort \
+            | uniq -c \
+            | sort -rn \
+            | awk '{
+                count=$1
+                $1=""
+                sub(/^ /, "")
+                printf "  %s: %d occurrence(s)\n", $0, count
+            }'
+
+        # Per-message statistics (helps distinguish "Device timeout" vs other messages)
+        echo ""
+        echo "Failures per message:"
+        awk -F'|' '{print $4}' "$ERRORS_FILE" \
+            | sort \
+            | uniq -c \
+            | sort -rn \
+            | awk '{
+                count=$1
+                $1=""
+                sub(/^ /, "")
+                printf "  \"%s\": %d occurrence(s)\n", $0, count
+            }'
+
+        # All recorded failures in the requested object shape
+        echo ""
+        echo "All recorded failures:"
+        awk -F'|' '{
+            printf "{\n"
+            printf "  \"index\": %s,\n", NR
+            printf "  \"boardAddress\": %s,\n", ($1 == "N/A" ? "null" : $1)
+            printf "  \"slotIndex\": %s,\n", ($2 == "N/A" ? "null" : $2)
+            printf "  \"error\": \"%s\",\n", $3
+            printf "  \"message\": \"%s\",\n", $4
+            printf "  \"call\": %s\n", $5
+            printf "}\n"
+        }' "$ERRORS_FILE"
+    fi
+} > "$LOG_FILE"
+
 echo ""
-echo "Overall Summary:"
-echo "  Total calls: $times"
-echo "  Successful calls: $total_success_count"
-echo "  Failed calls: $total_failure_count"
-echo "  Total errors detected: $total_error_count"
-echo "  Total timeout errors: $total_timeout_failure_count"
+echo "Results written to: $LOG_FILE"
 
