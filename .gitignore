@@ -2,3 +2,7 @@ node_modules/
 dist/
 
 executables/
+
+*.log
+
+.DS_Store
