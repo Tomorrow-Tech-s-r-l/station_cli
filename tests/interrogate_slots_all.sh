@@ -140,9 +140,17 @@ total_failure_count=0
 total_timeout_failure_count=0
 total_error_count=0
 
+# Execution time metrics (in ms)
+exec_time_count=0
+exec_time_sum=0
+exec_time_min=""
+exec_time_max=""
+
 # Temp file to log every individual error as: boardAddress|slotIndex|error|message|callIndex
 ERRORS_FILE=$(mktemp -t interrogate_slots_errors.XXXXXX)
-trap 'rm -f "$ERRORS_FILE"' EXIT
+# Temp file to log every captured executionTimeMs (one value per line)
+EXEC_TIMES_FILE=$(mktemp -t interrogate_slots_exec_times.XXXXXX)
+trap 'rm -f "$ERRORS_FILE" "$EXEC_TIMES_FILE"' EXIT
 
 # Execute slots command multiple times with delay
 for ((i=1; i<=times; i++)); do
@@ -176,6 +184,20 @@ for ((i=1; i<=times; i++)); do
                 # The slots command returns a response with slots array and errors array
                 has_slots=$(echo "$output" | jq -r 'has("slots")' 2>/dev/null)
                 has_errors=$(echo "$output" | jq -r 'has("errors")' 2>/dev/null)
+
+                # Capture executionTimeMs (top-level field on the SlotsResponse)
+                exec_time_value=$(echo "$output" | jq -r '.executionTimeMs // empty' 2>/dev/null)
+                if [ -n "$exec_time_value" ] && [[ "$exec_time_value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                    echo "$exec_time_value" >> "$EXEC_TIMES_FILE"
+                    ((exec_time_count++))
+                    exec_time_sum=$(awk "BEGIN {printf \"%.6f\", $exec_time_sum + $exec_time_value}")
+                    if [ -z "$exec_time_min" ] || awk "BEGIN {exit !($exec_time_value < $exec_time_min)}"; then
+                        exec_time_min="$exec_time_value"
+                    fi
+                    if [ -z "$exec_time_max" ] || awk "BEGIN {exit !($exec_time_value > $exec_time_max)}"; then
+                        exec_time_max="$exec_time_value"
+                    fi
+                fi
                 
                 # Check for errors in the errors array
                 if [ "$has_errors" = "true" ]; then
@@ -216,6 +238,20 @@ for ((i=1; i<=times; i++)); do
             fi
         else
             # Fallback: use grep to check for patterns (works with single-line or multi-line JSON)
+            # Capture executionTimeMs via grep (best-effort; works for `"executionTimeMs": 123` or `"executionTimeMs":123.45`)
+            exec_time_value=$(echo "$output" | grep -oE '"executionTimeMs"[[:space:]]*:[[:space:]]*[0-9]+(\.[0-9]+)?' | head -n 1 | grep -oE '[0-9]+(\.[0-9]+)?$')
+            if [ -n "$exec_time_value" ] && [[ "$exec_time_value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                echo "$exec_time_value" >> "$EXEC_TIMES_FILE"
+                ((exec_time_count++))
+                exec_time_sum=$(awk "BEGIN {printf \"%.6f\", $exec_time_sum + $exec_time_value}")
+                if [ -z "$exec_time_min" ] || awk "BEGIN {exit !($exec_time_value < $exec_time_min)}"; then
+                    exec_time_min="$exec_time_value"
+                fi
+                if [ -z "$exec_time_max" ] || awk "BEGIN {exit !($exec_time_value > $exec_time_max)}"; then
+                    exec_time_max="$exec_time_value"
+                fi
+            fi
+
             if echo "$output" | grep -q '"slots"'; then
                 # Check for errors array
                 if echo "$output" | grep -q '"errors"'; then
@@ -308,6 +344,21 @@ LOG_FILE="$SCRIPT_DIR/interrogate_slots_all_results_${TIMESTAMP}.log"
     echo "  Failed calls: $total_failure_count"
     echo "  Total errors detected: $total_error_count"
     echo "  Total timeout errors: $total_timeout_failure_count"
+
+    # Execution time metrics (computed across all calls that returned a parseable executionTimeMs)
+    echo ""
+    echo "=========================================="
+    echo "Execution time metrics (executionTimeMs)"
+    echo "=========================================="
+    if [ "$exec_time_count" -gt 0 ]; then
+        exec_time_avg=$(awk "BEGIN {printf \"%.3f\", $exec_time_sum / $exec_time_count}")
+        echo "  Samples: $exec_time_count"
+        echo "  Min: ${exec_time_min} ms"
+        echo "  Max: ${exec_time_max} ms"
+        echo "  Average (mean): ${exec_time_avg} ms"
+    else
+        echo "  No executionTimeMs values were captured."
+    fi
 
     # Detailed failure breakdown (only when we have logged structured errors via jq)
     if [ -s "$ERRORS_FILE" ]; then

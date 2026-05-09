@@ -12,7 +12,15 @@ import {
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
   CMD_GET_FW_VER,
+  STATUS_TIMEOUT,
 } from "../../../utils/constants";
+
+// Retry on transient powerbank-link timeouts (HOST_CMD_STATUS_ERR_TIMEOUT).
+// The interface board returns this status when it didn't get a reply from the
+// powerbank within its own 500ms window; with independent failures at p≈0.145
+// observed in the field, two retries drop the residual rate to ≈0.003.
+const PB_TIMEOUT_RETRIES = 2;
+const PB_TIMEOUT_RETRY_DELAY_MS = 30;
 
 // Helper function to get command name from command code
 function getCommandName(commandCode: number): string {
@@ -46,18 +54,31 @@ export abstract class BaseCommand {
       const commandName = getCommandName(message.command);
       debug.slotRequest(commandName, message.boardAddress, slotIndex);
 
-      const response = await this.serialService.sendMessage(message);
-
-      const result: CommandResponse = {
-        success: response[2] === 0,
-        status: response[2],
-        data: response.subarray(3),
-      };
+      let result: CommandResponse | undefined;
+      for (let attempt = 0; attempt <= PB_TIMEOUT_RETRIES; attempt++) {
+        const response = await this.serialService.sendMessage(message);
+        result = {
+          success: response[2] === 0,
+          status: response[2],
+          data: response.subarray(3),
+        };
+        if (result.status !== STATUS_TIMEOUT) {
+          break;
+        }
+        if (attempt < PB_TIMEOUT_RETRIES) {
+          debug.log(
+            `Powerbank link timeout on ${commandName} (board=${message.boardAddress}, slot=${slotIndex}), retrying ${attempt + 1}/${PB_TIMEOUT_RETRIES}`
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, PB_TIMEOUT_RETRY_DELAY_MS)
+          );
+        }
+      }
 
       // Log the end of the slot request
       debug.slotRequestEnd();
 
-      return result;
+      return result!;
     } catch (error) {
       console.error("Command execution failed:", error);
       debug.slotRequestEnd();
