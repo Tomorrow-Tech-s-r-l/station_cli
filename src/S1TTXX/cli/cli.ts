@@ -10,6 +10,8 @@ import {
   PB_STATUS_PLUGGED_IN,
   PB_STATUS_IDLE,
 } from "../../utils/constants";
+import { PbLinkStatsCommand } from "./commands/pb_link_stats";
+import { StatsCommand } from "./commands/stats";
 import {
   SlotState,
   SlotError,
@@ -831,6 +833,105 @@ export function registerS1TTXXCommands(program: Command): void {
           );
         } else {
           logger.error("Command failed with status:", response[1]);
+        }
+
+        await service.disconnect();
+      } catch (error) {
+        logger.error("Error:", error);
+        process.exit(1);
+      }
+    });
+
+  // Per-slot powerbank link telemetry: attempts, retries, final timeouts.
+  // Use --reset to clear the counters after reading (handy between test runs).
+  program
+    .command("pb-link-stats")
+    .description("Get per-slot powerbank link retry telemetry")
+    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .option("--reset", "Clear counters after reading", false)
+    .action(async (options: CommandOptions & { reset?: boolean }) => {
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const command = new PbLinkStatsCommand(service);
+        const response = await command.execute(
+          parseInt(options.board),
+          options.reset === true
+        );
+
+        if (!response.success) {
+          logger.error("Command failed with status:", response.status);
+        } else if (!response.slots) {
+          logger.error("Malformed response (no per-slot stats)");
+        } else {
+          logger.log("Per-slot powerbank link stats:");
+          for (let i = 0; i < response.slots.length; i++) {
+            const s = response.slots[i];
+            const attempted = s.attempts;
+            const succeededFirstTry = Math.max(
+              0,
+              s.attempts - s.retries - s.finalFailures
+            );
+            const recoveredByRetry = Math.max(
+              0,
+              s.retries - s.finalFailures
+            );
+            const ratePct =
+              attempted > 0
+                ? ((s.finalFailures / attempted) * 100).toFixed(2)
+                : "0.00";
+            logger.log(
+              `  slot ${i}: attempts=${attempted}  retries=${s.retries}  ` +
+                `final_failures=${s.finalFailures}  ` +
+                `(first-try=${succeededFirstTry}, recovered=${recoveredByRetry}, residual=${ratePct}%)`
+            );
+          }
+          if (options.reset) {
+            logger.log("(counters cleared)");
+          }
+        }
+
+        await service.disconnect();
+      } catch (error) {
+        logger.error("Error:", error);
+        process.exit(1);
+      }
+    });
+
+  // Lifetime per-slot solenoid trigger counters. Persisted to flash hourly.
+  // Use --reset to read+clear+flush in one shot.
+  program
+    .command("stats")
+    .description("Get per-slot solenoid usage counters")
+    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .option("--reset", "Clear counters after reading and flush to flash", false)
+    .action(async (options: CommandOptions & { reset?: boolean }) => {
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const command = new StatsCommand(service);
+        const response = await command.execute(
+          parseInt(options.board),
+          options.reset === true
+        );
+
+        if (!response.success) {
+          logger.error("Command failed with status:", response.status);
+        } else if (!response.slots) {
+          logger.error("Malformed response (no per-slot stats)");
+        } else {
+          logger.log("Per-slot usage counters:");
+          for (let i = 0; i < response.slots.length; i++) {
+            const s = response.slots[i];
+            logger.log(`  slot ${i}: unlocks=${s.unlockCount}`);
+          }
+          if (options.reset) {
+            logger.log("(counters cleared and flushed to flash)");
+          }
         }
 
         await service.disconnect();

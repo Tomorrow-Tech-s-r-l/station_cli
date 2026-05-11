@@ -62,13 +62,17 @@ echo "  2) S1TT6"
 read_input "Enter selection (1 or 2): " model_choice
 model_choice=$(echo "$model_choice" | tr -d '[:space:]')
 
-# Validate and set model based on selection
+# Validate and set model based on selection. boards[] is the list of board
+# addresses we'll target for pb-link-stats reset/read at the start/end of
+# this run (BF-260510 validation flow).
 case "$model_choice" in
     1)
         model="S1TT30"
+        boards=(0 1 2 3 4)
         ;;
     2)
         model="S1TT6"
+        boards=(0)
         ;;
     *)
         echo "Error: Invalid selection. Must be 1 or 2" >&2
@@ -134,6 +138,39 @@ echo ""
 echo "Interrogating slots for model $model, $times time(s) with ${delay_ms_value}ms delay..."
 echo ""
 
+# Capture pb-link-stats output across all boards. Used both for the start
+# reset and the end read. Echoes through the test log so we have a
+# permanent record alongside the slot results.
+LINK_STATS_BEFORE_FILE=$(mktemp -t interrogate_link_stats_before.XXXXXX)
+LINK_STATS_AFTER_FILE=$(mktemp -t interrogate_link_stats_after.XXXXXX)
+trap 'rm -f "$ERRORS_FILE" "$EXEC_TIMES_FILE" "$LINK_STATS_BEFORE_FILE" "$LINK_STATS_AFTER_FILE"' EXIT
+
+run_link_stats() {
+    # $1 = output file, $2 = "--reset" or empty, $3 = label
+    local out_file="$1"
+    local reset_flag="$2"
+    local label="$3"
+    : > "$out_file"
+    echo "[$label] pb-link-stats across boards: ${boards[*]}"
+    for board in "${boards[@]}"; do
+        if [ "$USE_NODE" = "true" ]; then
+            stats_output=$(node "$CLI_SCRIPT" "$model" "pb-link-stats" -b "$board" $reset_flag 2>&1)
+        else
+            stats_output=$("$EXECUTABLE" "$model" "pb-link-stats" -b "$board" $reset_flag 2>&1)
+        fi
+        {
+            echo "--- board $board ---"
+            echo "$stats_output"
+        } | tee -a "$out_file"
+    done
+    echo ""
+}
+
+# BF-260510 validation: reset the link telemetry so the run starts from
+# a clean slate. This makes attempts/retries/final_failures directly
+# comparable to the slot-call counts produced below.
+run_link_stats "$LINK_STATS_BEFORE_FILE" "--reset" "BEFORE (reset)"
+
 # Initialize counters
 total_success_count=0
 total_failure_count=0
@@ -150,7 +187,7 @@ exec_time_max=""
 ERRORS_FILE=$(mktemp -t interrogate_slots_errors.XXXXXX)
 # Temp file to log every captured executionTimeMs (one value per line)
 EXEC_TIMES_FILE=$(mktemp -t interrogate_slots_exec_times.XXXXXX)
-trap 'rm -f "$ERRORS_FILE" "$EXEC_TIMES_FILE"' EXIT
+# (cleanup trap is registered earlier and already covers all four temp files)
 
 # Execute slots command multiple times with delay
 for ((i=1; i<=times; i++)); do
@@ -325,6 +362,13 @@ echo "=========================================="
 echo "Interrogation complete!"
 echo "=========================================="
 
+# BF-260510 validation: read the link telemetry now that the slot loop is
+# done. retries vs final_failures tells us whether the protocol fix is
+# carrying its weight or whether residual failures need a hardware
+# investigation (see BF-260510.md, validation plan step 5).
+echo ""
+run_link_stats "$LINK_STATS_AFTER_FILE" "" "AFTER"
+
 # Build the results log file (named with a timestamp so multiple runs don't overwrite each other)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE="$SCRIPT_DIR/interrogate_slots_all_results_${TIMESTAMP}.log"
@@ -423,6 +467,30 @@ LOG_FILE="$SCRIPT_DIR/interrogate_slots_all_results_${TIMESTAMP}.log"
             printf "  \"call\": %s\n", $5
             printf "}\n"
         }' "$ERRORS_FILE"
+    fi
+
+    # BF-260510 link telemetry snapshots. BEFORE shows the post-reset
+    # state (sanity-checks that --reset took); AFTER shows what the
+    # interface board observed across this run. Decision rule:
+    #   retries >> final_failures  -> protocol fix is carrying its weight
+    #   retries ~= final_failures  -> mechanical (see BF-260510.md step 5)
+    echo ""
+    echo "=========================================="
+    echo "Link telemetry (BF-260510)"
+    echo "=========================================="
+    echo ""
+    echo "[BEFORE — post-reset]"
+    if [ -s "$LINK_STATS_BEFORE_FILE" ]; then
+        cat "$LINK_STATS_BEFORE_FILE"
+    else
+        echo "  (no output captured)"
+    fi
+    echo ""
+    echo "[AFTER — end of run]"
+    if [ -s "$LINK_STATS_AFTER_FILE" ]; then
+        cat "$LINK_STATS_AFTER_FILE"
+    else
+        echo "  (no output captured)"
     fi
 } > "$LOG_FILE"
 

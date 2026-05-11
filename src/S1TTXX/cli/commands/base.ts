@@ -17,10 +17,11 @@ import {
 
 // Retry on transient powerbank-link timeouts (HOST_CMD_STATUS_ERR_TIMEOUT).
 // The interface board returns this status when it didn't get a reply from the
-// powerbank within its own 500ms window; with independent failures at p≈0.145
-// observed in the field, two retries drop the residual rate to ≈0.003.
-const PB_TIMEOUT_RETRIES = 2;
-const PB_TIMEOUT_RETRY_DELAY_MS = 30;
+// powerbank within its own 500ms window. The delays grow per attempt so the
+// link/contact has time to settle when the failure is correlated rather than
+// a single independent glitch (e.g. brief pogo-pin contact loss).
+const PB_TIMEOUT_RETRY_DELAYS_MS: readonly number[] = [150, 400];
+const PB_TIMEOUT_RETRIES = PB_TIMEOUT_RETRY_DELAYS_MS.length;
 
 // Helper function to get command name from command code
 function getCommandName(commandCode: number): string {
@@ -66,12 +67,11 @@ export abstract class BaseCommand {
           break;
         }
         if (attempt < PB_TIMEOUT_RETRIES) {
+          const delayMs = PB_TIMEOUT_RETRY_DELAYS_MS[attempt];
           debug.log(
-            `Powerbank link timeout on ${commandName} (board=${message.boardAddress}, slot=${slotIndex}), retrying ${attempt + 1}/${PB_TIMEOUT_RETRIES}`
+            `Powerbank link timeout on ${commandName} (board=${message.boardAddress}, slot=${slotIndex}), retrying ${attempt + 1}/${PB_TIMEOUT_RETRIES} after ${delayMs}ms`
           );
-          await new Promise((resolve) =>
-            setTimeout(resolve, PB_TIMEOUT_RETRY_DELAY_MS)
-          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
       }
 
