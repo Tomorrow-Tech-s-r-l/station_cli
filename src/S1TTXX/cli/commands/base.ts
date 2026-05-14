@@ -12,6 +12,13 @@ import {
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
   CMD_GET_FW_VER,
+  CMD_ENTER_BOOT_CODE,
+  CMD_FWU_HELLO_CODE,
+  CMD_FWU_BEGIN_CODE,
+  CMD_FWU_DATA_CODE,
+  CMD_FWU_END_CODE,
+  CMD_FWU_ABORT_CODE,
+  CMD_FWU_EXIT_CODE,
   STATUS_TIMEOUT,
 } from "../../../utils/constants";
 
@@ -36,6 +43,13 @@ function getCommandName(commandCode: number): string {
     [CMD_SET_INFO_PWB]: "SET_INFO_PWB",
     [CMD_SET_INFO_BATTERY]: "SET_INFO_BATTERY",
     [CMD_GET_FW_VER]: "GET_FW_VER",
+    [CMD_ENTER_BOOT_CODE]: "ENTER_BOOT",
+    [CMD_FWU_HELLO_CODE]: "FWU_HELLO",
+    [CMD_FWU_BEGIN_CODE]: "FWU_BEGIN",
+    [CMD_FWU_DATA_CODE]: "FWU_DATA",
+    [CMD_FWU_END_CODE]: "FWU_END",
+    [CMD_FWU_ABORT_CODE]: "FWU_ABORT",
+    [CMD_FWU_EXIT_CODE]: "FWU_EXIT",
   };
   return commandNames[commandCode] || `UNKNOWN(0x${commandCode.toString(16)})`;
 }

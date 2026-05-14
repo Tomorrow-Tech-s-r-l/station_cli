@@ -37,6 +37,10 @@ import {
   SLOT_IS_LOCKED_DEFAULT_VALUE,
 } from "../utils/slot_mapping";
 import { LedCommand } from "./commands/led";
+import { EnterBootCommand } from "./commands/enter_boot";
+import { FwuHelloCommand, FwuHelloInfo } from "./commands/fwu_hello";
+import { FwuExitCommand } from "./commands/fwu_exit";
+import { runFirmwareUpdate } from "./commands/firmware_update";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
@@ -937,6 +941,320 @@ export function registerS1TTXXCommands(program: Command): void {
         await service.disconnect();
       } catch (error) {
         logger.error("Error:", error);
+        process.exit(1);
+      }
+    });
+
+  // ---- Firmware-update (FWU) commands ---------------------------------
+  //
+  // Three thin one-shot commands that exercise the Phase 3 bootloader
+  // protocol. They route by slot index just like `status`/`charge`/`led`.
+  //
+  //   enter-boot -i <index>   App -> ack + soft reset into the bootloader
+  //   fwu-hello  -i <index>   BL  -> returns BL version + slot info
+  //   fwu-exit   -i <index>   BL  -> ack + soft reset back into the app
+  //
+  // The bootloader is unresponsive for ~30 ms while it resets across an
+  // ENTER_BOOT or FWU_EXIT, so a script that chains the three should
+  // sleep ~200 ms between them.
+
+  program
+    .command("enter-boot")
+    .description(
+      "Tell the powerbank app to reset into the bootloader (CMD_ENTER_BOOT 0x10)"
+    )
+    .requiredOption(
+      "-i, --index <index>",
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
+      cliInputValidatorIndex
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const index = parseInt(options.index);
+      const slotMapping = mapSlotToBoard(index);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const command = new EnterBootCommand(service);
+        const response = await command.execute(
+          slotMapping.boardAddress,
+          slotMapping.slotInBoard
+        );
+
+        const result = {
+          success: response.success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: response.success
+            ? null
+            : {
+                code: response.status,
+                message: getStatusMessage(response.status),
+              },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+
+        await service.disconnect();
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("fwu-hello")
+    .description(
+      "Query the powerbank bootloader for version + slot info (CMD_FWU_HELLO 0x11)"
+    )
+    .requiredOption(
+      "-i, --index <index>",
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
+      cliInputValidatorIndex
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const index = parseInt(options.index);
+      const slotMapping = mapSlotToBoard(index);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const command = new FwuHelloCommand(service);
+        const response = await command.execute(
+          slotMapping.boardAddress,
+          slotMapping.slotInBoard
+        );
+
+        let bootloader: FwuHelloInfo | null = null;
+        if (response.success) {
+          try {
+            bootloader = JSON.parse(response.data.toString()) as FwuHelloInfo;
+          } catch {
+            // Bootloader payload was shorter than 15 bytes — surface as a
+            // protocol error rather than a parse crash.
+          }
+        }
+
+        const result = {
+          success: response.success && bootloader !== null,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          bootloader,
+          error:
+            response.success && bootloader !== null
+              ? null
+              : {
+                  code: response.status,
+                  message: !response.success
+                    ? getStatusMessage(response.status)
+                    : "Malformed FWU_HELLO response payload",
+                },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+
+        await service.disconnect();
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
+
+  // ---- firmware-update orchestrator ---------------------------------
+  //
+  // End-to-end Phase 5 flow: read the .bin, IEEE-802.3 CRC32 it,
+  // ENTER_BOOT → FWU_HELLO → FWU_BEGIN → loop FWU_DATA → FWU_END →
+  // FWU_EXIT. Honors RES_OFFSET_MISMATCH and falls back to FWU_ABORT on
+  // mid-stream failure so the slot is cleanly invalidated.
+  program
+    .command("firmware-update")
+    .description(
+      "Flash a new application image onto a powerbank via the pogo line"
+    )
+    .requiredOption(
+      "-i, --index <index>",
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
+      cliInputValidatorIndex
+    )
+    .requiredOption(
+      "--image <path>",
+      "Path to the .bin image to flash (typically build/P1TT2C-firmware.bin)"
+    )
+    .option(
+      "--app-version <hex>",
+      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Defaults to 0x00040000. (Not to be confused with the top-level CLI --version flag.)",
+      "0x00040000"
+    )
+    .option("--verbose", "Print per-chunk progress", false)
+    .option(
+      "--inter-chunk-delay <ms>",
+      "Extra wait between consecutive FWU_DATA chunks. The station inserts ~50 ms after every command on its own — this knob is for situations where that's not enough breathing room for the BL's half-duplex direction-switch to settle. Default 0.",
+      "0"
+    )
+    .action(
+      async (
+        options: CommandOptions & {
+          image?: string;
+          appVersion?: string;
+          verbose?: boolean;
+          interChunkDelay?: string;
+        }
+      ) => {
+        const startTime = Date.now();
+        const index = parseInt(options.index);
+        const slotMapping = mapSlotToBoard(index);
+        try {
+          if (!options.image) {
+            throw new Error("--image is required");
+          }
+          const version = parseInt(options.appVersion ?? "0x00040000", 16) >>> 0;
+          const interChunkDelayMs = parseInt(options.interChunkDelay ?? "0", 10);
+
+          const port = await selectPort();
+          const service = new SerialService(port);
+          await service.connect();
+
+          const r = await runFirmwareUpdate(service, {
+            boardAddress: slotMapping.boardAddress,
+            slotInBoard: slotMapping.slotInBoard,
+            imagePath: options.image,
+            version,
+            verbose: options.verbose === true,
+            interChunkDelayMs,
+          });
+
+          const out = {
+            success: r.success,
+            executionTimeMs: Date.now() - startTime,
+            timestamp: new Date().toISOString(),
+            slotIndex: index,
+            boardAddress: slotMapping.boardAddress,
+            slotInBoard: slotMapping.slotInBoard,
+            image: {
+              path: r.imagePath,
+              sizeBytes: r.imageSize,
+              crc32: r.imageCrc32,
+              version,
+            },
+            chunks: r.chunks,
+            retries: r.retries,
+            durationMs: r.durationMs,
+            bootloader: r.blInfo,
+            error: r.error,
+          };
+          logger.log(JSON.stringify(out, null, 2));
+
+          await service.disconnect();
+          if (!r.success) {
+            process.exit(1);
+          }
+        } catch (error) {
+          const result = {
+            success: false,
+            executionTimeMs: Date.now() - startTime,
+            timestamp: new Date().toISOString(),
+            slotIndex: index,
+            boardAddress: slotMapping.boardAddress,
+            slotInBoard: slotMapping.slotInBoard,
+            error: {
+              code: -1,
+              message: error instanceof Error ? error.message : "Unknown error",
+            },
+          };
+          logger.log(JSON.stringify(result, null, 2));
+          process.exit(1);
+        }
+      }
+    );
+
+  program
+    .command("fwu-exit")
+    .description(
+      "Tell the bootloader to reset back into the app (CMD_FWU_EXIT 0x16)"
+    )
+    .requiredOption(
+      "-i, --index <index>",
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
+      cliInputValidatorIndex
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const index = parseInt(options.index);
+      const slotMapping = mapSlotToBoard(index);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const command = new FwuExitCommand(service);
+        const response = await command.execute(
+          slotMapping.boardAddress,
+          slotMapping.slotInBoard
+        );
+
+        const result = {
+          success: response.success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: response.success
+            ? null
+            : {
+                code: response.status,
+                message: getStatusMessage(response.status),
+              },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+
+        await service.disconnect();
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
         process.exit(1);
       }
     });

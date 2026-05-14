@@ -16,6 +16,20 @@ export const CMD_UNLOCK_CODE = 0x06;
 export const CMD_SET_LED_CODE = 0x07;
 export const CMD_SET_INFO_PWB = 0x08;
 export const CMD_SET_INFO_BATTERY = 0x09;
+
+// Firmware-update opcodes (see NF-260513-bootloader.md and
+// firmware App/Inc/fwu_iface.h — single source of truth on the firmware side).
+// CMD_ENTER_BOOT is handled by the application and triggers a reset into
+// the bootloader; the rest are answered by the bootloader. Phase 3 wires
+// up HELLO and EXIT; BEGIN/DATA/END/ABORT land in Phase 4.
+export const CMD_ENTER_BOOT_CODE = 0x10;
+export const CMD_FWU_HELLO_CODE = 0x11;
+export const CMD_FWU_BEGIN_CODE = 0x12;
+export const CMD_FWU_DATA_CODE = 0x13;
+export const CMD_FWU_END_CODE = 0x14;
+export const CMD_FWU_ABORT_CODE = 0x15;
+export const CMD_FWU_EXIT_CODE = 0x16;
+
 export const CMD_GET_FW_VER = 0x50;
 export const CMD_PB_LINK_STATS = 0x51;
 export const CMD_STATS = 0x52;
