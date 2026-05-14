@@ -35,6 +35,22 @@ export const CMD_GET_FW_VER = 0x50;
 export const CMD_PB_LINK_STATS = 0x51;
 export const CMD_STATS = 0x52;
 
+// Station-side firmware-update opcodes — bootloader/Inc/fwu_iface.h on the
+// firmware side is the single source of truth. ENTER is handled by the
+// running Zephyr application (it writes the rendezvous magic and calls
+// sys_reboot). The other six are handled by the in-application bootloader
+// itself, which speaks the same addressed RS-485 framing as the app
+// (SOF 0xEA, board address, payload, CRC16-Modbus). Unlike the powerbank
+// CMD_FWU_* family these do NOT carry a slot index — they target the
+// station board itself, not a powerbank slot.
+export const CMD_STATION_FWU_ENTER_CODE = 0x60;
+export const CMD_STATION_FWU_HELLO_CODE = 0x61;
+export const CMD_STATION_FWU_BEGIN_CODE = 0x62;
+export const CMD_STATION_FWU_DATA_CODE  = 0x63;
+export const CMD_STATION_FWU_END_CODE   = 0x64;
+export const CMD_STATION_FWU_ABORT_CODE = 0x65;
+export const CMD_STATION_FWU_EXIT_CODE  = 0x66;
+
 // Status Codes
 export const STATUS_OK = 0x00;
 export const STATUS_TIMEOUT = 0x01;

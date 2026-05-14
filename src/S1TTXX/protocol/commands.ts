@@ -18,6 +18,13 @@ import {
   CMD_FWU_END_CODE,
   CMD_FWU_ABORT_CODE,
   CMD_FWU_EXIT_CODE,
+  CMD_STATION_FWU_ENTER_CODE,
+  CMD_STATION_FWU_HELLO_CODE,
+  CMD_STATION_FWU_BEGIN_CODE,
+  CMD_STATION_FWU_DATA_CODE,
+  CMD_STATION_FWU_END_CODE,
+  CMD_STATION_FWU_ABORT_CODE,
+  CMD_STATION_FWU_EXIT_CODE,
   MAXIMUM_SLOT_ADDRESS,
 } from "../../utils/constants";
 import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
@@ -333,6 +340,81 @@ export class FwuAbortCommandBuilder extends BaseCommandBuilder {
   }
 }
 
+// ---- Station-side firmware-update builders -----------------------------
+//
+// Mirror the powerbank CMD_FWU_* family but with no slot byte — these
+// target the station board itself. ENTER lives in the Zephyr app (writes
+// the RAM magic + sys_reboot); HELLO/BEGIN/DATA/END/ABORT/EXIT live in the
+// in-application bootloader at 0x08000000. Layouts mirror
+// bootloader/Src/fwu_protocol.c byte-for-byte.
+
+// STATION_FWU_ENTER (0x60): app-side. No payload — pure trigger.
+export class StationFwuEnterCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_STATION_FWU_ENTER_CODE]);
+  }
+}
+
+// STATION_FWU_HELLO (0x61): BL. No payload.
+export class StationFwuHelloCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_STATION_FWU_HELLO_CODE]);
+  }
+}
+
+// STATION_FWU_BEGIN (0x62): BL. data layout (12 bytes, no slot index):
+//   [img_size_u32_le][img_crc32_u32_le][version_u32_le]
+export class StationFwuBeginCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length !== 12) {
+      throw new Error(
+        "STATION_FWU_BEGIN command requires image size + CRC32 + version (12 B)"
+      );
+    }
+    return Buffer.concat([Buffer.from([CMD_STATION_FWU_BEGIN_CODE]), message.data]);
+  }
+}
+
+// STATION_FWU_DATA (0x63): BL. data layout (5+len bytes, no slot index):
+//   [offset_u32_le][len_u8][bytes 0..len]
+export class StationFwuDataCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length < 5) {
+      throw new Error(
+        "STATION_FWU_DATA command requires offset + len + bytes"
+      );
+    }
+    const len = message.data[4];
+    if (message.data.length !== 5 + len) {
+      throw new Error(
+        `STATION_FWU_DATA payload mismatch: header says len=${len}, total ${message.data.length}`
+      );
+    }
+    return Buffer.concat([Buffer.from([CMD_STATION_FWU_DATA_CODE]), message.data]);
+  }
+}
+
+// STATION_FWU_END (0x64): BL. No payload.
+export class StationFwuEndCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_STATION_FWU_END_CODE]);
+  }
+}
+
+// STATION_FWU_ABORT (0x65): BL. No payload.
+export class StationFwuAbortCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_STATION_FWU_ABORT_CODE]);
+  }
+}
+
+// STATION_FWU_EXIT (0x66): BL. No payload.
+export class StationFwuExitCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_STATION_FWU_EXIT_CODE]);
+  }
+}
+
 // Command factory
 export class CommandFactory {
   private static builders: Map<number, CommandBuilder> = new Map([
@@ -354,6 +436,13 @@ export class CommandFactory {
     [CMD_FWU_END_CODE, new FwuEndCommandBuilder()],
     [CMD_FWU_ABORT_CODE, new FwuAbortCommandBuilder()],
     [CMD_FWU_EXIT_CODE, new FwuExitCommandBuilder()],
+    [CMD_STATION_FWU_ENTER_CODE, new StationFwuEnterCommandBuilder()],
+    [CMD_STATION_FWU_HELLO_CODE, new StationFwuHelloCommandBuilder()],
+    [CMD_STATION_FWU_BEGIN_CODE, new StationFwuBeginCommandBuilder()],
+    [CMD_STATION_FWU_DATA_CODE,  new StationFwuDataCommandBuilder()],
+    [CMD_STATION_FWU_END_CODE,   new StationFwuEndCommandBuilder()],
+    [CMD_STATION_FWU_ABORT_CODE, new StationFwuAbortCommandBuilder()],
+    [CMD_STATION_FWU_EXIT_CODE,  new StationFwuExitCommandBuilder()],
   ]);
 
   static getBuilder(command: number): CommandBuilder {
@@ -373,7 +462,14 @@ export class CommandFactory {
     // glue [boardAddress][opcode][...message.data...] together.
     if (
       message.command === CMD_FWU_BEGIN_CODE ||
-      message.command === CMD_FWU_DATA_CODE
+      message.command === CMD_FWU_DATA_CODE ||
+      message.command === CMD_STATION_FWU_ENTER_CODE ||
+      message.command === CMD_STATION_FWU_HELLO_CODE ||
+      message.command === CMD_STATION_FWU_BEGIN_CODE ||
+      message.command === CMD_STATION_FWU_DATA_CODE ||
+      message.command === CMD_STATION_FWU_END_CODE ||
+      message.command === CMD_STATION_FWU_ABORT_CODE ||
+      message.command === CMD_STATION_FWU_EXIT_CODE
     ) {
       const data = message.data ?? Buffer.alloc(0);
       const out = Buffer.alloc(2 + data.length);

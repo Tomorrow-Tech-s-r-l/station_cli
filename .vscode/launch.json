@@ -274,6 +274,32 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "Debug: Station Firmware Update (verbose)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "station-firmware-update",
+        "-b", "${input:board}",
+        "--image", "${input:stationFwuImage}",
+        "--verbose"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Debug: Model",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
@@ -420,6 +446,12 @@
       "type": "promptString",
       "description": "Path to .bin to flash onto the powerbank",
       "default": "${workspaceFolder}/../../firmware/P1TT2C-firmware/build/P1TT2C-firmware.bin"
+    },
+    {
+      "id": "stationFwuImage",
+      "type": "promptString",
+      "description": "Path to .bin to flash onto the station (typically build/zephyr/zephyr.bin)",
+      "default": "${workspaceFolder}/../../firmware/S1TTXX-firmware/build/zephyr/zephyr.bin"
     }
   ]
 }

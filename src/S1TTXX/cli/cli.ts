@@ -2,6 +2,7 @@ import { Command } from "commander";
 import {
   MAXIMUM_POWER_LEVEL,
   MAXIMUM_SLOT_ADDRESS,
+  MINIMUM_BOARD_ADDRESS,
   SLOT_INDEX_MINIMUM,
   SLOT_LOCKED,
   CMD_GET_FW_VER,
@@ -41,6 +42,10 @@ import { EnterBootCommand } from "./commands/enter_boot";
 import { FwuHelloCommand, FwuHelloInfo } from "./commands/fwu_hello";
 import { FwuExitCommand } from "./commands/fwu_exit";
 import { runFirmwareUpdate } from "./commands/firmware_update";
+import { runStationFirmwareUpdate } from "./commands/station_firmware_update";
+import { StationFwuHelloCommand, StationFwuHelloInfo } from "./commands/station_fwu_hello";
+import { StationFwuEnterCommand } from "./commands/station_fwu_enter";
+import { StationFwuExitCommand } from "./commands/station_fwu_exit";
 import { PbFirmwareCommand } from "./commands/pb_firmware";
 import {
   cliInputValidatorEnable,
@@ -60,6 +65,10 @@ interface CommandOptions {
   currentCharge?: string;
   cutoffCharge?: string;
   cycles?: string;
+  image?: string;
+  appVersion?: string;
+  verbose?: boolean;
+  interChunkDelay?: string;
 }
 
 /**
@@ -1288,6 +1297,261 @@ export function registerS1TTXXCommands(program: Command): void {
         }
       }
     );
+
+  // ---- Station-side firmware-update (S1TTXX board itself) -----------
+  //
+  // Mirrors the powerbank `firmware-update` orchestrator above but targets
+  // the station board itself over its USART1 RS-485 link. The wire format
+  // is the same addressed framing the rest of the host-protocol uses
+  // (SOF 0xEA, board address, payload, CRC16-Modbus). Opcodes 0x60..0x66
+  // live in bootloader/Inc/fwu_iface.h on the firmware side.
+  //
+  // Three thin one-shot commands first (handy for poking at a board
+  // manually), then the full orchestrator.
+
+  program
+    .command("station-fwu-enter")
+    .description(
+      "Tell the station's running app to reset into its bootloader (CMD_STATION_FWU_ENTER 0x60)"
+    )
+    .requiredOption(
+      "-b, --board <address>",
+      `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const response = await new StationFwuEnterCommand(service).execute(boardAddress);
+
+        const result = {
+          success: response.success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          error: response.success
+            ? null
+            : { code: response.status, message: getStatusMessage(response.status) },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        await service.disconnect();
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("station-fwu-hello")
+    .description(
+      "Query the station's bootloader for version + slot info (CMD_STATION_FWU_HELLO 0x61)"
+    )
+    .requiredOption(
+      "-b, --board <address>",
+      `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const response = await new StationFwuHelloCommand(service).execute(boardAddress);
+
+        let bootloader: StationFwuHelloInfo | null = null;
+        if (response.success) {
+          try {
+            bootloader = JSON.parse(response.data.toString()) as StationFwuHelloInfo;
+          } catch {
+            /* malformed payload — surfaced via the error block below */
+          }
+        }
+
+        const result = {
+          success: response.success && bootloader !== null,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          bootloader,
+          error:
+            response.success && bootloader !== null
+              ? null
+              : {
+                  code: response.status,
+                  message: !response.success
+                    ? getStatusMessage(response.status)
+                    : "Malformed STATION_FWU_HELLO response payload",
+                },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        await service.disconnect();
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("station-fwu-exit")
+    .description(
+      "Tell the station's bootloader to reset back into the app (CMD_STATION_FWU_EXIT 0x66)"
+    )
+    .requiredOption(
+      "-b, --board <address>",
+      `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const response = await new StationFwuExitCommand(service).execute(boardAddress);
+
+        const result = {
+          success: response.success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          error: response.success
+            ? null
+            : { code: response.status, message: getStatusMessage(response.status) },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        await service.disconnect();
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
+
+  // ---- station-firmware-update orchestrator -------------------------
+  //
+  // End-to-end flow against the S1TTXX board itself:
+  //   STATION_FWU_ENTER → STATION_FWU_HELLO → STATION_FWU_BEGIN →
+  //     loop STATION_FWU_DATA → STATION_FWU_END → STATION_FWU_EXIT.
+  // Honors RES_OFFSET_MISMATCH and falls back to STATION_FWU_ABORT on
+  // mid-stream failure so the slot is cleanly invalidated.
+  program
+    .command("station-firmware-update")
+    .description("Flash a new application image onto the station via USART1 (RS-485)")
+    .requiredOption(
+      "-b, --board <address>",
+      `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`
+    )
+    .requiredOption(
+      "--image <path>",
+      "Path to the .bin image to flash (typically build/zephyr/zephyr.bin)"
+    )
+    .option(
+      "--app-version <hex>",
+      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Defaults to 0x00000000.",
+      "0x00000000"
+    )
+    .option("--verbose", "Print per-chunk progress", false)
+    .option(
+      "--inter-chunk-delay <ms>",
+      "Extra wait between consecutive STATION_FWU_DATA chunks. The transport already inserts 50 ms after each frame; bump this for slow links. Default 0.",
+      "0"
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
+      try {
+        if (!options.image) {
+          throw new Error("--image is required");
+        }
+        const version = parseInt(options.appVersion ?? "0x00000000", 16) >>> 0;
+        const interChunkDelayMs = parseInt(options.interChunkDelay ?? "0", 10);
+
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const r = await runStationFirmwareUpdate(service, {
+          boardAddress,
+          imagePath: options.image,
+          version,
+          verbose: options.verbose === true,
+          interChunkDelayMs,
+        });
+
+        const out = {
+          success: r.success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          image: {
+            path: r.imagePath,
+            sizeBytes: r.imageSize,
+            crc32: r.imageCrc32,
+            version,
+          },
+          chunks: r.chunks,
+          retries: r.retries,
+          durationMs: r.durationMs,
+          bootloader: r.blInfo,
+          error: r.error,
+        };
+        logger.log(JSON.stringify(out, null, 2));
+
+        await service.disconnect();
+        if (!r.success) {
+          process.exit(1);
+        }
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
 
   program
     .command("fwu-exit")
