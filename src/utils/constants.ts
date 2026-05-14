@@ -16,6 +16,7 @@ export const CMD_UNLOCK_CODE = 0x06;
 export const CMD_SET_LED_CODE = 0x07;
 export const CMD_SET_INFO_PWB = 0x08;
 export const CMD_SET_INFO_BATTERY = 0x09;
+export const CMD_PB_FW_VER_CODE = 0x0a;
 
 // Firmware-update opcodes (see NF-260513-bootloader.md and
 // firmware App/Inc/fwu_iface.h — single source of truth on the firmware side).

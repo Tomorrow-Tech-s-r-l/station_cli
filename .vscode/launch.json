@@ -224,6 +224,56 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "Debug: Powerbank Firmware Version",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "pb-firmware",
+        "-i", "${input:index}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+     {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Powerbank Firmware Update (verbose)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "firmware-update",
+        "-i", "${input:index}",
+        "--image", "${input:fwuImage}",
+        "--verbose"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Debug: Model",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
@@ -324,32 +374,6 @@
         "S0RU6",
         "s0ruxx-unlock",
         "-i", "${input:index}"
-      ],
-      "preLaunchTask": "Prepare: Debug",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
-      "console": "integratedTerminal",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--nolazy"],
-      "env": {
-        "DEBUG": "true"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug: Firmware Update (verbose)",
-      "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/src/cli.ts",
-      "args": [
-        "firmware-update",
-        "-i", "${input:index}",
-        "--image", "${input:fwuImage}",
-        "--verbose"
       ],
       "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],

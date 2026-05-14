@@ -41,6 +41,7 @@ import { EnterBootCommand } from "./commands/enter_boot";
 import { FwuHelloCommand, FwuHelloInfo } from "./commands/fwu_hello";
 import { FwuExitCommand } from "./commands/fwu_exit";
 import { runFirmwareUpdate } from "./commands/firmware_update";
+import { PbFirmwareCommand } from "./commands/pb_firmware";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
@@ -820,28 +821,119 @@ export function registerS1TTXXCommands(program: Command): void {
     .requiredOption("-b, --board <address>", "Board address (0-4)")
     .action(async (options: CommandOptions) => {
       const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
       try {
         const port = await selectPort();
         const service = new SerialService(port);
         await service.connect();
 
         const response = await service.sendMessage({
-          boardAddress: parseInt(options.board),
+          boardAddress,
           command: CMD_GET_FW_VER,
         });
 
-        if (response[1] === 0 && response.length >= 4) {
-          logger.log(
-            "Firmware version:",
-            `${response[2]}.${response[3]}.${response[4]}`
-          );
-        } else {
-          logger.error("Command failed with status:", response[1]);
-        }
+        // Response layout: [boardAddress][cmd_type][status][payload...].
+        // Firmware writes the FW_VERSION string verbatim (no length prefix,
+        // no NUL terminator); the remaining frame bytes are the UTF-8 chars.
+        const status = response[2];
+        const success = status === 0 && response.length > 3;
+        const version = success
+          ? response.subarray(3).toString("utf8").replace(/\0+$/, "")
+          : null;
+
+        const out = {
+          success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          name: "S1TTXX-firmware",
+          version,
+          status,
+        };
+        logger.log(JSON.stringify(out, null, 2));
 
         await service.disconnect();
+        if (!success) {
+          process.exit(1);
+        }
       } catch (error) {
-        logger.error("Error:", error);
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          name: "S1TTXX-firmware",
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    });
+
+  // Powerbank application firmware version (per slot).
+  //
+  // Sends CMD_PB_FW_VER (0x0a) to the station, which forwards it over the
+  // pogo line to the powerbank's running application. The app responds with
+  // the compile-time FW_VERSION string (read from package.json by CMake at
+  // build time). Non-disruptive — does NOT enter the bootloader.
+  program
+    .command("pb-firmware")
+    .description(
+      "Get the running application firmware version of the powerbank in a slot"
+    )
+    .requiredOption(
+      "-i, --index <index>",
+      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
+      cliInputValidatorIndex
+    )
+    .action(async (options: CommandOptions) => {
+      const startTime = Date.now();
+      const index = parseInt(options.index);
+      const slotMapping = mapSlotToBoard(index);
+      try {
+        const port = await selectPort();
+        const service = new SerialService(port);
+        await service.connect();
+
+        const r = await new PbFirmwareCommand(service).execute(
+          slotMapping.boardAddress,
+          slotMapping.slotInBoard
+        );
+
+        const out = {
+          success: r.success,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          name: r.info?.name ?? null,
+          version: r.info?.version ?? null,
+          status: r.status,
+        };
+        logger.log(JSON.stringify(out, null, 2));
+
+        await service.disconnect();
+        if (!r.success) {
+          process.exit(1);
+        }
+      } catch (error) {
+        const result = {
+          success: false,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          slotIndex: index,
+          boardAddress: slotMapping.boardAddress,
+          slotInBoard: slotMapping.slotInBoard,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
+        logger.log(JSON.stringify(result, null, 2));
         process.exit(1);
       }
     });

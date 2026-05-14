@@ -9,6 +9,7 @@ import {
   CMD_SET_LED_CODE,
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
+  CMD_PB_FW_VER_CODE,
   CMD_GET_FW_VER,
   CMD_ENTER_BOOT_CODE,
   CMD_FWU_HELLO_CODE,
@@ -225,6 +226,18 @@ export class FirmwareVersionCommandBuilder extends BaseCommandBuilder {
   }
 }
 
+// Powerbank firmware-version command builder (app-side, slot-routed).
+// Request is just [opcode][slot] — the powerbank's response carries the
+// FW_VERSION string baked in at build time from package.json.
+export class PbFwVerCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length !== 1) {
+      throw new Error("PB_FW_VER command requires slot index");
+    }
+    return Buffer.from([CMD_PB_FW_VER_CODE, message.data[0]]);
+  }
+}
+
 // Firmware-update opcode builders (Phase 3+).
 //
 // All three follow the existing slot-routed pattern: [opcode][slotInBoard].
@@ -333,6 +346,7 @@ export class CommandFactory {
     [CMD_SET_INFO_PWB, new SetInfoCommandBuilder()],
     [CMD_SET_INFO_BATTERY, new SetBatteryInfoCommandBuilder()],
     [CMD_GET_FW_VER, new FirmwareVersionCommandBuilder()],
+    [CMD_PB_FW_VER_CODE, new PbFwVerCommandBuilder()],
     [CMD_ENTER_BOOT_CODE, new EnterBootCommandBuilder()],
     [CMD_FWU_HELLO_CODE, new FwuHelloCommandBuilder()],
     [CMD_FWU_BEGIN_CODE, new FwuBeginCommandBuilder()],

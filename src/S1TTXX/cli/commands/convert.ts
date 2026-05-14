@@ -81,7 +81,7 @@ function getExpectedResponseFormat(commandCode: number): string {
       "Response: <cmd> <status> (status: 0x00=OK, 0x01=timeout, 0x02=invalid_cmd, 0x03=invalid_args, 0x04=internal_error)",
     [CMD_SET_INFO_BATTERY]:
       "Response: <cmd> <status> (status: 0x00=OK, 0x01=timeout, 0x02=invalid_cmd, 0x03=invalid_args, 0x04=internal_error)",
-    [CMD_GET_FW_VER]: "Response: <cmd> <status> <major> <minor> <patch>",
+    [CMD_GET_FW_VER]: "Response: <cmd> <status> <version utf-8 string>",
   };
   return formats[commandCode] || "Unknown response format";
 }
@@ -557,16 +557,13 @@ function parseResponseData(commandCode: number, data: Buffer): any {
       break;
 
     case CMD_GET_FW_VER:
-      if (data.length >= 3) {
-        const version = {
-          major: data.readUInt8(0),
-          minor: data.readUInt8(1),
-          patch: data.readUInt8(2),
-        };
+      if (data.length > 0) {
+        // Wire format: raw UTF-8 string (no length prefix, no NUL).
+        const version = data.toString("utf8").replace(/\0+$/, "");
         return {
-          parsed: version,
-          jsonString: JSON.stringify(version),
-          buffer: `Buffer.from(JSON.stringify(${JSON.stringify(version)}))`,
+          parsed: { version },
+          jsonString: JSON.stringify({ version }),
+          buffer: `Buffer.from(JSON.stringify(${JSON.stringify({ version })}))`,
         };
       }
       break;
