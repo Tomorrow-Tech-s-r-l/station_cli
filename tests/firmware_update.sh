@@ -29,7 +29,7 @@ fi
 
 SLOT_INDEX_MINIMUM=1
 SLOT_INDEX_MAXIMUM=30
-DEFAULT_IMAGE_PATH="$SCRIPT_DIR/../../../firmware/P1TT2C-firmware/build_phase3/P1TT2C-firmware.bin"
+DEFAULT_IMAGE_PATH="$SCRIPT_DIR/../../../firmware/P1TT2C-firmware/build/P1TT2C-firmware.bin"
 
 chmod +x "$EXECUTABLE" 2>/dev/null
 

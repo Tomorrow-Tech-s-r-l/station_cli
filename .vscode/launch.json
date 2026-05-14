@@ -395,7 +395,7 @@
       "id": "fwuImage",
       "type": "promptString",
       "description": "Path to .bin to flash onto the powerbank",
-      "default": "${workspaceFolder}/../../firmware/P1TT2C-firmware/build_phase3/P1TT2C-firmware.bin"
+      "default": "${workspaceFolder}/../../firmware/P1TT2C-firmware/build/P1TT2C-firmware.bin"
     }
   ]
 }
