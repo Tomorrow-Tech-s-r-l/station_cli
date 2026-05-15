@@ -24,8 +24,7 @@
         "DEBUG": "true"
       }
     },
-
-        {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Slots (S1TT6)",
@@ -43,13 +42,13 @@
         "!**/node_modules/**"
       ],
       "console": "integratedTerminal",
-       "runtimeExecutable": "node",
+      "runtimeExecutable": "node",
       "runtimeArgs": ["--nolazy"],
       "env": {
         "DEBUG": "true"
       }
     },
-        {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Slots with 2 boards",
@@ -73,7 +72,7 @@
         "DEBUG": "true"
       }
     },
-      {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Unlock",
@@ -97,7 +96,7 @@
         "DEBUG": "true"
       }
     },
-      {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Status",
@@ -121,7 +120,7 @@
         "DEBUG": "true"
       }
     },
-      {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Charge",
@@ -171,7 +170,7 @@
         "DEBUG": "true"
       }
     },
-        {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Initialize Powerbank",
@@ -180,8 +179,7 @@
       "args": [
         "initialize-powerbank",
         "-i", "${input:index}",
-        "--id", "1234567890",
-
+        "--id", "1234567890"
       ],
       "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -197,7 +195,7 @@
         "DEBUG": "true"
       }
     },
-      {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Firmware Version",
@@ -206,6 +204,32 @@
       "args": [
         "firmware",
         "-b", "${input:board}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+     {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Firmware Update (verbose)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "firmware-update",
+        "-b", "${input:board}",
+        "--image", "${input:stationFwuImage}",
+        "--verbose"
       ],
       "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -245,14 +269,14 @@
         "DEBUG": "true"
       }
     },
-     {
+    {
       "type": "node",
       "request": "launch",
       "name": "Debug: Powerbank Firmware Update (verbose)",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
-        "firmware-update",
+        "pb-firmware-update",
         "-i", "${input:index}",
         "--image", "${input:fwuImage}",
         "--verbose"
@@ -274,14 +298,181 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug: Station Firmware Update (verbose)",
+      "name": "Debug: Powerbank Link Stats",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/src/cli.ts",
       "args": [
-        "station-firmware-update",
+        "pb-link-stats",
+        "-b", "${input:board}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Powerbank Link Stats (reset)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "pb-link-stats",
         "-b", "${input:board}",
-        "--image", "${input:stationFwuImage}",
-        "--verbose"
+        "--reset"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: PB Enter Boot",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "pb-enter-boot",
+        "-i", "${input:index}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: PB FWU Hello",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "pb-fwu-hello",
+        "-i", "${input:index}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: PB FWU Exit",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "pb-fwu-exit",
+        "-i", "${input:index}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: FWU Enter",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "fwu-enter",
+        "-b", "${input:board}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: FWU Hello",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "fwu-hello",
+        "-b", "${input:board}"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: FWU Exit",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "fwu-exit",
+        "-b", "${input:board}"
       ],
       "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -351,6 +542,30 @@
         "stats",
         "-b", "${input:board}",
         "--reset"
+      ],
+      "preLaunchTask": "Prepare: Debug",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--nolazy"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Convert Frame",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": [
+        "convert",
+        "${input:hexFrame}"
       ],
       "preLaunchTask": "Prepare: Debug",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
@@ -452,6 +667,12 @@
       "type": "promptString",
       "description": "Path to .bin to flash onto the station (typically build/zephyr/zephyr.bin)",
       "default": "${workspaceFolder}/../../firmware/S1TTXX-firmware/build/zephyr/zephyr.bin"
+    },
+    {
+      "id": "hexFrame",
+      "type": "promptString",
+      "description": "Hex frame to convert (e.g., 'ea 01 05 c0 23' or 'ea0105c023')",
+      "default": "ea 01 05 c0 23"
     }
   ]
 }
