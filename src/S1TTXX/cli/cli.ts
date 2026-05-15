@@ -38,14 +38,14 @@ import {
   SLOT_IS_LOCKED_DEFAULT_VALUE,
 } from "../utils/slot_mapping";
 import { LedCommand } from "./commands/led";
-import { EnterBootCommand } from "./commands/enter_boot";
+import { PbEnterBootCommand } from "./commands/pb_enter_boot";
+import { PbFwuHelloCommand, PbFwuHelloInfo } from "./commands/pb_fwu_hello";
+import { PbFwuExitCommand } from "./commands/pb_fwu_exit";
+import { runPbFirmwareUpdate } from "./commands/pb_firmware_update";
+import { runStationFirmwareUpdate } from "./commands/firmware_update";
 import { FwuHelloCommand, FwuHelloInfo } from "./commands/fwu_hello";
+import { FwuEnterCommand } from "./commands/fwu_enter";
 import { FwuExitCommand } from "./commands/fwu_exit";
-import { runFirmwareUpdate } from "./commands/firmware_update";
-import { runStationFirmwareUpdate } from "./commands/station_firmware_update";
-import { StationFwuHelloCommand, StationFwuHelloInfo } from "./commands/station_fwu_hello";
-import { StationFwuEnterCommand } from "./commands/station_fwu_enter";
-import { StationFwuExitCommand } from "./commands/station_fwu_exit";
 import { PbFirmwareCommand } from "./commands/pb_firmware";
 import {
   cliInputValidatorEnable,
@@ -1058,9 +1058,9 @@ export function registerS1TTXXCommands(program: Command): void {
   // sleep ~200 ms between them.
 
   program
-    .command("enter-boot")
+    .command("pb-enter-boot")
     .description(
-      "Tell the powerbank app to reset into the bootloader (CMD_ENTER_BOOT 0x10)"
+      "Tell the powerbank app to reset into the bootloader (CMD_PB_ENTER_BOOT 0x10)"
     )
     .requiredOption(
       "-i, --index <index>",
@@ -1076,7 +1076,7 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const command = new EnterBootCommand(service);
+        const command = new PbEnterBootCommand(service);
         const response = await command.execute(
           slotMapping.boardAddress,
           slotMapping.slotInBoard
@@ -1118,9 +1118,9 @@ export function registerS1TTXXCommands(program: Command): void {
     });
 
   program
-    .command("fwu-hello")
+    .command("pb-fwu-hello")
     .description(
-      "Query the powerbank bootloader for version + slot info (CMD_FWU_HELLO 0x11)"
+      "Query the powerbank bootloader for version + slot info (CMD_PB_FWU_HELLO 0x11)"
     )
     .requiredOption(
       "-i, --index <index>",
@@ -1136,16 +1136,16 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const command = new FwuHelloCommand(service);
+        const command = new PbFwuHelloCommand(service);
         const response = await command.execute(
           slotMapping.boardAddress,
           slotMapping.slotInBoard
         );
 
-        let bootloader: FwuHelloInfo | null = null;
+        let bootloader: PbFwuHelloInfo | null = null;
         if (response.success) {
           try {
-            bootloader = JSON.parse(response.data.toString()) as FwuHelloInfo;
+            bootloader = JSON.parse(response.data.toString()) as PbFwuHelloInfo;
           } catch {
             // Bootloader payload was shorter than 15 bytes — surface as a
             // protocol error rather than a parse crash.
@@ -1167,7 +1167,7 @@ export function registerS1TTXXCommands(program: Command): void {
                   code: response.status,
                   message: !response.success
                     ? getStatusMessage(response.status)
-                    : "Malformed FWU_HELLO response payload",
+                    : "Malformed PB_FWU_HELLO response payload",
                 },
         };
         logger.log(JSON.stringify(result, null, 2));
@@ -1191,14 +1191,15 @@ export function registerS1TTXXCommands(program: Command): void {
       }
     });
 
-  // ---- firmware-update orchestrator ---------------------------------
+  // ---- pb-firmware-update orchestrator ------------------------------
   //
   // End-to-end Phase 5 flow: read the .bin, IEEE-802.3 CRC32 it,
-  // ENTER_BOOT → FWU_HELLO → FWU_BEGIN → loop FWU_DATA → FWU_END →
-  // FWU_EXIT. Honors RES_OFFSET_MISMATCH and falls back to FWU_ABORT on
-  // mid-stream failure so the slot is cleanly invalidated.
+  // PB_ENTER_BOOT → PB_FWU_HELLO → PB_FWU_BEGIN → loop PB_FWU_DATA →
+  // PB_FWU_END → PB_FWU_EXIT. Honors RES_OFFSET_MISMATCH and falls back
+  // to PB_FWU_ABORT on mid-stream failure so the slot is cleanly
+  // invalidated.
   program
-    .command("firmware-update")
+    .command("pb-firmware-update")
     .description(
       "Flash a new application image onto a powerbank via the pogo line"
     )
@@ -1219,7 +1220,7 @@ export function registerS1TTXXCommands(program: Command): void {
     .option("--verbose", "Print per-chunk progress", false)
     .option(
       "--inter-chunk-delay <ms>",
-      "Extra wait between consecutive FWU_DATA chunks. The station inserts ~50 ms after every command on its own — this knob is for situations where that's not enough breathing room for the BL's half-duplex direction-switch to settle. Default 0.",
+      "Extra wait between consecutive PB_FWU_DATA chunks. The station inserts ~50 ms after every command on its own — this knob is for situations where that's not enough breathing room for the BL's half-duplex direction-switch to settle. Default 0.",
       "0"
     )
     .action(
@@ -1245,7 +1246,7 @@ export function registerS1TTXXCommands(program: Command): void {
           const service = new SerialService(port);
           await service.connect();
 
-          const r = await runFirmwareUpdate(service, {
+          const r = await runPbFirmwareUpdate(service, {
             boardAddress: slotMapping.boardAddress,
             slotInBoard: slotMapping.slotInBoard,
             imagePath: options.image,
@@ -1300,19 +1301,20 @@ export function registerS1TTXXCommands(program: Command): void {
 
   // ---- Station-side firmware-update (S1TTXX board itself) -----------
   //
-  // Mirrors the powerbank `firmware-update` orchestrator above but targets
-  // the station board itself over its USART1 RS-485 link. The wire format
-  // is the same addressed framing the rest of the host-protocol uses
-  // (SOF 0xEA, board address, payload, CRC16-Modbus). Opcodes 0x60..0x66
-  // live in bootloader/Inc/fwu_iface.h on the firmware side.
+  // Mirrors the powerbank `pb-firmware-update` orchestrator above but
+  // targets the station board itself over its USART1 RS-485 link. The
+  // wire format is the same addressed framing the rest of the
+  // host-protocol uses (SOF 0xEA, board address, payload, CRC16-Modbus).
+  // Opcodes 0x60..0x66 live in bootloader/Inc/fwu_iface.h on the firmware
+  // side.
   //
   // Three thin one-shot commands first (handy for poking at a board
   // manually), then the full orchestrator.
 
   program
-    .command("station-fwu-enter")
+    .command("fwu-enter")
     .description(
-      "Tell the station's running app to reset into its bootloader (CMD_STATION_FWU_ENTER 0x60)"
+      "Tell the station's running app to reset into its bootloader (CMD_FWU_ENTER 0x60)"
     )
     .requiredOption(
       "-b, --board <address>",
@@ -1326,7 +1328,7 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const response = await new StationFwuEnterCommand(service).execute(boardAddress);
+        const response = await new FwuEnterCommand(service).execute(boardAddress);
 
         const result = {
           success: response.success,
@@ -1356,9 +1358,9 @@ export function registerS1TTXXCommands(program: Command): void {
     });
 
   program
-    .command("station-fwu-hello")
+    .command("fwu-hello")
     .description(
-      "Query the station's bootloader for version + slot info (CMD_STATION_FWU_HELLO 0x61)"
+      "Query the station's bootloader for version + slot info (CMD_FWU_HELLO 0x61)"
     )
     .requiredOption(
       "-b, --board <address>",
@@ -1372,12 +1374,12 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const response = await new StationFwuHelloCommand(service).execute(boardAddress);
+        const response = await new FwuHelloCommand(service).execute(boardAddress);
 
-        let bootloader: StationFwuHelloInfo | null = null;
+        let bootloader: FwuHelloInfo | null = null;
         if (response.success) {
           try {
-            bootloader = JSON.parse(response.data.toString()) as StationFwuHelloInfo;
+            bootloader = JSON.parse(response.data.toString()) as FwuHelloInfo;
           } catch {
             /* malformed payload — surfaced via the error block below */
           }
@@ -1396,7 +1398,7 @@ export function registerS1TTXXCommands(program: Command): void {
                   code: response.status,
                   message: !response.success
                     ? getStatusMessage(response.status)
-                    : "Malformed STATION_FWU_HELLO response payload",
+                    : "Malformed FWU_HELLO response payload",
                 },
         };
         logger.log(JSON.stringify(result, null, 2));
@@ -1418,9 +1420,9 @@ export function registerS1TTXXCommands(program: Command): void {
     });
 
   program
-    .command("station-fwu-exit")
+    .command("fwu-exit")
     .description(
-      "Tell the station's bootloader to reset back into the app (CMD_STATION_FWU_EXIT 0x66)"
+      "Tell the station's bootloader to reset back into the app (CMD_FWU_EXIT 0x66)"
     )
     .requiredOption(
       "-b, --board <address>",
@@ -1434,7 +1436,7 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const response = await new StationFwuExitCommand(service).execute(boardAddress);
+        const response = await new FwuExitCommand(service).execute(boardAddress);
 
         const result = {
           success: response.success,
@@ -1463,15 +1465,14 @@ export function registerS1TTXXCommands(program: Command): void {
       }
     });
 
-  // ---- station-firmware-update orchestrator -------------------------
+  // ---- firmware-update orchestrator ---------------------------------
   //
   // End-to-end flow against the S1TTXX board itself:
-  //   STATION_FWU_ENTER → STATION_FWU_HELLO → STATION_FWU_BEGIN →
-  //     loop STATION_FWU_DATA → STATION_FWU_END → STATION_FWU_EXIT.
-  // Honors RES_OFFSET_MISMATCH and falls back to STATION_FWU_ABORT on
-  // mid-stream failure so the slot is cleanly invalidated.
+  //   FWU_ENTER → FWU_HELLO → FWU_BEGIN → loop FWU_DATA → FWU_END →
+  //   FWU_EXIT. Honors RES_OFFSET_MISMATCH and falls back to FWU_ABORT
+  //   on mid-stream failure so the slot is cleanly invalidated.
   program
-    .command("station-firmware-update")
+    .command("firmware-update")
     .description("Flash a new application image onto the station via USART1 (RS-485)")
     .requiredOption(
       "-b, --board <address>",
@@ -1489,7 +1490,7 @@ export function registerS1TTXXCommands(program: Command): void {
     .option("--verbose", "Print per-chunk progress", false)
     .option(
       "--inter-chunk-delay <ms>",
-      "Extra wait between consecutive STATION_FWU_DATA chunks. The transport already inserts 50 ms after each frame; bump this for slow links. Default 0.",
+      "Extra wait between consecutive FWU_DATA chunks. The transport already inserts 50 ms after each frame; bump this for slow links. Default 0.",
       "0"
     )
     .action(async (options: CommandOptions) => {
@@ -1554,9 +1555,9 @@ export function registerS1TTXXCommands(program: Command): void {
     });
 
   program
-    .command("fwu-exit")
+    .command("pb-fwu-exit")
     .description(
-      "Tell the bootloader to reset back into the app (CMD_FWU_EXIT 0x16)"
+      "Tell the powerbank bootloader to reset back into the app (CMD_PB_FWU_EXIT 0x16)"
     )
     .requiredOption(
       "-i, --index <index>",
@@ -1572,7 +1573,7 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const command = new FwuExitCommand(service);
+        const command = new PbFwuExitCommand(service);
         const response = await command.execute(
           slotMapping.boardAddress,
           slotMapping.slotInBoard

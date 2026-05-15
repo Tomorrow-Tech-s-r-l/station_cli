@@ -1,31 +1,20 @@
 import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
-import {
-  CMD_FWU_END_CODE,
-  MAXIMUM_SLOT_ADDRESS,
-} from "../../../utils/constants";
+import { CMD_FWU_END_CODE } from "../../../utils/constants";
 
 /**
- * CMD_FWU_END (0x14): bootloader-side. Verifies the rolling CRC32 of the
- * received body bytes matches the value declared at FWU_BEGIN, then writes
- * the app header page magic-last so a power loss mid-write leaves the
- * slot invalid. On success the BL idles in BL mode — call FWU_EXIT to
- * reset back into the new app.
+ * CMD_FWU_END (0x64): bootloader-side. Verifies the rolling CRC32 of
+ * the received body bytes against the value declared at FWU_BEGIN,
+ * then writes the app header page magic-last so a power loss
+ * mid-write leaves the slot invalid. On success the BL idles in BL
+ * mode — call FWU_EXIT to reset back into the new app.
  */
 export class FwuEndCommand extends BaseCommand {
-  async execute(
-    boardAddress: number,
-    slotAddress: number
-  ): Promise<CommandResponse> {
-    if (slotAddress < 0 || slotAddress > MAXIMUM_SLOT_ADDRESS) {
-      throw new Error(
-        `Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
-      );
-    }
+  async execute(boardAddress: number): Promise<CommandResponse> {
     const message: SerialMessage = {
       boardAddress,
       command: CMD_FWU_END_CODE,
-      data: Buffer.from([slotAddress]),
+      data: Buffer.alloc(0),
     };
     return this.executeCommand(message);
   }

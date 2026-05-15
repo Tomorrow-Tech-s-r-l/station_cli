@@ -11,20 +11,20 @@ import {
   CMD_SET_INFO_BATTERY,
   CMD_PB_FW_VER_CODE,
   CMD_GET_FW_VER,
-  CMD_ENTER_BOOT_CODE,
+  CMD_PB_ENTER_BOOT_CODE,
+  CMD_PB_FWU_HELLO_CODE,
+  CMD_PB_FWU_BEGIN_CODE,
+  CMD_PB_FWU_DATA_CODE,
+  CMD_PB_FWU_END_CODE,
+  CMD_PB_FWU_ABORT_CODE,
+  CMD_PB_FWU_EXIT_CODE,
+  CMD_FWU_ENTER_CODE,
   CMD_FWU_HELLO_CODE,
   CMD_FWU_BEGIN_CODE,
   CMD_FWU_DATA_CODE,
   CMD_FWU_END_CODE,
   CMD_FWU_ABORT_CODE,
   CMD_FWU_EXIT_CODE,
-  CMD_STATION_FWU_ENTER_CODE,
-  CMD_STATION_FWU_HELLO_CODE,
-  CMD_STATION_FWU_BEGIN_CODE,
-  CMD_STATION_FWU_DATA_CODE,
-  CMD_STATION_FWU_END_CODE,
-  CMD_STATION_FWU_ABORT_CODE,
-  CMD_STATION_FWU_EXIT_CODE,
   MAXIMUM_SLOT_ADDRESS,
 } from "../../utils/constants";
 import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
@@ -245,71 +245,147 @@ export class PbFwVerCommandBuilder extends BaseCommandBuilder {
   }
 }
 
-// Firmware-update opcode builders (Phase 3+).
+// Powerbank firmware-update opcode builders (slot-routed, NF-260513).
 //
-// All three follow the existing slot-routed pattern: [opcode][slotInBoard].
+// All follow the existing slot-routed pattern: [opcode][slotInBoard][...].
 // The station's interface board uses the slot byte to pick which pogo-pin
 // (slot) to forward the encrypted frame onto. The payload then reaches
-// either the running application (for CMD_ENTER_BOOT) or the bootloader
-// (for CMD_FWU_*).
+// either the running powerbank application (for CMD_PB_ENTER_BOOT) or the
+// powerbank bootloader (for CMD_PB_FWU_*).
 
-// ENTER_BOOT: app-side. Triggers RAM-magic + NVIC_SystemReset() in the
-// running application so the next boot stays in the bootloader.
-export class EnterBootCommandBuilder extends BaseCommandBuilder {
+// PB_ENTER_BOOT: app-side. Triggers RAM-magic + NVIC_SystemReset() in the
+// running powerbank application so the next boot stays in the bootloader.
+export class PbEnterBootCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
     if (!message.data || message.data.length !== 1) {
-      throw new Error("ENTER_BOOT command requires slot index");
+      throw new Error("PB_ENTER_BOOT command requires slot index");
     }
-    return Buffer.from([CMD_ENTER_BOOT_CODE, message.data[0]]);
+    return Buffer.from([CMD_PB_ENTER_BOOT_CODE, message.data[0]]);
   }
 }
 
-// FWU_HELLO: bootloader-side. Returns BL version, app_present flag, app
+// PB_FWU_HELLO: bootloader-side. Returns BL version, app_present flag, app
 // version, max chunk, page size, slot size.
-export class FwuHelloCommandBuilder extends BaseCommandBuilder {
+export class PbFwuHelloCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
     if (!message.data || message.data.length !== 1) {
-      throw new Error("FWU_HELLO command requires slot index");
+      throw new Error("PB_FWU_HELLO command requires slot index");
     }
-    return Buffer.from([CMD_FWU_HELLO_CODE, message.data[0]]);
+    return Buffer.from([CMD_PB_FWU_HELLO_CODE, message.data[0]]);
   }
 }
 
-// FWU_EXIT: bootloader-side. Ack then NVIC_SystemReset(); the BL clears
+// PB_FWU_EXIT: bootloader-side. Ack then NVIC_SystemReset(); the BL clears
 // the RAM magic on entry so the reset boots straight back into the app.
-export class FwuExitCommandBuilder extends BaseCommandBuilder {
+export class PbFwuExitCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
     if (!message.data || message.data.length !== 1) {
-      throw new Error("FWU_EXIT command requires slot index");
+      throw new Error("PB_FWU_EXIT command requires slot index");
     }
-    return Buffer.from([CMD_FWU_EXIT_CODE, message.data[0]]);
+    return Buffer.from([CMD_PB_FWU_EXIT_CODE, message.data[0]]);
   }
 }
 
-// FWU_BEGIN: bootloader-side. data layout:
+// PB_FWU_BEGIN: bootloader-side. data layout:
 //   [slot_index][img_size_u32_le][img_crc32_u32_le][version_u32_le]  (13 B)
-export class FwuBeginCommandBuilder extends BaseCommandBuilder {
+export class PbFwuBeginCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
     if (!message.data || message.data.length !== 13) {
       throw new Error(
-        "FWU_BEGIN command requires slot index + image size + CRC32 + version"
+        "PB_FWU_BEGIN command requires slot index + image size + CRC32 + version"
+      );
+    }
+    return Buffer.concat([Buffer.from([CMD_PB_FWU_BEGIN_CODE]), message.data]);
+  }
+}
+
+// PB_FWU_DATA: bootloader-side. data layout:
+//   [slot_index][offset_u32_le][len_u8][bytes 0..len]   (variable; 7+len B)
+export class PbFwuDataCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length < 7) {
+      throw new Error(
+        "PB_FWU_DATA command requires slot index + offset + len + bytes"
+      );
+    }
+    const len = message.data[5];
+    if (message.data.length !== 6 + 1 + len) {
+      throw new Error(
+        `PB_FWU_DATA payload mismatch: header says len=${len}, total ${message.data.length}`
+      );
+    }
+    return Buffer.concat([Buffer.from([CMD_PB_FWU_DATA_CODE]), message.data]);
+  }
+}
+
+// PB_FWU_END: bootloader-side. Verifies CRC32, writes header magic-last,
+// then idles in BL waiting for PB_FWU_EXIT.
+export class PbFwuEndCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length !== 1) {
+      throw new Error("PB_FWU_END command requires slot index");
+    }
+    return Buffer.from([CMD_PB_FWU_END_CODE, message.data[0]]);
+  }
+}
+
+// PB_FWU_ABORT: bootloader-side. Discards the staged session — header stays
+// invalid (BEGIN erased it) so the user can retry the update.
+export class PbFwuAbortCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length !== 1) {
+      throw new Error("PB_FWU_ABORT command requires slot index");
+    }
+    return Buffer.from([CMD_PB_FWU_ABORT_CODE, message.data[0]]);
+  }
+}
+
+// ---- Station-side firmware-update builders -----------------------------
+//
+// Mirror the powerbank CMD_PB_FWU_* family but with no slot byte — these
+// target the station board itself. ENTER lives in the Zephyr app (writes
+// the RAM magic + sys_reboot); HELLO/BEGIN/DATA/END/ABORT/EXIT live in the
+// in-application bootloader at 0x08000000. Layouts mirror
+// bootloader/Src/fwu_protocol.c byte-for-byte.
+
+// FWU_ENTER (0x60): app-side. No payload — pure trigger.
+export class FwuEnterCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_FWU_ENTER_CODE]);
+  }
+}
+
+// FWU_HELLO (0x61): BL. No payload.
+export class FwuHelloCommandBuilder extends BaseCommandBuilder {
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_FWU_HELLO_CODE]);
+  }
+}
+
+// FWU_BEGIN (0x62): BL. data layout (12 bytes, no slot index):
+//   [img_size_u32_le][img_crc32_u32_le][version_u32_le]
+export class FwuBeginCommandBuilder extends BaseCommandBuilder {
+  buildCommand(message: SerialMessage): Buffer {
+    if (!message.data || message.data.length !== 12) {
+      throw new Error(
+        "FWU_BEGIN command requires image size + CRC32 + version (12 B)"
       );
     }
     return Buffer.concat([Buffer.from([CMD_FWU_BEGIN_CODE]), message.data]);
   }
 }
 
-// FWU_DATA: bootloader-side. data layout:
-//   [slot_index][offset_u32_le][len_u8][bytes 0..len]   (variable; 7+len B)
+// FWU_DATA (0x63): BL. data layout (5+len bytes, no slot index):
+//   [offset_u32_le][len_u8][bytes 0..len]
 export class FwuDataCommandBuilder extends BaseCommandBuilder {
   buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length < 7) {
+    if (!message.data || message.data.length < 5) {
       throw new Error(
-        "FWU_DATA command requires slot index + offset + len + bytes"
+        "FWU_DATA command requires offset + len + bytes"
       );
     }
-    const len = message.data[5];
-    if (message.data.length !== 6 + 1 + len) {
+    const len = message.data[4];
+    if (message.data.length !== 5 + len) {
       throw new Error(
         `FWU_DATA payload mismatch: header says len=${len}, total ${message.data.length}`
       );
@@ -318,100 +394,24 @@ export class FwuDataCommandBuilder extends BaseCommandBuilder {
   }
 }
 
-// FWU_END: bootloader-side. Verifies CRC32, writes header magic-last,
-// then idles in BL waiting for FWU_EXIT.
+// FWU_END (0x64): BL. No payload.
 export class FwuEndCommandBuilder extends BaseCommandBuilder {
-  buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length !== 1) {
-      throw new Error("FWU_END command requires slot index");
-    }
-    return Buffer.from([CMD_FWU_END_CODE, message.data[0]]);
+  buildCommand(_message: SerialMessage): Buffer {
+    return Buffer.from([CMD_FWU_END_CODE]);
   }
 }
 
-// FWU_ABORT: bootloader-side. Discards the staged session — header stays
-// invalid (BEGIN erased it) so the user can retry the update.
+// FWU_ABORT (0x65): BL. No payload.
 export class FwuAbortCommandBuilder extends BaseCommandBuilder {
-  buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length !== 1) {
-      throw new Error("FWU_ABORT command requires slot index");
-    }
-    return Buffer.from([CMD_FWU_ABORT_CODE, message.data[0]]);
-  }
-}
-
-// ---- Station-side firmware-update builders -----------------------------
-//
-// Mirror the powerbank CMD_FWU_* family but with no slot byte — these
-// target the station board itself. ENTER lives in the Zephyr app (writes
-// the RAM magic + sys_reboot); HELLO/BEGIN/DATA/END/ABORT/EXIT live in the
-// in-application bootloader at 0x08000000. Layouts mirror
-// bootloader/Src/fwu_protocol.c byte-for-byte.
-
-// STATION_FWU_ENTER (0x60): app-side. No payload — pure trigger.
-export class StationFwuEnterCommandBuilder extends BaseCommandBuilder {
   buildCommand(_message: SerialMessage): Buffer {
-    return Buffer.from([CMD_STATION_FWU_ENTER_CODE]);
+    return Buffer.from([CMD_FWU_ABORT_CODE]);
   }
 }
 
-// STATION_FWU_HELLO (0x61): BL. No payload.
-export class StationFwuHelloCommandBuilder extends BaseCommandBuilder {
+// FWU_EXIT (0x66): BL. No payload.
+export class FwuExitCommandBuilder extends BaseCommandBuilder {
   buildCommand(_message: SerialMessage): Buffer {
-    return Buffer.from([CMD_STATION_FWU_HELLO_CODE]);
-  }
-}
-
-// STATION_FWU_BEGIN (0x62): BL. data layout (12 bytes, no slot index):
-//   [img_size_u32_le][img_crc32_u32_le][version_u32_le]
-export class StationFwuBeginCommandBuilder extends BaseCommandBuilder {
-  buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length !== 12) {
-      throw new Error(
-        "STATION_FWU_BEGIN command requires image size + CRC32 + version (12 B)"
-      );
-    }
-    return Buffer.concat([Buffer.from([CMD_STATION_FWU_BEGIN_CODE]), message.data]);
-  }
-}
-
-// STATION_FWU_DATA (0x63): BL. data layout (5+len bytes, no slot index):
-//   [offset_u32_le][len_u8][bytes 0..len]
-export class StationFwuDataCommandBuilder extends BaseCommandBuilder {
-  buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length < 5) {
-      throw new Error(
-        "STATION_FWU_DATA command requires offset + len + bytes"
-      );
-    }
-    const len = message.data[4];
-    if (message.data.length !== 5 + len) {
-      throw new Error(
-        `STATION_FWU_DATA payload mismatch: header says len=${len}, total ${message.data.length}`
-      );
-    }
-    return Buffer.concat([Buffer.from([CMD_STATION_FWU_DATA_CODE]), message.data]);
-  }
-}
-
-// STATION_FWU_END (0x64): BL. No payload.
-export class StationFwuEndCommandBuilder extends BaseCommandBuilder {
-  buildCommand(_message: SerialMessage): Buffer {
-    return Buffer.from([CMD_STATION_FWU_END_CODE]);
-  }
-}
-
-// STATION_FWU_ABORT (0x65): BL. No payload.
-export class StationFwuAbortCommandBuilder extends BaseCommandBuilder {
-  buildCommand(_message: SerialMessage): Buffer {
-    return Buffer.from([CMD_STATION_FWU_ABORT_CODE]);
-  }
-}
-
-// STATION_FWU_EXIT (0x66): BL. No payload.
-export class StationFwuExitCommandBuilder extends BaseCommandBuilder {
-  buildCommand(_message: SerialMessage): Buffer {
-    return Buffer.from([CMD_STATION_FWU_EXIT_CODE]);
+    return Buffer.from([CMD_FWU_EXIT_CODE]);
   }
 }
 
@@ -429,20 +429,20 @@ export class CommandFactory {
     [CMD_SET_INFO_BATTERY, new SetBatteryInfoCommandBuilder()],
     [CMD_GET_FW_VER, new FirmwareVersionCommandBuilder()],
     [CMD_PB_FW_VER_CODE, new PbFwVerCommandBuilder()],
-    [CMD_ENTER_BOOT_CODE, new EnterBootCommandBuilder()],
+    [CMD_PB_ENTER_BOOT_CODE, new PbEnterBootCommandBuilder()],
+    [CMD_PB_FWU_HELLO_CODE,  new PbFwuHelloCommandBuilder()],
+    [CMD_PB_FWU_BEGIN_CODE,  new PbFwuBeginCommandBuilder()],
+    [CMD_PB_FWU_DATA_CODE,   new PbFwuDataCommandBuilder()],
+    [CMD_PB_FWU_END_CODE,    new PbFwuEndCommandBuilder()],
+    [CMD_PB_FWU_ABORT_CODE,  new PbFwuAbortCommandBuilder()],
+    [CMD_PB_FWU_EXIT_CODE,   new PbFwuExitCommandBuilder()],
+    [CMD_FWU_ENTER_CODE, new FwuEnterCommandBuilder()],
     [CMD_FWU_HELLO_CODE, new FwuHelloCommandBuilder()],
     [CMD_FWU_BEGIN_CODE, new FwuBeginCommandBuilder()],
-    [CMD_FWU_DATA_CODE, new FwuDataCommandBuilder()],
-    [CMD_FWU_END_CODE, new FwuEndCommandBuilder()],
+    [CMD_FWU_DATA_CODE,  new FwuDataCommandBuilder()],
+    [CMD_FWU_END_CODE,   new FwuEndCommandBuilder()],
     [CMD_FWU_ABORT_CODE, new FwuAbortCommandBuilder()],
-    [CMD_FWU_EXIT_CODE, new FwuExitCommandBuilder()],
-    [CMD_STATION_FWU_ENTER_CODE, new StationFwuEnterCommandBuilder()],
-    [CMD_STATION_FWU_HELLO_CODE, new StationFwuHelloCommandBuilder()],
-    [CMD_STATION_FWU_BEGIN_CODE, new StationFwuBeginCommandBuilder()],
-    [CMD_STATION_FWU_DATA_CODE,  new StationFwuDataCommandBuilder()],
-    [CMD_STATION_FWU_END_CODE,   new StationFwuEndCommandBuilder()],
-    [CMD_STATION_FWU_ABORT_CODE, new StationFwuAbortCommandBuilder()],
-    [CMD_STATION_FWU_EXIT_CODE,  new StationFwuExitCommandBuilder()],
+    [CMD_FWU_EXIT_CODE,  new FwuExitCommandBuilder()],
   ]);
 
   static getBuilder(command: number): CommandBuilder {
@@ -456,20 +456,21 @@ export class CommandFactory {
   static buildCommand(message: SerialMessage): Buffer {
     // Raw-passthrough opcodes: the firmware-update streaming commands
     // carry payloads that don't fit the BoardCommand {slotId, param}
-    // shape — BEGIN is slot + 12 B (img_size, img_crc32, version) and
-    // DATA is slot + 5 B header + up to 32 B chunk. The station's
+    // shape — PB_FWU_BEGIN is slot + 12 B (img_size, img_crc32, version)
+    // and PB_FWU_DATA is slot + 5 B header + up to 32 B chunk. The
+    // station-side FWU_* family has no slot byte at all. The station's
     // host_protocol_decode_request expects the bytes verbatim, so just
     // glue [boardAddress][opcode][...message.data...] together.
     if (
+      message.command === CMD_PB_FWU_BEGIN_CODE ||
+      message.command === CMD_PB_FWU_DATA_CODE ||
+      message.command === CMD_FWU_ENTER_CODE ||
+      message.command === CMD_FWU_HELLO_CODE ||
       message.command === CMD_FWU_BEGIN_CODE ||
       message.command === CMD_FWU_DATA_CODE ||
-      message.command === CMD_STATION_FWU_ENTER_CODE ||
-      message.command === CMD_STATION_FWU_HELLO_CODE ||
-      message.command === CMD_STATION_FWU_BEGIN_CODE ||
-      message.command === CMD_STATION_FWU_DATA_CODE ||
-      message.command === CMD_STATION_FWU_END_CODE ||
-      message.command === CMD_STATION_FWU_ABORT_CODE ||
-      message.command === CMD_STATION_FWU_EXIT_CODE
+      message.command === CMD_FWU_END_CODE ||
+      message.command === CMD_FWU_ABORT_CODE ||
+      message.command === CMD_FWU_EXIT_CODE
     ) {
       const data = message.data ?? Buffer.alloc(0);
       const out = Buffer.alloc(2 + data.length);

@@ -5,10 +5,10 @@
 #
 # Drives one end-to-end firmware update through the station's pogo pin:
 #
-#   firmware-update --index <slot> --image <path-to-bin>
-#       → ENTER_BOOT → FWU_HELLO → FWU_BEGIN
-#       → loop FWU_DATA (32-byte chunks, ~570 chunks for 18 KB)
-#       → FWU_END → FWU_EXIT
+#   pb-firmware-update --index <slot> --image <path-to-bin>
+#       → PB_ENTER_BOOT → PB_FWU_HELLO → PB_FWU_BEGIN
+#       → loop PB_FWU_DATA (32-byte chunks, ~570 chunks for 18 KB)
+#       → PB_FWU_END → PB_FWU_EXIT
 #
 # Then a follow-up `status` call to confirm the new application is
 # running on the slot. Writes a timestamped log alongside the script.
@@ -80,10 +80,10 @@ LOG_FILE="$SCRIPT_DIR/firmware_update_${TIMESTAMP}.log"
     echo "Version: $version"
     echo ""
     echo "=========================================="
-    echo "Step 1 — firmware-update"
+    echo "Step 1 — pb-firmware-update"
     echo "=========================================="
 
-    update_output=$("$EXECUTABLE" firmware-update \
+    update_output=$("$EXECUTABLE" pb-firmware-update \
         -i "$index" \
         --image "$image" \
         --app-version "$version" \
@@ -91,11 +91,11 @@ LOG_FILE="$SCRIPT_DIR/firmware_update_${TIMESTAMP}.log"
     update_rc=$?
     echo "$update_output"
     echo ""
-    echo "(firmware-update exit code: $update_rc)"
+    echo "(pb-firmware-update exit code: $update_rc)"
     echo ""
 
     if [ $update_rc -ne 0 ]; then
-        echo "[FAIL] firmware-update returned non-zero — see output above."
+        echo "[FAIL] pb-firmware-update returned non-zero — see output above."
     else
         if command -v jq &> /dev/null; then
             if echo "$update_output" | jq empty 2>/dev/null \

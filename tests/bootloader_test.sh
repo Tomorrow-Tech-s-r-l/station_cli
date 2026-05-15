@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# Phase 3 bootloader integration test for the P1TT2C powerbank firmware.
+# Test bootloader integration test for the P1TT2C powerbank firmware.
 #
 # Per iteration the script drives the full Phase 3 round-trip:
 #
-#   1. enter-boot  -i <index>   (app drops into the bootloader)
-#   2. fwu-hello   -i <index>   (bootloader returns version + slot info)
-#   3. fwu-exit    -i <index>   (bootloader resets back into the app)
+#   1. pb-enter-boot  -i <index>   (app drops into the bootloader)
+#   2. pb-fwu-hello   -i <index>   (bootloader returns version + slot info)
+#   3. pb-fwu-exit    -i <index>   (bootloader resets back into the app)
 #
 # Each transition is followed by a short settle delay so the chip can
 # finish resetting before the next command goes out on the pogo pin.
@@ -38,7 +38,7 @@ SLOT_INDEX_MAXIMUM=30
 # The app's MX_USART1_UART_Init runs inside ~5 ms post-reset so the
 # bootloader / app is ready well before the next CLI frame goes out.
 DEFAULT_RESET_DELAY_MS=300
-# Phase 3 firmware version we expect FWU_HELLO to report.
+# Phase 3 firmware version we expect PB_FWU_HELLO to report.
 EXPECTED_BL_MAJOR=0
 EXPECTED_BL_MINOR=1
 
@@ -67,7 +67,7 @@ if ! [[ "$index" =~ ^[0-9]+$ ]] || [ "$index" -lt "$SLOT_INDEX_MINIMUM" ] || [ "
 fi
 
 # Ask for iteration count
-read_input "Enter number of full ENTER_BOOT -> FWU_HELLO -> FWU_EXIT cycles: " times
+read_input "Enter number of full PB_ENTER_BOOT -> PB_FWU_HELLO -> PB_FWU_EXIT cycles: " times
 times=$(echo "$times" | tr -d '[:space:]')
 
 if ! [[ "$times" =~ ^[0-9]+$ ]] || [ "$times" -lt 1 ]; then
@@ -131,8 +131,8 @@ run_step() {
         echo "[cycle $i/$times]"
         echo "=========================================="
 
-        # Step 1: ENTER_BOOT - app -> bootloader
-        run_step "ENTER_BOOT" "enter-boot" "$index"
+        # Step 1: PB_ENTER_BOOT - app -> bootloader
+        run_step "PB_ENTER_BOOT" "pb-enter-boot" "$index"
         enter_step_ok=false
         if [ "$LAST_RC" -eq 0 ] && command -v jq &> /dev/null \
            && echo "$LAST_OUTPUT" | jq empty 2>/dev/null \
@@ -142,8 +142,8 @@ run_step() {
         fi
         sleep_ms "$delay_ms"
 
-        # Step 2: FWU_HELLO - bootloader returns version + slot info
-        run_step "FWU_HELLO" "fwu-hello" "$index"
+        # Step 2: PB_FWU_HELLO - bootloader returns version + slot info
+        run_step "PB_FWU_HELLO" "pb-fwu-hello" "$index"
         hello_step_ok=false
         if [ "$LAST_RC" -eq 0 ] && command -v jq &> /dev/null \
            && echo "$LAST_OUTPUT" | jq empty 2>/dev/null \
@@ -173,8 +173,8 @@ run_step() {
         fi
         sleep_ms "$delay_ms"
 
-        # Step 3: FWU_EXIT - bootloader -> app
-        run_step "FWU_EXIT" "fwu-exit" "$index"
+        # Step 3: PB_FWU_EXIT - bootloader -> app
+        run_step "PB_FWU_EXIT" "pb-fwu-exit" "$index"
         exit_step_ok=false
         if [ "$LAST_RC" -eq 0 ] && command -v jq &> /dev/null \
            && echo "$LAST_OUTPUT" | jq empty 2>/dev/null \
@@ -197,10 +197,10 @@ run_step() {
     echo "Summary"
     echo "=========================================="
     echo "  Cycles:                $times"
-    echo "  ENTER_BOOT success:    $enter_ok"
-    echo "  FWU_HELLO success:     $hello_ok"
+    echo "  PB_ENTER_BOOT success: $enter_ok"
+    echo "  PB_FWU_HELLO success:  $hello_ok"
     echo "    of which appPresent: $hello_app_present_ok"
-    echo "  FWU_EXIT success:      $exit_ok"
+    echo "  PB_FWU_EXIT success:   $exit_ok"
     echo "  Fully-OK cycles:       $cycle_fully_ok"
 } 2>&1 | tee "$LOG_FILE"
 

@@ -2,49 +2,49 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { SerialService } from "../../services/serial";
-import { EnterBootCommand } from "./enter_boot";
-import { FwuHelloCommand, FwuHelloInfo } from "./fwu_hello";
+import { FwuEnterCommand } from "./fwu_enter";
+import {
+  FwuHelloCommand,
+  FwuHelloInfo,
+} from "./fwu_hello";
 import { FwuBeginCommand } from "./fwu_begin";
-import { FwuDataCommand } from "./fwu_data";
+import {
+  FwuDataCommand,
+  FWU_MAX_CHUNK,
+} from "./fwu_data";
 import { FwuEndCommand } from "./fwu_end";
 import { FwuAbortCommand } from "./fwu_abort";
 import { FwuExitCommand } from "./fwu_exit";
 import { debug } from "../../../utils/debug";
 
-/** Phase 3+ on-target sentinel for "the command was accepted" — the
- *  station strips opcode/status into response[2], so success means
- *  response.status === 0 in CommandResponse. */
+/** Same FWU_RES_* sentinel set the bootloader uses (see
+ *  bootloader/Inc/fwu_iface.h). The station/CLI strips response[2] into
+ *  CommandResponse.status, so success means status === 0. */
 const STATUS_OK = 0x00;
 const STATUS_OFFSET_MISMATCH = 0x10;
 
-/** FWU_MAX_CHUNK on the firmware side. The bootloader rejects DATA chunks
- *  larger than 32 B today (see FWU_MAX_CHUNK in App/Inc/fwu_iface.h). The
- *  bootloader reports it in FWU_HELLO so we double-check before streaming. */
-const DEFAULT_MAX_CHUNK = 32;
-
-/** Time to wait for the device to come back online after a soft reset
- *  (ENTER_BOOT → BL; FWU_EXIT → app). At HSI 8 MHz the BL needs ~30 ms;
- *  the app at 48 MHz needs ~5 ms. 300 ms is generous and matches the
- *  tests/bootloader_phase3.sh default. */
+/** Settle time for the soft reset across FWU_ENTER → BL and FWU_EXIT
+ *  → app. The bare-metal BL inherits HSI 8 MHz so its Reset_Handler
+ *  runs in ~10 ms; the Zephyr app comes up in ~50 ms. 300 ms matches
+ *  the powerbank runPbFirmwareUpdate() default and is plenty. */
 const RESET_SETTLE_MS = 300;
 
-export interface FirmwareUpdateOptions {
-  /** Slot index, board+slot routed through mapSlotToBoard() upstream. */
+export interface StationFirmwareUpdateOptions {
+  /** Board address from PB4..PB7 DIP switches on the target station. */
   boardAddress: number;
-  slotInBoard: number;
-  /** Path to the raw .bin to flash. The CRC32 is computed over its bytes. */
+  /** Path to the Zephyr application body — typically build/zephyr/zephyr.bin. */
   imagePath: string;
   /** (major<<16)|(minor<<8)|patch, stamped into the app header on END. */
   version: number;
   /** Print per-chunk progress and timing. */
   verbose?: boolean;
-  /** Extra delay between consecutive DATA chunks. Useful when the BL needs
-   *  more breathing room after the half-duplex direction switch than the
-   *  station's natural 50 ms inter-command delay provides. Default 0. */
+  /** Extra delay between consecutive DATA chunks. The transport already
+   *  inserts INTER_COMMAND_DELAY_MS (50 ms) after each frame; bump this
+   *  if a particular cable/transceiver pair needs more breathing room. */
   interChunkDelayMs?: number;
 }
 
-export interface FirmwareUpdateResult {
+export interface StationFirmwareUpdateResult {
   success: boolean;
   imagePath: string;
   imageSize: number;
@@ -59,10 +59,10 @@ export interface FirmwareUpdateResult {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * IEEE 802.3 CRC32 (poly 0xEDB88320) — bit-exact match with the
- * bootloader's fwu_crc32_update() in bootloader/Src/fwu_crc32.c, and with
- * `crc32` from Python/zlib. Inlined here so we work on Node 18 (the
- * binary target via `pkg`); Node 22's `zlib.crc32` would be the obvious
+ * IEEE 802.3 CRC32 (poly 0xEDB88320). Bit-exact match with the
+ * bootloader's fwu_crc32_update() in bootloader/Src/fwu_crc.c and with
+ * the merge.py script that builds merged.bin. Inlined here so we work on
+ * Node 18 (the pkg target); Node 22's `zlib.crc32` would be the obvious
  * one-liner but isn't available there.
  */
 function crc32(data: Buffer): number {
@@ -78,27 +78,31 @@ function crc32(data: Buffer): number {
 }
 
 /**
- * Drive the full Phase 5 firmware-update handshake against a slot:
+ * Drive the full station firmware-update handshake against a board:
  *
- *   ENTER_BOOT → settle → FWU_HELLO → FWU_BEGIN → loop FWU_DATA
- *               → FWU_END → FWU_EXIT → settle
+ *   FWU_ENTER → settle → FWU_HELLO → FWU_BEGIN → loop FWU_DATA
+ *     → FWU_END → FWU_EXIT → settle
  *
  * Honors RES_OFFSET_MISMATCH (0x10) by resyncing to next_expected_offset
  * before retrying the chunk. On any other failure mid-stream, tries to
  * issue FWU_ABORT so the BL session is cleanly torn down; the BL keeps
  * the header erased so the slot is invalid until the next attempt.
+ *
+ * Mirrors `runPbFirmwareUpdate` (powerbank-side) — same staging, same
+ * resync logic, same self-healing pre-flight that fires EXIT first in
+ * case a previous run left the device stuck in BL.
  */
-export async function runFirmwareUpdate(
+export async function runStationFirmwareUpdate(
   service: SerialService,
-  opts: FirmwareUpdateOptions
-): Promise<FirmwareUpdateResult> {
+  opts: StationFirmwareUpdateOptions
+): Promise<StationFirmwareUpdateResult> {
   const startTs = Date.now();
   const imagePath = path.resolve(opts.imagePath);
   const image = fs.readFileSync(imagePath);
   const imageSize = image.length;
   const imageCrc32 = crc32(image);
 
-  const out: FirmwareUpdateResult = {
+  const out: StationFirmwareUpdateResult = {
     success: false,
     imagePath,
     imageSize,
@@ -114,36 +118,41 @@ export async function runFirmwareUpdate(
     if (opts.verbose) debug.log(msg);
   };
 
-  const { boardAddress, slotInBoard } = opts;
+  const { boardAddress } = opts;
 
   // ------- Step 0: best-effort FWU_EXIT ------------------------------
   //
   // If a previous run left the device stuck in BL mode (e.g. it bailed
-  // between BEGIN and EXIT), the app-side opcodes don't work — sending
-  // ENTER_BOOT to the BL would fall in its `default:` branch and return
-  // FWU_RES_INVALID. Silently fire FWU_EXIT first: the BL acks + resets
-  // into the app, then we proceed. If the device is already in app mode,
-  // FWU_EXIT gets rejected (the app doesn't know 0x16) and we just lose
-  // ~RESET_SETTLE_MS — acceptable price for self-healing the test loop.
-  log(`[FWU] (pre-flight) fwu-exit to ensure app mode`);
-  await new FwuExitCommand(service).execute(boardAddress, slotInBoard).catch(() => {});
+  // between BEGIN and EXIT), the app-side FWU_ENTER doesn't work —
+  // sending it to the BL falls in its `default:` branch and returns
+  // FWU_RES_INVALID. Silently fire EXIT first: the BL acks + resets
+  // into the app, then we proceed. If the device is already in app
+  // mode, EXIT gets rejected (the app doesn't know 0x66) and we just
+  // lose ~RESET_SETTLE_MS — acceptable price for self-healing the test
+  // loop.
+  log(`[STATION-FWU] (pre-flight) fwu-exit to ensure app mode`);
+  await new FwuExitCommand(service).execute(boardAddress).catch(() => {});
   await sleep(RESET_SETTLE_MS);
 
-  // ------- Step 1: ENTER_BOOT ---------------------------------------
-  log(`[FWU] enter-boot (board=${boardAddress}, slot=${slotInBoard})`);
-  const enter = await new EnterBootCommand(service).execute(boardAddress, slotInBoard);
+  // ------- Step 1: FWU_ENTER -----------------------------------------
+  log(`[STATION-FWU] fwu-enter (board=${boardAddress})`);
+  const enter = await new FwuEnterCommand(service).execute(boardAddress);
   if (!enter.success) {
-    out.error = { stage: "ENTER_BOOT", code: enter.status, message: "App did not ack" };
+    out.error = { stage: "FWU_ENTER", code: enter.status, message: "App did not ack" };
     out.durationMs = Date.now() - startTs;
     return out;
   }
   await sleep(RESET_SETTLE_MS);
 
-  // ------- Step 2: FWU_HELLO ----------------------------------------
-  log(`[FWU] fwu-hello`);
-  const hello = await new FwuHelloCommand(service).execute(boardAddress, slotInBoard);
+  // ------- Step 2: FWU_HELLO -----------------------------------------
+  log(`[STATION-FWU] fwu-hello`);
+  const hello = await new FwuHelloCommand(service).execute(boardAddress);
   if (!hello.success || hello.data.length === 0) {
-    out.error = { stage: "FWU_HELLO", code: hello.status, message: "Bootloader did not answer HELLO" };
+    out.error = {
+      stage: "FWU_HELLO",
+      code: hello.status,
+      message: "Bootloader did not answer HELLO",
+    };
     out.durationMs = Date.now() - startTs;
     return out;
   }
@@ -162,16 +171,21 @@ export async function runFirmwareUpdate(
     out.durationMs = Date.now() - startTs;
     return out;
   }
-  const maxChunk = Math.min(out.blInfo.maxChunk || DEFAULT_MAX_CHUNK, DEFAULT_MAX_CHUNK);
+  const maxChunk = Math.min(
+    out.blInfo.maxChunk || FWU_MAX_CHUNK,
+    FWU_MAX_CHUNK
+  );
   log(
-    `[FWU] BL=${out.blInfo.blVersionMajor}.${out.blInfo.blVersionMinor}  ` +
+    `[STATION-FWU] BL=${out.blInfo.blVersionMajor}.${out.blInfo.blVersionMinor}  ` +
       `slotSize=${out.blInfo.slotSize}  pageSize=${out.blInfo.pageSize}  ` +
       `maxChunk=${maxChunk}  image=${imageSize}B crc32=0x${imageCrc32.toString(16).padStart(8, "0")}`
   );
 
-  // ------- Step 3: FWU_BEGIN ----------------------------------------
-  log(`[FWU] fwu-begin size=${imageSize} crc32=0x${imageCrc32.toString(16)} version=0x${opts.version.toString(16)}`);
-  const begin = await new FwuBeginCommand(service).execute(boardAddress, slotInBoard, {
+  // ------- Step 3: FWU_BEGIN -----------------------------------------
+  log(
+    `[STATION-FWU] fwu-begin size=${imageSize} crc32=0x${imageCrc32.toString(16)} version=0x${opts.version.toString(16)}`
+  );
+  const begin = await new FwuBeginCommand(service).execute(boardAddress, {
     imgSize: imageSize,
     imgCrc32: imageCrc32,
     version: opts.version,
@@ -182,7 +196,7 @@ export async function runFirmwareUpdate(
     return out;
   }
 
-  // ------- Step 4: stream FWU_DATA chunks ---------------------------
+  // ------- Step 4: stream FWU_DATA chunks ----------------------------
   let offset = 0;
   const dataCmd = new FwuDataCommand(service);
   while (offset < imageSize) {
@@ -190,10 +204,32 @@ export async function runFirmwareUpdate(
     const chunkLen = Math.min(maxChunk, remaining);
     const chunk = image.subarray(offset, offset + chunkLen);
     log(
-      `[FWU] fwu-data offset=${offset} len=${chunkLen} (${(((offset + chunkLen) / imageSize) * 100).toFixed(1)}%)`
+      `[STATION-FWU] fwu-data offset=${offset} len=${chunkLen} ` +
+        `(${(((offset + chunkLen) / imageSize) * 100).toFixed(1)}%)`
     );
-    const r = await dataCmd.execute(boardAddress, slotInBoard, { offset, bytes: chunk });
+    const isFinal = offset + chunkLen === imageSize;
+    const r = await dataCmd.execute(boardAddress, {
+      offset,
+      bytes: chunk,
+      isFinal,
+    });
     out.chunks++;
+    /* V-19: clamp next_expected_offset against imageSize before
+     * trusting it for resync — see pb_firmware_update.ts for the same
+     * gate. The station-side BL is a closer trust boundary than the
+     * pogo-wire powerbank, but the principle is identical: a
+     * BL-side bug or memory corruption returning 0xFFFFFFFF here
+     * would lock the host into an infinite loop. */
+    if (r.info && r.info.nextExpectedOffset > imageSize) {
+      out.error = {
+        stage: "FWU_DATA",
+        code: r.status,
+        message: `Station returned next_expected_offset=${r.info.nextExpectedOffset} > imageSize=${imageSize} (V-19)`,
+      };
+      await new FwuAbortCommand(service).execute(boardAddress).catch(() => {});
+      out.durationMs = Date.now() - startTs;
+      return out;
+    }
     if (r.success && r.info) {
       offset = r.info.nextExpectedOffset;
       if ((opts.interChunkDelayMs ?? 0) > 0) {
@@ -202,7 +238,7 @@ export async function runFirmwareUpdate(
       continue;
     }
     if (r.status === STATUS_OFFSET_MISMATCH && r.info) {
-      log(`[FWU] OFFSET_MISMATCH — resync to ${r.info.nextExpectedOffset}`);
+      log(`[STATION-FWU] OFFSET_MISMATCH — resync to ${r.info.nextExpectedOffset}`);
       offset = r.info.nextExpectedOffset;
       out.retries++;
       continue;
@@ -213,26 +249,34 @@ export async function runFirmwareUpdate(
       message: `DATA failed at offset ${offset}`,
     };
     /* Best-effort cleanup — keep the slot in a known invalid state. */
-    await new FwuAbortCommand(service).execute(boardAddress, slotInBoard).catch(() => {});
+    await new FwuAbortCommand(service).execute(boardAddress).catch(() => {});
     out.durationMs = Date.now() - startTs;
     return out;
   }
 
-  // ------- Step 5: FWU_END ------------------------------------------
-  log(`[FWU] fwu-end (verifying CRC32 + writing header)`);
-  const end = await new FwuEndCommand(service).execute(boardAddress, slotInBoard);
+  // ------- Step 5: FWU_END -------------------------------------------
+  log(`[STATION-FWU] fwu-end (verifying CRC32 + writing header)`);
+  const end = await new FwuEndCommand(service).execute(boardAddress);
   if (!end.success) {
-    out.error = { stage: "FWU_END", code: end.status, message: "BL rejected END (CRC mismatch?)" };
-    await new FwuAbortCommand(service).execute(boardAddress, slotInBoard).catch(() => {});
+    out.error = {
+      stage: "FWU_END",
+      code: end.status,
+      message: "BL rejected END (CRC mismatch?)",
+    };
+    await new FwuAbortCommand(service).execute(boardAddress).catch(() => {});
     out.durationMs = Date.now() - startTs;
     return out;
   }
 
-  // ------- Step 6: FWU_EXIT -----------------------------------------
-  log(`[FWU] fwu-exit (reset into new app)`);
-  const exit = await new FwuExitCommand(service).execute(boardAddress, slotInBoard);
+  // ------- Step 6: FWU_EXIT ------------------------------------------
+  log(`[STATION-FWU] fwu-exit (reset into new app)`);
+  const exit = await new FwuExitCommand(service).execute(boardAddress);
   if (!exit.success) {
-    out.error = { stage: "FWU_EXIT", code: exit.status, message: "BL did not ack EXIT" };
+    out.error = {
+      stage: "FWU_EXIT",
+      code: exit.status,
+      message: "BL did not ack EXIT",
+    };
     out.durationMs = Date.now() - startTs;
     return out;
   }
