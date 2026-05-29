@@ -9,7 +9,6 @@ import {
   STATUS_ERR_INTERNAL,
   PB_STATUS_CHARGING,
   PB_STATUS_PLUGGED_IN,
-  PB_STATUS_IDLE,
 } from "../../utils/constants";
 import { PbLinkStatsCommand } from "./commands/pb_link_stats";
 import { StatsCommand } from "./commands/stats";
@@ -23,7 +22,7 @@ import {
 import { debug } from "../../utils/debug";
 import { selectPort } from "../../utils/port_selector";
 import { getStatusMessage } from "../utils/status";
-import { calculatePowerLevel } from "../utils/power_level";
+import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import { logger } from "../../utils/logger";
 import { SerialService } from "../services/serial";
 import { SlotsCommand } from "./commands/slots";
@@ -166,6 +165,7 @@ export async function runS1TTXXSlots(): Promise<void> {
               isPowerbankPresent: boolean;
               powerBankInfo: any;
               powerLevel: number;
+              packVoltageMv: number;
               needsCharging: boolean;
             }> = [];
 
@@ -173,6 +173,7 @@ export async function runS1TTXXSlots(): Promise<void> {
               const isPowerbankPresent = slotsInfo.lockedSlots[j] == SLOT_LOCKED;
               let powerBankInfo = null;
               let powerLevel = 0;
+              let packVoltageMv = 0;
               let needsCharging = false;
 
               // Turn on led for available slot
@@ -190,6 +191,7 @@ export async function runS1TTXXSlots(): Promise<void> {
                       parseInt(powerBankInfo?.totalCharge) || 0;
                     const cutoffCharge =
                       parseInt(powerBankInfo?.cutoffCharge) || 0;
+                    packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
                     powerLevel = calculatePowerLevel(
                       currentCharge,
@@ -226,6 +228,7 @@ export async function runS1TTXXSlots(): Promise<void> {
                 isPowerbankPresent,
                 powerBankInfo,
                 powerLevel,
+                packVoltageMv,
                 needsCharging,
               });
             }
@@ -298,6 +301,12 @@ export async function runS1TTXXSlots(): Promise<void> {
                   ? {
                       id: slot.powerBankInfo?.serial,
                       powerLevel: slot.powerLevel,
+                      status: slot.powerBankInfo?.status,
+                      packVoltageMv: slot.packVoltageMv,
+                      lowVoltage: isLowVoltage(
+                        slot.powerBankInfo?.status,
+                        slot.packVoltageMv
+                      ),
                     }
                   : null,
                 isPowerbankPresent: slot.isPowerbankPresent,
@@ -452,6 +461,7 @@ export function registerS1TTXXCommands(program: Command): void {
                 powerBankInfo?.totalCharge,
                 powerBankInfo?.cutoffCharge
               );
+              const packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
               const endTime = Date.now();
               const executionTime = endTime - startTime;
@@ -464,9 +474,15 @@ export function registerS1TTXXCommands(program: Command): void {
                   powerBank: {
                     id: powerBankInfo?.serial,
                     powerLevel: powerLevel,
+                    status: powerBankInfo?.status,
+                    packVoltageMv: packVoltageMv,
+                    lowVoltage: isLowVoltage(
+                      powerBankInfo?.status,
+                      packVoltageMv
+                    ),
                   },
                   isPowerbankPresent,
-                  isCharging: powerBankInfo?.isCharging,
+                  isCharging: powerBankInfo?.status === PB_STATUS_CHARGING,
                   isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                   index: parseInt(options.index),
                   state: SlotState.available,

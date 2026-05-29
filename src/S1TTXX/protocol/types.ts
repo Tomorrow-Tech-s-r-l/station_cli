@@ -56,11 +56,25 @@ export interface PowerbankInfo {
   cutoffCharge: number;
   cycles: number;
   status: number;
+  // Pack voltage in mV (LTC2943 vtr). 0 = unknown or firmware too old.
+  // Used to detect deeply-discharged packs (status==CUTOFF, vtr near 0V
+  // typically means a tripped BMS that needs a recovery charge cycle).
+  packVoltageMv: number;
 }
 
 export interface PowerBankServer {
   id: string;
   powerLevel: number;
+  // Raw powerbank firmware status byte. See PB_STATUS_* in utils/constants.
+  status?: number;
+  // Pack voltage in mV from the LTC2943. 0 = unknown / old firmware.
+  packVoltageMv?: number;
+  // True when the pack has a low-voltage issue: firmware reports
+  // PB_STATUS_CUTOFF (5), or the LTC2943 pack voltage is below the cutoff
+  // threshold. Surfaced so the kiosk can warn the operator. A CUTOFF pack is
+  // skipped by the `slots` auto-charge logic (which only charges plugged-in
+  // packs), so recovery is started manually via `station_cli charge`.
+  lowVoltage?: boolean;
 }
 
 export interface SlotsInfo {

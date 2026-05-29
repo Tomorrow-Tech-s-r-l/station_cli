@@ -82,6 +82,13 @@ export const PB_STATUS_CHARGING = 3;
 export const PB_STATUS_DISCHARGING = 4;
 export const PB_STATUS_CUTOFF = 5;
 
+// Pack voltage (mV) at/under which the kiosk flags a "low voltage issue" on
+// the battery. Matches BATTERY_V_CUTOFF in
+// firmware/P1TT2C-firmware/App/Inc/config.h. A pack flagged low-voltage that is
+// in PB_STATUS_CUTOFF is skipped by the `slots` auto-charge logic (it only
+// charges plugged-in packs); the operator recovers it with `charge -i N -e true`.
+export const LOW_VOLTAGE_THRESHOLD_MV = 12000;
+
 // Limits
 export const MINIMUM_BOARD_ADDRESS = 0;
 export const MAXIMUM_BOARD_ADDRESS_S0RU6 = 0;

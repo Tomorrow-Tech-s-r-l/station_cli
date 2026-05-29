@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "station-cli",
-  "version": "0.1.0",
-  "minKioskAppVersion": "1.0.0",
+  "version": "0.2.0",
+  "minKioskAppVersion": "1.2.0",
   "description": "CLI tool to control station board and powerbanks",
   "main": "dist/cli.js",
   "bin": {

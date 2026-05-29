@@ -29,7 +29,17 @@ export class StatusCommand extends BaseCommand {
 
     const response = await this.executeCommand(message);
     if (response.success && response.data.length >= 19) {
-      // Parse powerbank info from response data
+      // Parse powerbank info from response data.
+      // Layout (offsets in bytes):
+      //   0..9   serial
+      //   10..13 timestamp
+      //   14..15 totalCharge
+      //   16..17 currentCharge
+      //   18..19 cutoffCharge
+      //   20..21 cycles
+      //   22     status
+      //   23..24 packVoltageMv (added with recovery feature; 0 on old fw)
+      const hasVoltage = response.data.length >= 25;
       const info: PowerbankInfo = {
         serial: response.data
           .subarray(0, 10)
@@ -42,6 +52,7 @@ export class StatusCommand extends BaseCommand {
         cutoffCharge: response.data.readUInt16LE(18),
         cycles: response.data.readUInt16LE(20),
         status: response.data.readUInt8(22),
+        packVoltageMv: hasVoltage ? response.data.readUInt16LE(23) : 0,
       };
       return { ...response, data: Buffer.from(JSON.stringify(info)) };
     }
