@@ -140,8 +140,13 @@ jobs:
 
       - name: Generate metadata.json
         run: |
+          # Single source of truth:
+          #   - cli_version           ← package.json "version" (authoritative version number)
+          #   - min_kiosk_app_version ← committed metadata.json (maintained via `npm run release`)
+          # The committed metadata.json is the canonical compatibility record the
+          # kiosk reads from the release assets; we never derive it from package.json.
           VERSION=$(node -p "require('./package.json').version")
-          MIN_KIOSK=$(node -p "require('./package.json').minKioskAppVersion || '1.0.0'")
+          MIN_KIOSK=$(node -p "(require('fs').existsSync('./metadata.json') && require('./metadata.json').min_kiosk_app_version) || '1.0.0'")
           printf '{\n  "cli_version": "%s",\n  "min_kiosk_app_version": "%s"\n}\n' "$VERSION" "$MIN_KIOSK" > metadata.json
           echo "Generated metadata.json:"
           cat metadata.json
