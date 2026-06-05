@@ -36,7 +36,6 @@ import {
   SLOT_IS_DISABLED_DEFAULT_VALUE,
   SLOT_IS_LOCKED_DEFAULT_VALUE,
 } from "../utils/slot_mapping";
-import { LedCommand } from "./commands/led";
 import { PbEnterBootCommand } from "./commands/pb_enter_boot";
 import { PbFwuHelloCommand, PbFwuHelloInfo } from "./commands/pb_fwu_hello";
 import { PbFwuExitCommand } from "./commands/pb_fwu_exit";
@@ -85,12 +84,6 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
 
     const endTime = Date.now();
     const executionTime = endTime - startTime;
-
-    if (response.success) {
-      // Turn off led for unlocked slot
-      const ledCommand = new LedCommand(service);
-      await ledCommand.execute(index, false);
-    }
 
     const result = {
       success: response.success,
@@ -147,7 +140,6 @@ export async function runS1TTXXSlots(): Promise<void> {
 
     const command = new SlotsCommand(service);
     const statusCommand = new StatusCommand(service);
-    const ledCommand = new LedCommand(service);
     const chargeCommand = new ChargeCommand(service);
 
     for (let i = 0; i <= getMaximumBoardAddress(); i++) {
@@ -175,9 +167,6 @@ export async function runS1TTXXSlots(): Promise<void> {
               let powerLevel = 0;
               let packVoltageMv = 0;
               let needsCharging = false;
-
-              // Turn on led for available slot
-              await ledCommand.execute(mapBoardToSlot(i, j), isPowerbankPresent);
 
               if (isPowerbankPresent) {
                 // Get status of powerbank
@@ -618,62 +607,6 @@ export function registerS1TTXXCommands(program: Command): void {
       }
     });
 
-  // Turn on/off led for a specific slot
-  program
-    .command("led")
-    .description("Turn on/off led for a specific slot")
-    .requiredOption(
-      "-i, --index <index>",
-      `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
-      cliInputValidatorIndex
-    )
-    .requiredOption(
-      "-e, --enable <enable>",
-      "Enable led (true/false)",
-      cliInputValidatorEnable
-    )
-    .action(async (options: CommandOptions) => {
-      const startTime = Date.now();
-      try {
-        const port = await selectPort();
-        const service = new SerialService(port);
-        await service.connect();
-
-        const command = new LedCommand(service);
-
-        const response = await command.execute(
-          parseInt(options.index),
-          options.enable === "true" ? true : false
-        );
-
-        const endTime = Date.now();
-        const executionTime = endTime - startTime;
-
-        const result = {
-          success: response.success,
-          executionTimeMs: executionTime,
-          timestamp: new Date().toISOString(),
-          slotIndex: parseInt(options.index),
-          boardAddress: Math.floor((parseInt(options.index) - 1) / 6),
-          slotInBoard: (parseInt(options.index) - 1) % 6,
-          ledEnabled: !!options.enable,
-          error: response.success
-            ? null
-            : {
-                code: response.status,
-                message: getStatusMessage(response.status),
-              },
-        };
-
-        logger.log(JSON.stringify(result, null, 2));
-
-        await service.disconnect();
-      } catch (error) {
-        logger.error("Error:", error);
-        process.exit(1);
-      }
-    });
-
   // Initialize powerbank
   program
     .command("initialize-powerbank")
@@ -1063,7 +996,7 @@ export function registerS1TTXXCommands(program: Command): void {
   // ---- Firmware-update (FWU) commands ---------------------------------
   //
   // Three thin one-shot commands that exercise the Phase 3 bootloader
-  // protocol. They route by slot index just like `status`/`charge`/`led`.
+  // protocol. They route by slot index just like `status`/`charge`.
   //
   //   enter-boot -i <index>   App -> ack + soft reset into the bootloader
   //   fwu-hello  -i <index>   BL  -> returns BL version + slot info

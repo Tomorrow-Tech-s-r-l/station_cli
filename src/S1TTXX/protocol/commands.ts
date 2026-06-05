@@ -6,7 +6,6 @@ import {
   CMD_SET_PDO_CODE,
   CMD_SLOTS_CODE,
   CMD_UNLOCK_CODE,
-  CMD_SET_LED_CODE,
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
   CMD_PB_FW_VER_CODE,
@@ -41,7 +40,6 @@ import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
  * - SET_PDO (0x04): Set charging profile
  * - SLOTS (0x05): Get slot status
  * - UNLOCK (0x06): Unlock powerbank
- * - SET_LED (0x07): Control LED
  * - SET_PB_INFO (0x08): Set powerbank info
  * - SET_PB_BATT_INFO (0x09): Set battery info
  * - FW_VER (0x50): Get firmware version
@@ -181,16 +179,6 @@ export class UnlockCommandBuilder extends BaseCommandBuilder {
       throw new Error("Unlock command requires slot index");
     }
     return Buffer.from([CMD_UNLOCK_CODE, message.data[0]]);
-  }
-}
-
-// Set LED command builder
-export class SetLedCommandBuilder extends BaseCommandBuilder {
-  buildCommand(message: SerialMessage): Buffer {
-    if (!message.data || message.data.length !== 2) {
-      throw new Error("Set LED command requires slot index and color");
-    }
-    return Buffer.from([CMD_SET_LED_CODE, message.data[0], message.data[1]]);
   }
 }
 
@@ -424,7 +412,6 @@ export class CommandFactory {
     [CMD_SET_PDO_CODE, new SetPdoCommandBuilder()],
     [CMD_SLOTS_CODE, new SlotsCommandBuilder()],
     [CMD_UNLOCK_CODE, new UnlockCommandBuilder()],
-    [CMD_SET_LED_CODE, new SetLedCommandBuilder()],
     [CMD_SET_INFO_PWB, new SetInfoCommandBuilder()],
     [CMD_SET_INFO_BATTERY, new SetBatteryInfoCommandBuilder()],
     [CMD_GET_FW_VER, new FirmwareVersionCommandBuilder()],
@@ -547,7 +534,6 @@ export class CommandValidatorFactory {
     [CMD_RESET_CODE, new SlotCommandValidator()],
     [CMD_SET_PDO_CODE, new SlotCommandValidator()],
     [CMD_UNLOCK_CODE, new SlotCommandValidator()],
-    [CMD_SET_LED_CODE, new SlotCommandValidator()],
     [CMD_SET_INFO_PWB, new SlotCommandValidator()],
     [CMD_SET_INFO_BATTERY, new SlotCommandValidator()],
   ]);

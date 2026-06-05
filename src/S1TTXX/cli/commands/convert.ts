@@ -11,7 +11,6 @@ import {
   CMD_SET_PDO_CODE,
   CMD_SLOTS_CODE,
   CMD_UNLOCK_CODE,
-  CMD_SET_LED_CODE,
   CMD_SET_INFO_PWB,
   CMD_SET_INFO_BATTERY,
   CMD_GET_FW_VER,
@@ -28,7 +27,6 @@ function getCommandName(commandCode: number): string {
     [CMD_SET_PDO_CODE]: "SET_PDO",
     [CMD_SLOTS_CODE]: "SLOTS",
     [CMD_UNLOCK_CODE]: "UNLOCK",
-    [CMD_SET_LED_CODE]: "SET_LED",
     [CMD_SET_INFO_PWB]: "SET_INFO_PWB",
     [CMD_SET_INFO_BATTERY]: "SET_INFO_BATTERY",
     [CMD_GET_FW_VER]: "GET_FW_VER",
@@ -50,7 +48,6 @@ function getCommandDescription(commandCode: number): string {
     [CMD_SET_PDO_CODE]: "Set charging profile (voltage/current)",
     [CMD_SLOTS_CODE]: "Get status of all slots on the board",
     [CMD_UNLOCK_CODE]: "Unlock a powerbank from its slot",
-    [CMD_SET_LED_CODE]: "Control LED indicator for a slot",
     [CMD_SET_INFO_PWB]: "Initialize powerbank information",
     [CMD_SET_INFO_BATTERY]: "Set battery information",
     [CMD_GET_FW_VER]: "Get firmware version",
@@ -74,8 +71,6 @@ function getExpectedResponseFormat(commandCode: number): string {
     [CMD_SLOTS_CODE]:
       "Response: <cmd> <status> <lockedSlots(6 bytes)> (JSON format with slot lock status)",
     [CMD_UNLOCK_CODE]:
-      "Response: <cmd> <status> (status: 0x00=OK, 0x01=timeout, 0x02=invalid_cmd, 0x03=invalid_args, 0x04=internal_error)",
-    [CMD_SET_LED_CODE]:
       "Response: <cmd> <status> (status: 0x00=OK, 0x01=timeout, 0x02=invalid_cmd, 0x03=invalid_args, 0x04=internal_error)",
     [CMD_SET_INFO_PWB]:
       "Response: <cmd> <status> (status: 0x00=OK, 0x01=timeout, 0x02=invalid_cmd, 0x03=invalid_args, 0x04=internal_error)",
@@ -588,17 +583,10 @@ function interpretCommandData(commandCode: number, data: Buffer): any {
       break;
 
     case CMD_SET_CHARGE_CODE:
-    case CMD_SET_LED_CODE:
       if (data.length >= 2) {
         interpretation.slotIndex = data.readUInt8(0);
         interpretation.param = data.readUInt8(1);
-        if (commandCode === CMD_SET_CHARGE_CODE) {
-          interpretation.powerLevel = data.readUInt8(1);
-        } else if (commandCode === CMD_SET_LED_CODE) {
-          interpretation.color = data.readUInt8(1);
-          interpretation.colorName =
-            ["RED", "GREEN", "BLUE"][data.readUInt8(1)] || "UNKNOWN";
-        }
+        interpretation.powerLevel = data.readUInt8(1);
       }
       break;
 
