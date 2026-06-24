@@ -3,6 +3,14 @@ export const FRAME_START_BYTE = 0xea;
 export const BAUD_RATE = 115200;
 export const CRC_ALGORITHM = "MODBUS";
 export const INTER_COMMAND_DELAY_MS = 50;
+// Make-before-break settle window: after disabling charging on a slot, wait
+// this long before firing the eject solenoid so the powerbank's charge FET
+// opens and the charge current decays. Breaking the pogo contacts while
+// current is still flowing draws a DC arc that erodes them (see the unlock
+// flow in S1TTXX/cli/cli.ts). The pack disables CHARGE_EN immediately on
+// receipt of CMD_SET_CHARGE=0, so a few hundred ms covers command round-trip
+// plus FET turn-off and current decay.
+export const CHARGE_DISABLE_SETTLE_MS = 300;
 export const FRAME_START_CHAR = "{";
 export const FRAME_END_CHAR = "}";
 

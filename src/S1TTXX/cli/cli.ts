@@ -9,6 +9,7 @@ import {
   STATUS_ERR_INTERNAL,
   PB_STATUS_CHARGING,
   PB_STATUS_PLUGGED_IN,
+  CHARGE_DISABLE_SETTLE_MS,
 } from "../../utils/constants";
 import { PbLinkStatsCommand } from "./commands/pb_link_stats";
 import { StatsCommand } from "./commands/stats";
@@ -79,6 +80,46 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
     const service = new SerialService(port);
     await service.connect();
 
+    // Make-before-break: disable charging on THIS slot and let the charge FET
+    // open / current decay before firing the eject solenoid. Breaking the pogo
+    // contacts under load draws a DC arc that erodes them over many cycles; the
+    // pack firmware only cuts charge reactively (up to ~1 s after it has already
+    // lost contact), far too late to help. CMD_SET_CHARGE is per-slot, so this
+    // only ever stops the pack being ejected — the powerbanks in the other
+    // slots keep charging undisturbed.
+    let chargeDisabledBeforeUnlock = false;
+    try {
+      const chargeResponse = await new ChargeCommand(service).execute(
+        index,
+        false
+      );
+      chargeDisabledBeforeUnlock = chargeResponse.success;
+      if (chargeResponse.success) {
+        // Settle: wait for the charge FET to open and current to decay before
+        // the contacts physically separate.
+        await new Promise((resolve) =>
+          setTimeout(resolve, CHARGE_DISABLE_SETTLE_MS)
+        );
+      } else {
+        // Couldn't confirm charge-off (e.g. empty slot, or pack didn't ACK).
+        // Proceed with the unlock anyway — never trap a customer's powerbank —
+        // but flag it. Warning goes to stderr so the stdout JSON stays parseable.
+        logger.error(
+          `Warning: could not disable charging on slot ${index} before unlock ` +
+            `(status ${chargeResponse.status}: ${getStatusMessage(
+              chargeResponse.status
+            )}). Proceeding with unlock; contacts may break under load.`
+        );
+      }
+    } catch (chargeError) {
+      logger.error(
+        `Warning: charge-disable command failed before unlock on slot ${index}: ` +
+          `${
+            chargeError instanceof Error ? chargeError.message : "unknown error"
+          }. Proceeding with unlock.`
+      );
+    }
+
     const command = new UnlockCommand(service);
     const response = await command.execute(index);
 
@@ -92,6 +133,7 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
       slotIndex: index,
       boardAddress: Math.floor((index - 1) / 6),
       slotInBoard: (index - 1) % 6,
+      chargeDisabledBeforeUnlock,
       error: response.success
         ? null
         : {
