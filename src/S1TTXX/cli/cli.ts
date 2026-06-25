@@ -71,7 +71,29 @@ interface CommandOptions {
 }
 
 /**
- * Execute S1TTXX unlock for a given slot index.
+ * Execute an S1TTXX unlock for a given slot index.
+ *
+ * Make-before-break: before firing the eject solenoid, charging is disabled on
+ * the target slot (CMD_SET_CHARGE=0) and the function waits
+ * `CHARGE_DISABLE_SETTLE_MS` for the charge FET to open and current to decay,
+ * so the pogo contacts separate unloaded and don't draw a DC arc. The command
+ * is per-slot, so powerbanks in the other slots keep charging. If charging
+ * can't be confirmed off (empty slot, no ACK, or the charge command throws) the
+ * unlock still proceeds — never trap a customer's pack — and a warning is
+ * written to stderr; stdout stays clean JSON.
+ *
+ * Prints a JSON result object to stdout with:
+ *   - `success` (boolean) — whether the eject command was accepted
+ *   - `executionTimeMs` (number) — wall-clock time, includes the settle delay
+ *   - `timestamp` (string, ISO 8601)
+ *   - `slotIndex` (number) — the requested 1-based slot
+ *   - `boardAddress`, `slotInBoard` (number) — decoded board/slot position
+ *   - `chargeDisabledBeforeUnlock` (boolean) — true if charge-off was confirmed
+ *     before ejecting; false if the unlock proceeded without that guarantee
+ *   - `error` ({ code, message } | null) — populated when `success` is false
+ *
+ * The `chargeDisabledBeforeUnlock` field is additive; consumers that don't read
+ * it (e.g. older kiosk builds) are unaffected.
  */
 export async function runS1TTXXUnlock(index: number): Promise<void> {
   const startTime = Date.now();
