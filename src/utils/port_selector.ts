@@ -2,6 +2,16 @@ import { SerialPort } from "serialport";
 import { getModel } from "./model";
 
 export async function selectPort(): Promise<string> {
+  // Test/emulator seam: when STATION_CLI_PORT is set, use it verbatim and skip
+  // USB enumeration. This lets the unmodified CLI open a virtual serial port
+  // (e.g. a socat PTY bridged to the station_emulator) so every layer below —
+  // serialport open, framing, CRC, retries — runs for real against emulated
+  // hardware. Mirrors the kiosk's KIOSK_WS_URL_OVERRIDE seam.
+  const override = process.env.STATION_CLI_PORT;
+  if (override && override.length > 0) {
+    return override;
+  }
+
   const ports = await SerialPort.list().then((list: any[]) =>
     list.map((p: any) => p.path)
   );
@@ -22,6 +32,13 @@ export async function selectPorts(): Promise<[string, string]> {
   const model = getModel();
   if (model !== "S0RU30") {
     throw new Error("selectPorts() is only for S0RU30 model");
+  }
+
+  // Emulator seam (see selectPort): "PORT_A,PORT_B" forces both board ports.
+  const override = process.env.STATION_CLI_PORT;
+  if (override && override.includes(",")) {
+    const [a, b] = override.split(",").map((s) => s.trim());
+    if (a && b) return [a, b];
   }
 
   const ports = await SerialPort.list().then((list: any[]) =>
