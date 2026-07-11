@@ -22,7 +22,7 @@ import {
 } from "../protocol/types";
 import { debug } from "../../utils/debug";
 import { selectPort } from "../../utils/port_selector";
-import { getStatusMessage } from "../utils/status";
+import { getStatusMessage, getStatusCode } from "../utils/status";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import { logger } from "../../utils/logger";
 import { SerialService } from "../services/serial";
@@ -156,6 +156,9 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
       boardAddress: Math.floor((index - 1) / 6),
       slotInBoard: (index - 1) % 6,
       chargeDisabledBeforeUnlock,
+      // Additive stable token (null on success); older consumers ignore it and
+      // can still read `error.code`/`error.message`.
+      errorCode: response.success ? null : getStatusCode(response.status),
       error: response.success
         ? null
         : {
@@ -178,6 +181,9 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
       slotIndex: index,
       boardAddress: Math.floor((index - 1) / 6),
       slotInBoard: (index - 1) % 6,
+      // Additive stable token for a thrown failure (e.g. no serial port, connect
+      // failure) — distinct from a device-reported protocol status.
+      errorCode: "EXCEPTION",
       error: {
         code: -1,
         message: error instanceof Error ? error.message : "Unknown error",
