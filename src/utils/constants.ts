@@ -78,9 +78,11 @@ export const SLOT_LOCKED = 0;
 export const SLOT_INDEX_MINIMUM = 1;
 
 export const SLOT_INDEX_MAXIMUM_S1TT6 = 6;
-export const SLOT_INDEX_MAXIMUM_S0RU6 = 6;
-export const SLOT_INDEX_MAXIMUM_S0RU30 = 30;
 export const SLOT_INDEX_MAXIMUM_S1TT30 = 30;
+// S0TTXX NETCHECK cellular gateway variants (product codes S6A/S12A/S18A).
+export const SLOT_INDEX_MAXIMUM_S0TT6 = 6;
+export const SLOT_INDEX_MAXIMUM_S0TT12 = 12;
+export const SLOT_INDEX_MAXIMUM_S0TT18 = 18;
 
 // Powerbank Status
 export const PB_STATUS_IDLE = 1;
@@ -98,8 +100,9 @@ export const LOW_VOLTAGE_THRESHOLD_MV = 12000;
 
 // Limits
 export const MINIMUM_BOARD_ADDRESS = 0;
-export const MAXIMUM_BOARD_ADDRESS_S0RU6 = 0;
-export const MAXIMUM_BOARD_ADDRESS_S0RU30 = 1; // Two boards: 0 and 1
+// The S0TTXX gateway bridges a single OEM main board; commands relay to
+// address '0' ({0@..}), so there is one board address regardless of variant.
+export const MAXIMUM_BOARD_ADDRESS_S0TT = 0;
 
 export const MAXIMUM_BOARD_ADDRESS_S1TT6 = 0;
 export const MAXIMUM_BOARD_ADDRESS_S1TT30 = 4;
