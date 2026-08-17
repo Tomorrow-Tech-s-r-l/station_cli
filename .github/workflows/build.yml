@@ -90,12 +90,24 @@ jobs:
         run: npm run ${{ matrix.build_script }}
         shell: bash
 
+      # Purely a handoff to the `release` job below, which downloads all three
+      # legs and attaches them to the GitHub Release. The Release asset is the
+      # deliverable — the kiosk's station_cli_service / auto-updater fetch
+      # `releases/download/<tag>/<binary>`, never the Actions artifact API — so
+      # this copy is dead weight the moment the release job finishes.
+      #
+      # `retention-days: 3` rather than the org default: three platform binaries
+      # per push to main/development is ~57 MB a run, and at 90 days that was
+      # 571 MB of the 2.57 GB the org had accumulated against a 500 MB Free-plan
+      # allowance. Three days still leaves room to re-run a failed `release` job
+      # the next morning without re-running the whole build.
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: executables/${{ matrix.artifact_name }}
           if-no-files-found: error
+          retention-days: 3
 
       - name: Get version
         id: get_version
