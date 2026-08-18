@@ -9,13 +9,14 @@ import {
   runS1TTXXUnlock,
 } from "./S1TTXX/cli/cli";
 import {
-  registerS0RUXXCommands,
-  runS0RUXXSlots,
-  runS0RUXXUnlock,
-} from "./S0RUXX/cli/cli";
+  registerS0TTXXCommands,
+  runS0TTXXSlots,
+  runS0TTXXUnlock,
+} from "./S0TTXX/cli/cli";
 import {
   setModel,
   getModel,
+  isS0TTModel,
   type StationModel,
   getSlotIndexMinimum,
   getSlotIndexMaximum,
@@ -24,10 +25,10 @@ import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 import { convertFrame } from "./S1TTXX/cli/commands/convert";
 
 // Parse optional positional mode token before any command.
-// Accepted: S1TT30 (default), S1TT6, S0RU6, S0RU30
+// Accepted: S1TT30 (default), S1TT6, S0TT6, S0TT12, S0TT18
 (() => {
   const token = process.argv[2];
-  const allowed: StationModel[] = ["S1TT30", "S1TT6", "S0RU6", "S0RU30"];
+  const allowed: StationModel[] = ["S1TT30", "S1TT6", "S0TT6", "S0TT12", "S0TT18"];
   if (allowed.includes(token as StationModel)) {
     setModel(token as StationModel);
     // Remove the token so Commander sees the command next
@@ -77,21 +78,22 @@ process.on("SIGTERM", () => {
 
 // Register commands from both device types
 registerS1TTXXCommands(program);
-registerS0RUXXCommands(program);
+registerS0TTXXCommands(program);
 
 // Unified routed commands
 interface RoutedOptions {
   index?: string;
+  port?: string;
 }
 
 // Slots command
 program
   .command("slots")
   .description("Get slots information")
+  .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
   .action(async (options: RoutedOptions) => {
-    const model = getModel();
-    if (model === "S0RU6" || model === "S0RU30") {
-      await runS0RUXXSlots();
+    if (isS0TTModel(getModel())) {
+      await runS0TTXXSlots(options.port);
     } else {
       await runS1TTXXSlots();
     }
@@ -106,11 +108,11 @@ program
     `Slot index (${getSlotIndexMinimum()}-${getSlotIndexMaximum()})`,
     cliInputValidatorIndex
   )
+  .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
   .action(async (options: RoutedOptions) => {
-    const model = getModel();
     const index = parseInt(options.index as string);
-    if (model === "S0RU6" || model === "S0RU30") {
-      await runS0RUXXUnlock(index);
+    if (isS0TTModel(getModel())) {
+      await runS0TTXXUnlock(index, options.port);
     } else {
       await runS1TTXXUnlock(index);
     }
