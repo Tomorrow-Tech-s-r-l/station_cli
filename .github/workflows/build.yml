@@ -85,6 +85,9 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: executables/${{ matrix.artifact_name }}
           if-no-files-found: error
+          # Transport only: the release job republishes these as Release assets,
+          # which are not charged to the org's storage quota. Artifacts are.
+          retention-days: 1
 
       - name: Get version
         id: get_version
