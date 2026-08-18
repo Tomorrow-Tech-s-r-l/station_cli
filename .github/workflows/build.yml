@@ -55,23 +55,26 @@ jobs:
           fi
         shell: bash
 
-      - name: Setup Python
-        if: matrix.os == 'linux-arm64'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
+      # No actions/setup-python step for this leg: the arm64 builder is Debian 13,
+      # and actions/python-versions publishes no arm64 asset for Debian 13, so
+      # setup-python fails while resolving the version — it never gets as far as
+      # running anything. Nothing here needs a *specific* Python either:
+      # @serialport/bindings-cpp ships a linux-arm64 prebuild, so its
+      # node-gyp-build install hook loads that and never shells out to node-gyp.
+      # The distro python3 below is just insurance for the day a dependency
+      # arrives without a matching prebuild and that fallback does fire.
       - name: Install dependencies (Linux)
         if: matrix.os == 'linux-arm64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y make g++ git
+          sudo apt-get install -y make g++ git python3
+          echo "npm_config_python=$(command -v python3)" >> "$GITHUB_ENV"
           npm ci
 
       - name: Install dependencies (Windows)
