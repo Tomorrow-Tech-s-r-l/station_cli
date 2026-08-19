@@ -4,28 +4,47 @@ import {
 } from "../../utils/constants";
 
 /**
- * Calculates the power level percentage based on current and total charge
- * The cutoffCharge is subtracted from both values since currentCharge will not go below cutoffCharge
- * @param currentCharge Current charge value
- * @param totalCharge Total charge value
- * @param cutoffCharge Cutoff charge value (minimum charge level)
- * @returns Power level percentage (0-100)
+ * Calculates the power level percentage exactly as the powerbank firmware
+ * does, line for line — see P1TT2C-firmware/App/Src/modules/charge_module.c,
+ * the "Calculate State of Charge (SOC)" block. Same variable names, same
+ * ternaries, same integer-division order (multiply by 100 before dividing),
+ * so this always agrees with the value the powerbank itself would compute
+ * from the same readings.
+ *
+ * Denominator (socDenom) is whichever is larger between avgCapacity (the
+ * pack's learned average full-charge capacity, tracks ageing) and the
+ * previous cycle's calibrated span (totalCharge - cutoffCharge). On
+ * firmware that doesn't report avgCapacity yet, it defaults to 0 and this
+ * reduces to the old formula exactly. Like the firmware, this trades the
+ * old hard <=100% ceiling for a value that doesn't lag behind an aged pack
+ * — see BF-260512 §4.
+ * @param currentCharge Current charge value (LTC2943_Status.acr_mAh on the powerbank)
+ * @param totalCharge Total charge value (flashData.totalCap on the powerbank)
+ * @param cutoffCharge Cutoff charge value (flashData.cutoffCap on the powerbank)
+ * @param avgCapacity Learned average full-charge capacity (flashData.avgCap on the powerbank, 0 on old firmware)
+ * @returns Power level percentage (not clamped to 100 — see note above)
  */
 export function calculatePowerLevel(
   currentCharge: number | string | undefined,
   totalCharge: number | string | undefined,
-  cutoffCharge: number | string | undefined = 0
+  cutoffCharge: number | string | undefined = 0,
+  avgCapacity: number | string | undefined = 0
 ): number {
-  const total = parseInt(String(totalCharge)) || 0;
-  const current = parseInt(String(currentCharge)) || 0;
-  const cutoff = parseInt(String(cutoffCharge)) || 0;
+  const totalCap = parseInt(String(totalCharge)) || 0;
+  const currentCap = parseInt(String(currentCharge)) || 0;
+  const cutoffCap = parseInt(String(cutoffCharge)) || 0;
+  const avgCap = parseInt(String(avgCapacity)) || 0;
 
-  // Calculate usable charge (current - cutoff) and usable total (total - cutoff)
-  const usableCharge = Math.max(0, current - cutoff);
-  const usableTotal = total - cutoff;
+  // measuredCap = (acr_mAh > cutoffCap) ? acr_mAh - cutoffCap : 0;
+  const measuredCap = currentCap > cutoffCap ? currentCap - cutoffCap : 0;
+  // prevCap = totalCap - cutoffCap;
+  const prevCap = totalCap - cutoffCap;
+  // socDenom = (avgCap > prevCap) ? avgCap : prevCap;
+  const socDenom = avgCap > prevCap ? avgCap : prevCap;
 
-  // Return 0 if usableTotal is 0 or negative
-  return usableTotal > 0 ? Math.trunc((usableCharge / usableTotal) * 100) : 0;
+  // soc = 100 * measuredCap / socDenom; (guarded against socDenom <= 0,
+  // which the firmware doesn't need to guard against but JS should)
+  return socDenom > 0 ? Math.trunc((100 * measuredCap) / socDenom) : 0;
 }
 
 /**
