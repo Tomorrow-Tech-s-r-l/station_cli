@@ -76,13 +76,20 @@ jobs:
       # node-gyp-build install hook loads that and never shells out to node-gyp.
       # The distro python3 below is just insurance for the day a dependency
       # arrives without a matching prebuild and that fallback does fire.
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'linux-arm64' || matrix.os == 'linux-x64'
+      - name: Install dependencies (Linux ARM64)
+        if: matrix.os == 'linux-arm64'
         run: |
           sudo apt-get update
           sudo apt-get install -y make g++ git python3
           echo "npm_config_python=$(command -v python3)" >> "$GITHUB_ENV"
           npm ci
+
+      # The x64 self-hosted runner does not grant its Actions user passwordless
+      # sudo. `pkg` and serialport use their Linux x64 prebuilds, so Node's
+      # setup is sufficient here and no system package installation is needed.
+      - name: Install dependencies (Linux x64)
+        if: matrix.os == 'linux-x64'
+        run: npm ci
 
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-x64'
