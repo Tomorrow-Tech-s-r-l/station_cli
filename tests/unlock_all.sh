@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # Get the directory where this script is located
@@ -19,11 +18,53 @@ fi
 
 # Constants
 SLOT_INDEX_MINIMUM=1
-SLOT_INDEX_MAXIMUM=30
+DEFAULT_MODEL="S1TT30"
 DEFAULT_DELAY_MS=5
+# Delay used by the non-interactive (--model) mode: 1 second between unlocks
+NON_INTERACTIVE_DELAY_MS=1000
 
 # Make executable if not already
 chmod +x "$EXECUTABLE" 2>/dev/null
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [--model <MODEL>] [options]
+
+Without any argument the script runs interactively (asks for slot range,
+repetitions and delay) against the default model $DEFAULT_MODEL.
+
+With --model it runs unattended over the whole slot range of that model,
+once per slot, with a ${NON_INTERACTIVE_DELAY_MS}ms delay between unlocks.
+
+Options:
+  --model <MODEL>   S1TT30 (1-30), S1TT6 (1-6), S0TT6 (1-6),
+                    S0TT12 (1-12), S0TT18 (1-18)
+  --start <N>       First slot index (default: $SLOT_INDEX_MINIMUM)
+  --end <N>         Last slot index (default: model maximum)
+  --times <N>       Unlocks per slot (default: 1)
+  --delay <MS>      Delay between unlocks in milliseconds
+                    (default: $NON_INTERACTIVE_DELAY_MS)
+  --port <PORT>     Serial port (S0TTXX models only; default: auto-detect)
+  -h, --help        Show this help
+
+Examples:
+  $(basename "$0") --model S1TT30
+  $(basename "$0") --model S1TT6
+  $(basename "$0") --model S1TT30 --start 5 --end 10 --times 3 --delay 250
+EOF
+}
+
+# Return the maximum slot index for a given model, or empty if unknown
+slot_index_maximum_for_model() {
+    case "$1" in
+        S1TT30) echo 30 ;;
+        S1TT6)  echo 6 ;;
+        S0TT6)  echo 6 ;;
+        S0TT12) echo 12 ;;
+        S0TT18) echo 18 ;;
+        *)      echo "" ;;
+    esac
+}
 
 # Function to read user input
 read_input() {
@@ -35,75 +76,194 @@ read_input() {
 # Function to delay (in milliseconds)
 delay_ms() {
     local ms="$1"
-    # Convert milliseconds to seconds (5ms = 0.005s)
+    local seconds
+    seconds=$(awk "BEGIN {printf \"%.3f\", $ms / 1000.0}")
     python3 -c "import time; time.sleep($ms / 1000.0)" 2>/dev/null || \
     perl -e "select(undef, undef, undef, $ms / 1000.0)" 2>/dev/null || \
-    sleep 0.005
+    sleep "$seconds"
 }
 
-# Ask for slot range
-read_input "Enter starting slot index ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM): " start_slot
-start_slot=$(echo "$start_slot" | tr -d '[:space:]')
+# Validate a slot index against the model range
+validate_slot() {
+    local label="$1"
+    local value="$2"
+    if ! [[ "$value" =~ ^[0-9]+$ ]] || \
+       [ "$value" -lt "$SLOT_INDEX_MINIMUM" ] || \
+       [ "$value" -gt "$SLOT_INDEX_MAXIMUM" ]; then
+        echo "Error: Invalid $label slot. Must be between $SLOT_INDEX_MINIMUM and $SLOT_INDEX_MAXIMUM for $model" >&2
+        exit 1
+    fi
+}
 
-# Validate start slot
-if ! [[ "$start_slot" =~ ^[0-9]+$ ]] || [ "$start_slot" -lt "$SLOT_INDEX_MINIMUM" ] || [ "$start_slot" -gt "$SLOT_INDEX_MAXIMUM" ]; then
-    echo "Error: Invalid starting slot. Must be between $SLOT_INDEX_MINIMUM and $SLOT_INDEX_MAXIMUM" >&2
+# ------------------------------------------------------------------
+# Argument parsing
+# ------------------------------------------------------------------
+model=""
+start_slot=""
+end_slot=""
+times=""
+delay_ms_value=""
+port=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --model)
+            model="$2"; shift 2 || true
+            ;;
+        --model=*)
+            model="${1#*=}"; shift
+            ;;
+        --start)
+            start_slot="$2"; shift 2 || true
+            ;;
+        --start=*)
+            start_slot="${1#*=}"; shift
+            ;;
+        --end)
+            end_slot="$2"; shift 2 || true
+            ;;
+        --end=*)
+            end_slot="${1#*=}"; shift
+            ;;
+        --times)
+            times="$2"; shift 2 || true
+            ;;
+        --times=*)
+            times="${1#*=}"; shift
+            ;;
+        --delay)
+            delay_ms_value="$2"; shift 2 || true
+            ;;
+        --delay=*)
+            delay_ms_value="${1#*=}"; shift
+            ;;
+        --port)
+            port="$2"; shift 2 || true
+            ;;
+        --port=*)
+            port="${1#*=}"; shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown argument: $1" >&2
+            echo "" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Any argument switches the script to non-interactive mode
+if [ -n "$model" ] || [ -n "$start_slot" ] || [ -n "$end_slot" ] || \
+   [ -n "$times" ] || [ -n "$delay_ms_value" ] || [ -n "$port" ]; then
+    interactive=false
+else
+    interactive=true
+fi
+
+# Resolve the model and its slot range
+if [ -z "$model" ]; then
+    model="$DEFAULT_MODEL"
+fi
+model=$(echo "$model" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+SLOT_INDEX_MAXIMUM=$(slot_index_maximum_for_model "$model")
+if [ -z "$SLOT_INDEX_MAXIMUM" ]; then
+    echo "Error: Unknown model '$model'. Valid models: S1TT30, S1TT6, S0TT6, S0TT12, S0TT18" >&2
     exit 1
 fi
 
-read_input "Enter ending slot index ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM): " end_slot
-end_slot=$(echo "$end_slot" | tr -d '[:space:]')
+# ------------------------------------------------------------------
+# Interactive mode: ask for everything the flags did not provide
+# ------------------------------------------------------------------
+if [ "$interactive" = "true" ]; then
+    # Ask for slot range
+    read_input "Enter starting slot index ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM): " start_slot
+    start_slot=$(echo "$start_slot" | tr -d '[:space:]')
+    validate_slot "starting" "$start_slot"
 
-# Validate end slot
-if ! [[ "$end_slot" =~ ^[0-9]+$ ]] || [ "$end_slot" -lt "$SLOT_INDEX_MINIMUM" ] || [ "$end_slot" -gt "$SLOT_INDEX_MAXIMUM" ]; then
-    echo "Error: Invalid ending slot. Must be between $SLOT_INDEX_MINIMUM and $SLOT_INDEX_MAXIMUM" >&2
-    exit 1
+    read_input "Enter ending slot index ($SLOT_INDEX_MINIMUM-$SLOT_INDEX_MAXIMUM): " end_slot
+    end_slot=$(echo "$end_slot" | tr -d '[:space:]')
+    validate_slot "ending" "$end_slot"
+
+    # Ask for number of times
+    read_input "Enter number of times to unlock each slot: " times
+    times=$(echo "$times" | tr -d '[:space:]')
+
+    # Ask for delay (default is 5ms)
+    read_input "Enter delay in milliseconds (default: $DEFAULT_DELAY_MS ms): " delay_input
+    delay_input=$(echo "$delay_input" | tr -d '[:space:]')
+    if [ -z "$delay_input" ]; then
+        delay_ms_value=$DEFAULT_DELAY_MS
+    else
+        delay_ms_value="$delay_input"
+    fi
+else
+    # Non-interactive defaults: whole slot range, once per slot, 1s delay
+    [ -z "$start_slot" ] && start_slot="$SLOT_INDEX_MINIMUM"
+    [ -z "$end_slot" ] && end_slot="$SLOT_INDEX_MAXIMUM"
+    [ -z "$times" ] && times=1
+    [ -z "$delay_ms_value" ] && delay_ms_value="$NON_INTERACTIVE_DELAY_MS"
+
+    start_slot=$(echo "$start_slot" | tr -d '[:space:]')
+    end_slot=$(echo "$end_slot" | tr -d '[:space:]')
+    times=$(echo "$times" | tr -d '[:space:]')
+    delay_ms_value=$(echo "$delay_ms_value" | tr -d '[:space:]')
+
+    validate_slot "starting" "$start_slot"
+    validate_slot "ending" "$end_slot"
 fi
 
+# ------------------------------------------------------------------
+# Shared validation
+# ------------------------------------------------------------------
 # Validate that start <= end
 if [ "$start_slot" -gt "$end_slot" ]; then
     echo "Error: Starting slot ($start_slot) must be less than or equal to ending slot ($end_slot)" >&2
     exit 1
 fi
 
-# Ask for number of times
-read_input "Enter number of times to unlock each slot: " times
-times=$(echo "$times" | tr -d '[:space:]')
-
 # Validate times
 if ! [[ "$times" =~ ^[0-9]+$ ]] || [ "$times" -lt 1 ]; then
-    echo "Error: Invalid number. Must be at least 1" >&2
+    echo "Error: Invalid number of times. Must be at least 1" >&2
     exit 1
 fi
 
-# Ask for delay (default is 5ms)
-read_input "Enter delay in milliseconds (default: $DEFAULT_DELAY_MS ms): " delay_input
-delay_input=$(echo "$delay_input" | tr -d '[:space:]')
+# Validate delay - must be a positive number (can be decimal)
+if ! [[ "$delay_ms_value" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+    echo "Error: Invalid delay. Must be a positive number" >&2
+    exit 1
+fi
+# Check if it's greater than 0 using awk (more portable than bc)
+if ! awk "BEGIN {exit !($delay_ms_value > 0)}" 2>/dev/null; then
+    echo "Error: Invalid delay. Must be greater than 0" >&2
+    exit 1
+fi
 
-# Use default if empty, otherwise validate
-if [ -z "$delay_input" ]; then
-    delay_ms_value=$DEFAULT_DELAY_MS
-else
-    # Validate delay - must be a positive number (can be decimal)
-    if ! [[ "$delay_input" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-        echo "Error: Invalid delay. Must be a positive number" >&2
-        exit 1
-    fi
-    # Check if it's greater than 0 using awk (more portable than bc)
-    if ! awk "BEGIN {exit !($delay_input > 0)}" 2>/dev/null; then
-        echo "Error: Invalid delay. Must be greater than 0" >&2
-        exit 1
-    fi
-    delay_ms_value="$delay_input"
+# Serial port is only meaningful on the S0TTXX gateway models
+port_args=()
+if [ -n "$port" ]; then
+    case "$model" in
+        S0TT6|S0TT12|S0TT18)
+            port_args=(-p "$port")
+            ;;
+        *)
+            echo "Warning: --port is only supported for S0TTXX models; ignoring for $model" >&2
+            ;;
+    esac
 fi
 
 echo ""
-echo "Unlocking slots ($start_slot-$end_slot), $times time(s) per slot with ${delay_ms_value}ms delay..."
+echo "Model: $model"
+echo "Unlocking slots ($start_slot-$end_slot), $times time(s) per slot with ${delay_ms_value}ms delay between unlocks..."
 echo ""
 
 # Initialize counters
 total_success_count=0
 total_timeout_failure_count=0
+first_call=true
 
 # Loop through selected slot range
 for ((slot=$start_slot; slot<=$end_slot; slot++)); do
@@ -117,10 +277,19 @@ for ((slot=$start_slot; slot<=$end_slot; slot++)); do
     
     # Execute unlock command multiple times with delay
     for ((i=1; i<=times; i++)); do
+        # Delay before every call except the very first one, so the delay
+        # also applies when moving from one slot to the next
+        if [ "$first_call" = "true" ]; then
+            first_call=false
+        else
+            delay_ms "$delay_ms_value"
+        fi
+
         echo "[$i/$times] Executing unlock command..."
         
         # Execute the command and capture output
-        output=$("$EXECUTABLE" unlock -i "$slot" 2>&1)
+        # Format: executable MODEL unlock -i SLOT
+        output=$("$EXECUTABLE" "$model" unlock -i "$slot" "${port_args[@]}" 2>&1)
         exit_code=$?
         
         if [ $exit_code -eq 0 ]; then
@@ -162,11 +331,6 @@ for ((slot=$start_slot; slot<=$end_slot; slot++)); do
             echo "$output"
         fi
         
-        # Add delay between calls (except after the last one)
-        if [ $i -lt $times ]; then
-            delay_ms "$delay_ms_value"
-        fi
-        
         echo "" # Empty line for readability
     done
     
@@ -181,5 +345,7 @@ echo "Unlock complete!"
 echo "=========================================="
 echo ""
 echo "Overall Summary:"
+echo "  Model: $model"
+echo "  Slots: $start_slot-$end_slot"
 echo "  Total successful: $total_success_count"
 echo "  Total timeout failures: $total_timeout_failure_count"

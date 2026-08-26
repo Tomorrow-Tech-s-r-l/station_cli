@@ -6,3 +6,7 @@ executables/
 *.log
 
 .DS_Store
+# Local clone of the GitHub wiki (github.com/Tomorrow-Tech-s-r-l/station_cli.wiki.git).
+# Never track it: committing it adds a gitlink with no .gitmodules entry, which
+# makes actions/checkout wipe and re-clone the whole self-hosted workspace.
+station_cli.wiki/
