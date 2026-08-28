@@ -94,6 +94,16 @@ interface CommandOptions {
  *
  * The `chargeDisabledBeforeUnlock` field is additive; consumers that don't read
  * it (e.g. older kiosk builds) are unaffected.
+ *
+ * `success: false` covers two different situations, distinguished by
+ * `errorCode`. `ERR_UNLOCK_FAILED` means the station drove the solenoid and
+ * the slot's lock sensor still reads locked — the command arrived and the coil
+ * fired, so re-sending it only fires the coil again; the slot needs service.
+ * Every other code means the command did not complete (comms, bus, or
+ * argument error) and is a candidate for a retry. Firmware without
+ * CONFIG_SOLENOID_UNLOCK_VERIFY never sends `ERR_UNLOCK_FAILED`; it answers OK
+ * and logs the failure on the board, so `success: true` is not by itself proof
+ * that the latch opened on those builds.
  */
 export async function runS1TTXXUnlock(index: number): Promise<void> {
   const startTime = Date.now();

@@ -71,6 +71,14 @@ export const STATUS_TIMEOUT = 0x01;
 export const STATUS_ERR_INVALID_CMD = 0x02;
 export const STATUS_ERR_INVALID_ARGS = 0x03;
 export const STATUS_ERR_INTERNAL = 0x04;
+// Station-local failure: the interface board drove and released the eject
+// solenoid, but the slot's lock sensor still reads locked — i.e. the latch
+// did not open. The command itself was understood and executed, so this is
+// distinct from ERR_INTERNAL (the expander write failed) and from a comms
+// error. Only sent by firmware built with CONFIG_SOLENOID_UNLOCK_VERIFY;
+// older firmware answers OK and logs the failure locally instead.
+export const STATUS_ERR_UNLOCK_FAILED = 0x20;
+// CLI-local, never sent on the wire.
 export const STATUS_ERR_INVALID_RESPONSE = 0x80;
 
 // Slot Status

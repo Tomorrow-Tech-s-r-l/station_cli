@@ -5,6 +5,7 @@ import {
   STATUS_ERR_INTERNAL,
   STATUS_ERR_INVALID_RESPONSE,
   STATUS_ERR_INVALID_ARGS,
+  STATUS_ERR_UNLOCK_FAILED,
 } from "../../utils/constants";
 
 export const getStatusMessage = (status: number): string => {
@@ -19,6 +20,8 @@ export const getStatusMessage = (status: number): string => {
       return "Invalid arguments - check command parameters";
     case STATUS_ERR_INTERNAL:
       return "Internal device error - device may need reset";
+    case STATUS_ERR_UNLOCK_FAILED:
+      return "Unlock failed - solenoid fired but the slot is still locked";
     case STATUS_ERR_INVALID_RESPONSE:
       return "Invalid response format from device";
     default:
@@ -44,6 +47,8 @@ export const getStatusCode = (status: number): string => {
       return "ERR_INVALID_ARGS";
     case STATUS_ERR_INTERNAL:
       return "ERR_INTERNAL";
+    case STATUS_ERR_UNLOCK_FAILED:
+      return "ERR_UNLOCK_FAILED";
     case STATUS_ERR_INVALID_RESPONSE:
       return "ERR_INVALID_RESPONSE";
     default:
