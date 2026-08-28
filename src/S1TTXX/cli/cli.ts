@@ -90,22 +90,30 @@ interface CommandOptions {
  *   - `boardAddress`, `slotInBoard` (number) — decoded board/slot position
  *   - `chargeDisabledBeforeUnlock` (boolean) — true if charge-off was confirmed
  *     before ejecting; false if the unlock proceeded without that guarantee
+ *   - `releaseVerified` (boolean) — true if the station was asked to confirm
+ *     the pack left the slot, so `success` reflects the physical outcome
  *   - `error` ({ code, message } | null) — populated when `success` is false
  *
  * The `chargeDisabledBeforeUnlock` field is additive; consumers that don't read
  * it (e.g. older kiosk builds) are unaffected.
  *
- * `success: false` covers two different situations, distinguished by
- * `errorCode`. `ERR_UNLOCK_FAILED` means the station drove the solenoid and
- * the slot's lock sensor still reads locked — the command arrived and the coil
- * fired, so re-sending it only fires the coil again; the slot needs service.
- * Every other code means the command did not complete (comms, bus, or
- * argument error) and is a candidate for a retry. Firmware without
- * CONFIG_SOLENOID_UNLOCK_VERIFY never sends `ERR_UNLOCK_FAILED`; it answers OK
- * and logs the failure on the board, so `success: true` is not by itself proof
- * that the latch opened on those builds.
+ * With `verifyRelease` the station is asked to confirm, via the slot's
+ * powerbank presence sensor, that the pack actually left the slot — the check
+ * a caller would otherwise run by re-reading `slots` right after the unlock.
+ * It costs ~250 ms of station-side settle time, so it is opt-in: without it
+ * the unlock is open loop and `success: true` only means the coil was driven.
+ *
+ * `success: false` then covers two different situations, distinguished by
+ * `errorCode`. `ERR_UNLOCK_FAILED` means the coil fired and the pack is still
+ * in the slot — re-sending only fires it again; the slot needs service. Every
+ * other code means the command did not complete (comms, bus, or argument
+ * error) and is a candidate for a retry. Note that firmware predating the
+ * verify byte rejects the request with `ERR_INVALID_ARGS`.
  */
-export async function runS1TTXXUnlock(index: number): Promise<void> {
+export async function runS1TTXXUnlock(
+  index: number,
+  verifyRelease: boolean = false
+): Promise<void> {
   const startTime = Date.now();
   try {
     const port = await selectPort();
@@ -153,7 +161,7 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
     }
 
     const command = new UnlockCommand(service);
-    const response = await command.execute(index);
+    const response = await command.execute(index, verifyRelease);
 
     const endTime = Date.now();
     const executionTime = endTime - startTime;
@@ -166,6 +174,10 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
       boardAddress: Math.floor((index - 1) / 6),
       slotInBoard: (index - 1) % 6,
       chargeDisabledBeforeUnlock,
+      // Whether the station was asked to confirm the pack left the slot. When
+      // true, `success` reflects the physical outcome and the caller does not
+      // need to re-read the slot to find out. Additive; older consumers ignore it.
+      releaseVerified: verifyRelease,
       // Additive stable token (null on success); older consumers ignore it and
       // can still read `error.code`/`error.message`.
       errorCode: response.success ? null : getStatusCode(response.status),

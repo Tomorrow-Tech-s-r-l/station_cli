@@ -84,6 +84,7 @@ registerS0TTXXCommands(program);
 interface RoutedOptions {
   index?: string;
   port?: string;
+  verifyRelease?: boolean;
 }
 
 // Slots command
@@ -109,12 +110,17 @@ program
     cliInputValidatorIndex
   )
   .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
+  .option(
+    "--verify-release",
+    "Ask the station to confirm the powerbank left the slot (S1TTXX only). " +
+      "Adds ~250ms; without it the unlock is fire-and-forget."
+  )
   .action(async (options: RoutedOptions) => {
     const index = parseInt(options.index as string);
     if (isS0TTModel(getModel())) {
       await runS0TTXXUnlock(index, options.port);
     } else {
-      await runS1TTXXUnlock(index);
+      await runS1TTXXUnlock(index, options.verifyRelease === true);
     }
   });
 
