@@ -187,7 +187,8 @@ export async function runS1TTXXSlots(): Promise<void> {
                       currentCharge,
                       totalCharge,
                       cutoffCharge,
-                      avgCapacity
+                      avgCapacity,
+                      powerBankInfo?.status
                     );
 
                     needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
@@ -451,7 +452,8 @@ export function registerS1TTXXCommands(program: Command): void {
                 powerBankInfo?.currentCharge,
                 powerBankInfo?.totalCharge,
                 powerBankInfo?.cutoffCharge,
-                powerBankInfo?.avgCapacity
+                powerBankInfo?.avgCapacity,
+                powerBankInfo?.status
               );
               const packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
