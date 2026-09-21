@@ -25,13 +25,12 @@ export const CMD_SET_INFO_PWB = 0x08;
 export const CMD_SET_INFO_BATTERY = 0x09;
 export const CMD_PB_FW_VER_CODE = 0x0a;
 
-// Powerbank firmware-update opcodes (see NF-260513-bootloader.md and the
-// powerbank firmware App/Inc/fwu_iface.h — single source of truth on the
-// firmware side). These are slot-routed: the station uses the slot byte
-// to pick the pogo line and forwards the rest opaquely. PB_ENTER_BOOT is
-// served by the powerbank app and triggers a reset into the bootloader;
-// PB_FWU_* are served by the powerbank bootloader. Phase 3 wires HELLO
-// and EXIT; BEGIN/DATA/END/ABORT land in Phase 4.
+// Powerbank firmware-update opcodes. The powerbank firmware's
+// App/Inc/fwu_iface.h is the single source of truth for these values.
+// They are slot-routed: the station uses the slot byte to pick the pogo
+// line and forwards the rest opaquely. PB_ENTER_BOOT is served by the
+// powerbank app and triggers a reset into the bootloader; PB_FWU_* are
+// served by the powerbank bootloader.
 export const CMD_PB_ENTER_BOOT_CODE = 0x10;
 export const CMD_PB_FWU_HELLO_CODE  = 0x11;
 export const CMD_PB_FWU_BEGIN_CODE  = 0x12;
@@ -109,5 +108,11 @@ export const MAXIMUM_BOARD_ADDRESS_S1TT30 = 4;
 
 export const MAXIMUM_SLOT_ADDRESS = 5;
 export const MINIMUM_POWER_LEVEL = 0;
+// How many times a per-slot status read is attempted before the slot is
+// treated as unreadable. An unreadable slot is sent CMD_SET_CHARGE(false),
+// so one flaky poll must not be enough to turn a charging pack's charger
+// off — keep this greater than 1.
+export const STATUS_READ_ATTEMPTS = 2;
+
 export const MAXIMUM_POWER_LEVEL = 100;
 export const MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD = 1;

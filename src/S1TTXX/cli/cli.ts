@@ -1,7 +1,9 @@
 import { Command } from "commander";
 import {
   MAXIMUM_POWER_LEVEL,
+  MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD,
   MAXIMUM_SLOT_ADDRESS,
+  STATUS_READ_ATTEMPTS,
   MINIMUM_BOARD_ADDRESS,
   SLOT_INDEX_MINIMUM,
   SLOT_LOCKED,
@@ -239,6 +241,20 @@ export async function runS1TTXXSlots(): Promise<void> {
               let needsCharging = false;
 
               if (isPowerbankPresent) {
+                // Retry the read before giving up on the slot. A slot whose
+                // status read fails leaves powerBankInfo null, which excludes
+                // it from both selection passes below while Phase 3 still
+                // sends it CMD_SET_CHARGE(false); without the retry a single
+                // flaky poll is enough to turn a *charging* pack's charger
+                // off. Failures are still reported via errors[], so "read
+                // failed" stays distinguishable from "idle"; only the last
+                // attempt's failure is recorded.
+                for (
+                  let attempt = 1;
+                  attempt <= STATUS_READ_ATTEMPTS && powerBankInfo === null;
+                  attempt++
+                ) {
+                const isLastAttempt = attempt === STATUS_READ_ATTEMPTS;
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);
@@ -262,7 +278,7 @@ export async function runS1TTXXSlots(): Promise<void> {
                     );
 
                     needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
-                  } else {
+                  } else if (isLastAttempt) {
                     errors.push({
                       index: mapBoardToSlot(i, j),
                       boardAddress: i,
@@ -272,17 +288,18 @@ export async function runS1TTXXSlots(): Promise<void> {
                     });
                   }
                 } catch (error) {
-                  errors.push({
-                    index: mapBoardToSlot(i, j),
-                    boardAddress: i,
-                    slotIndex: j,
-                    error: SlotError.CONNECTION_ERROR,
-                    message:
-                      error instanceof Error ? error.message : "Unknown error",
-                  });
+                  if (isLastAttempt) {
+                    errors.push({
+                      index: mapBoardToSlot(i, j),
+                      boardAddress: i,
+                      slotIndex: j,
+                      error: SlotError.CONNECTION_ERROR,
+                      message:
+                        error instanceof Error ? error.message : "Unknown error",
+                    });
+                  }
                 }
-                // Wait 500ms before reading next powerbank information to avoid race conditions
-                //await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
               }
 
               boardSlots.push({
@@ -302,12 +319,47 @@ export async function runS1TTXXSlots(): Promise<void> {
             // Note: Powerbanks in PB_STATUS_IDLE (finished charging) are excluded from charging
             let chargingSlotIndex = -1;
 
-            // First, check if any powerbank is currently charging - keep it charging
+            // The one-per-board rule is enforced structurally: chargingSlotIndex
+            // holds a single slot, so the constant is never read by the
+            // selection logic. Assert the two agree, so raising the constant
+            // above 1 fails loudly here instead of being silently ignored.
+            if (MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD !== 1) {
+              throw new Error(
+                "MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD is " +
+                  MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD +
+                  " but the selection logic below can only arm one slot per board"
+              );
+            }
+
+            // A pack reporting CHARGING may keep the slot, but not
+            // unconditionally: re-confirming whichever slot reports CHARGING
+            // with no ceiling, latch or timer lets a pack whose status is stuck
+            // at CHARGING pin the board's only charging slot indefinitely and
+            // starve the other five.
+            //
+            // Two independent release conditions, both computable from one poll
+            // (this command is one-shot; there is no cross-run state to lean on):
+            //   1. needsCharging — powerLevel < MAXIMUM_POWER_LEVEL.
+            //   2. the coulomb counter has reached or passed the pack's own full
+            //      anchor. On firmware without the ACR cap the integrator keeps
+            //      climbing past totalCharge while the charger tops off a pack
+            //      that is already full, so currentCharge >= totalCharge means
+            //      "stop".
+            const stillNeedsCharge = (slot: (typeof boardSlots)[number]) => {
+              if (!slot.needsCharging) return false;
+              const currentCharge = parseInt(slot.powerBankInfo?.currentCharge) || 0;
+              const totalCharge = parseInt(slot.powerBankInfo?.totalCharge) || 0;
+              if (totalCharge > 0 && currentCharge >= totalCharge) return false;
+              return true;
+            };
+
+            // First, keep a powerbank that is charging AND still needs to be
             for (const slot of boardSlots) {
               if (
                 slot.isPowerbankPresent &&
                 slot.powerBankInfo &&
-                slot.powerBankInfo.status === PB_STATUS_CHARGING
+                slot.powerBankInfo.status === PB_STATUS_CHARGING &&
+                stillNeedsCharge(slot)
               ) {
                 chargingSlotIndex = slot.slotIndex;
                 break;
@@ -1070,7 +1122,7 @@ export function registerS1TTXXCommands(program: Command): void {
 
   // ---- Firmware-update (FWU) commands ---------------------------------
   //
-  // Three thin one-shot commands that exercise the Phase 3 bootloader
+  // Three thin one-shot commands that exercise the powerbank bootloader
   // protocol. They route by slot index just like `status`/`charge`.
   //
   //   enter-boot -i <index>   App -> ack + soft reset into the bootloader
@@ -1217,7 +1269,7 @@ export function registerS1TTXXCommands(program: Command): void {
 
   // ---- pb-firmware-update orchestrator ------------------------------
   //
-  // End-to-end Phase 5 flow: read the .bin, IEEE-802.3 CRC32 it,
+  // End-to-end flow: read the .bin, IEEE-802.3 CRC32 it,
   // PB_ENTER_BOOT → PB_FWU_HELLO → PB_FWU_BEGIN → loop PB_FWU_DATA →
   // PB_FWU_END → PB_FWU_EXIT. Honors RES_OFFSET_MISMATCH and falls back
   // to PB_FWU_ABORT on mid-stream failure so the slot is cleanly
