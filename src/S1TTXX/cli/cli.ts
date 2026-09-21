@@ -27,6 +27,9 @@ import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import {
   defaultBatteryParams,
   isBatteryInfoValid,
+  DEFAULT_TOTAL_CHARGE_MAH,
+  DEFAULT_CURRENT_CHARGE_MAH,
+  DEFAULT_CUTOFF_CHARGE_MAH,
 } from "../utils/battery_info";
 import { logger } from "../../utils/logger";
 import { SerialService } from "../services/serial";
@@ -744,7 +747,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--total-charge <mAh>",
-      "Total battery capacity in mAh (default: 13925)",
+      `Total battery capacity in mAh (default: ${DEFAULT_TOTAL_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -755,7 +758,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--current-charge <mAh>",
-      "Current battery charge in mAh (default: 11625)",
+      `Current battery charge in mAh (default: ${DEFAULT_CURRENT_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -766,7 +769,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--cutoff-charge <mAh>",
-      "Cutoff battery charge in mAh (default: 10625)",
+      `Cutoff battery charge in mAh (default: ${DEFAULT_CUTOFF_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -799,13 +802,13 @@ export function registerS1TTXXCommands(program: Command): void {
         const cycles = options.cycles ? parseInt(options.cycles) : 0;
         const totalCharge = options.totalCharge
           ? parseInt(options.totalCharge)
-          : 13925;
+          : DEFAULT_TOTAL_CHARGE_MAH;
         const currentCharge = options.currentCharge
           ? parseInt(options.currentCharge)
-          : 11625;
+          : DEFAULT_CURRENT_CHARGE_MAH;
         const cutoffCharge = options.cutoffCharge
           ? parseInt(options.cutoffCharge)
-          : 10625;
+          : DEFAULT_CUTOFF_CHARGE_MAH;
 
         const port = await selectPort();
         const service = new SerialService(port);

@@ -13,11 +13,26 @@
  * defaults below, so it charges normally again.
  */
 
-// Factory nameplate, matching the `initialize-powerbank` defaults and
-// tests/initialize_powerbank_all.sh.
-export const DEFAULT_TOTAL_CHARGE_MAH = 13925;
-export const DEFAULT_CURRENT_CHARGE_MAH = 11625;
+// Factory nameplate for the 4S pack (four 3500 mAh 18650 cells in series,
+// 12.0 V empty to 16.8 V full — see LOW_VOLTAGE_THRESHOLD_MV).
+//
+// These are not capacities: they are coulomb-counter values, offset so that
+// the counter reads DEFAULT_CUTOFF_CHARGE_MAH at 0% and never goes below it.
+// The pack's usable capacity is the window between cutoff and total, which is
+// why the numbers look far larger than the 3500 mAh the cells hold.
+export const PACK_USABLE_CAPACITY_MAH = 3500;
 export const DEFAULT_CUTOFF_CHARGE_MAH = 10625;
+export const DEFAULT_TOTAL_CHARGE_MAH =
+  DEFAULT_CUTOFF_CHARGE_MAH + PACK_USABLE_CAPACITY_MAH;
+
+// State of charge written to a pack that has to be initialized or repaired.
+// Deliberately low: it is an assumption, not a measurement, and a pack that
+// believes it is emptier than it is will charge and re-learn its counter,
+// whereas one that believes it is full never charges at all.
+export const DEFAULT_CHARGE_PERCENT = 30;
+export const DEFAULT_CURRENT_CHARGE_MAH =
+  DEFAULT_CUTOFF_CHARGE_MAH +
+  Math.round((DEFAULT_CHARGE_PERCENT / 100) * PACK_USABLE_CAPACITY_MAH);
 
 // Smallest value we accept as a real capacity nameplate. Anything under this
 // is a bad write (a zeroed field, a truncated value), not a small battery.
