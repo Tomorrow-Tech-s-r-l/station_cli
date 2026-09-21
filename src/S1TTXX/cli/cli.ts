@@ -512,12 +512,16 @@ export function registerS1TTXXCommands(program: Command): void {
           logger.log(JSON.stringify(error, null, 2));
           await service.disconnect();
         } else {
-          // Check if slot is available
+          // Check if slot is available.
+          // Occupancy comes from the lock bitmap, the same source `slots`
+          // uses (see runS1TTXXSlots). It used to be read from the fill
+          // bitmap here, which made the two commands disagree about the same
+          // slot: a station that sets the fill bit on an empty slot produced
+          // `state: "empty"` with `isPowerbankPresent: true` in one object.
           const slotsInfo = JSON.parse(slotsResp.data.toString());
           isAvailable =
             slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
-          const isPowerbankPresent =
-            slotsInfo.filledSlots[slotMapping.slotInBoard] === 1;
+          const isPowerbankPresent = isAvailable;
 
           // If slot is empty, return early with a clear response
           if (!isAvailable) {

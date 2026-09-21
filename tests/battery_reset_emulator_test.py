@@ -172,6 +172,27 @@ def run(station: Station, cli_args, cwd, timeout=120):
 
 # --------------------------------------------------------------------------
 
+
+class FillBitAlwaysSet(Station):
+    """A station that sets the fill bit on every slot, empty ones included.
+
+    Observed on a real S1TT6: `status -i 1` on an empty slot answered
+    `isPowerbankPresent: true` next to `state: "empty"`, because `status` read
+    occupancy from the fill bitmap while `slots` read it from the lock bitmap.
+    """
+
+    def handle(self, payload):
+        addr, op, args = payload[0], payload[1], payload[2:]
+        if op == CMD_SLOTS:
+            fill = lock = 0
+            for slot in range(6):
+                fill |= 1 << slot                   # set whatever is docked
+                if self.packs.get(slot) is None:
+                    lock |= 1 << slot               # empty slots read as locked
+            return bytes([addr, op, 0, fill, lock])
+        return super().handle(payload)
+
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE = None
 if "--baseline" in sys.argv:
@@ -285,6 +306,35 @@ check("the parameters are still written",
       sorted(w[0] for w in st_f.battery_writes) == [1, 2, 3])
 check("a failed re-read degrades gracefully: valid JSON, no crash",
       rc5 == 0 and isinstance(json.loads(out5)["slots"], list))
+
+print("\n=== occupancy: station sets the fill bit on empty slots too ===")
+
+
+def presence_board():
+    return FillBitAlwaysSet({0: None,
+                             1: Pack("REALPACK01", 13925, 12000, 10625, PB_PLUGGED_IN)})
+
+
+_, empty_out, _ = run(presence_board(), ["S1TT6", "status", "-i", "1"], cwd=REPO)
+_, full_out, _ = run(presence_board(), ["S1TT6", "status", "-i", "2"], cwd=REPO)
+_, list_out, _ = run(presence_board(), ["S1TT6", "slots"], cwd=REPO)
+empty_slot = json.loads(empty_out)["slot"]
+full_slot = json.loads(full_out)["slot"]
+listed = by_index(list_out)
+print(f"  status -i 1 (empty)    present={empty_slot['isPowerbankPresent']} "
+      f"state={empty_slot['state']}")
+print(f"  status -i 2 (occupied) present={full_slot['isPowerbankPresent']} "
+      f"state={full_slot['state']}")
+
+check("status does not report a powerbank in an empty slot",
+      empty_slot["isPowerbankPresent"] is False)
+check("status stays self-consistent: empty state implies no powerbank",
+      empty_slot["state"] == "empty" and empty_slot["powerBank"] is None)
+check("status still reports an occupied slot as occupied",
+      full_slot["isPowerbankPresent"] is True and full_slot["powerBank"]["id"] == "REALPACK01")
+check("status and slots agree about every slot",
+      empty_slot["isPowerbankPresent"] == listed[1]["isPowerbankPresent"]
+      and full_slot["isPowerbankPresent"] == listed[2]["isPowerbankPresent"])
 
 print("\n" + "=" * 62)
 failed = [n for n, ok, _ in results if not ok]
