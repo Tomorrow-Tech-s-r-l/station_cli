@@ -229,7 +229,20 @@ export async function runEngine(
     if (!candidate) continue; // unreachable: an item only updates when one exists
 
     if (opts.dryRun) {
-      debug.log(`[FWU] (dry-run) would flash ${item.label} → ${candidate.tag}`);
+      // Still fetch and verify the image: a dry run that skipped the download
+      // would tell you nothing about the half of the pipeline that actually
+      // fails in the field (private-repo auth, a missing .bin asset, a
+      // truncated transfer). Only the flash itself is withheld.
+      try {
+        const imagePath = await ensureImage(candidate, catalogOpts);
+        debug.log(
+          `[FWU] (dry-run) would flash ${item.label} → ${candidate.tag} from ${imagePath}`
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        warnings.push(`(dry-run) cannot stage ${candidate.tag} for ${item.label}: ${message}`);
+        report.success = false;
+      }
       continue;
     }
 

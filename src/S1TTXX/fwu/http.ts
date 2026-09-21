@@ -42,7 +42,7 @@ export class HttpError extends Error {
  * a request carrying two competing auth mechanisms with 400 — so the token is
  * scoped to GitHub's own API hosts and dropped on every other hop.
  */
-function isGitHubApiHost(hostname: string): boolean {
+export function isGitHubApiHost(hostname: string): boolean {
   return hostname === "api.github.com" || hostname === "github.com";
 }
 
@@ -82,6 +82,10 @@ function request(
     const req = https.get(
       {
         hostname: parsed.hostname,
+        // `URL.port` is empty for the scheme default; passing undefined then
+        // lets https fall back to 443. Omitting this entirely would send every
+        // non-default-port URL to 443 instead.
+        port: parsed.port === "" ? undefined : parsed.port,
         path: `${parsed.pathname}${parsed.search}`,
         headers,
         timeout: opts.timeoutMs ?? 30_000,
