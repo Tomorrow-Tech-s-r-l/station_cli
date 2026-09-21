@@ -335,9 +335,6 @@ check("status still reports an occupied slot as occupied",
 check("status and slots agree about every slot",
       empty_slot["isPowerbankPresent"] == listed[1]["isPowerbankPresent"]
       and full_slot["isPowerbankPresent"] == listed[2]["isPowerbankPresent"])
-check("the fill bit is reported separately instead of being dropped",
-      empty_slot["isSlotFilled"] is True and full_slot["isSlotFilled"] is True,
-      "this station sets it on empty slots too, which is the point")
 check("status passes through the telemetry it already read",
       {k: full_slot["powerBank"][k] for k in
        ("timestamp", "totalCharge", "currentCharge", "cutoffCharge", "cycles")}

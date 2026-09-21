@@ -522,12 +522,6 @@ export function registerS1TTXXCommands(program: Command): void {
           isAvailable =
             slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
           const isPowerbankPresent = isAvailable;
-          // The fill bit is reported separately rather than dropped: fill
-          // high with the slot not latched is a real state (something
-          // inserted but not seated), and it is the only place that bit
-          // reaches a caller.
-          const isSlotFilled =
-            slotsInfo.filledSlots[slotMapping.slotInBoard] === 1;
 
           // If slot is empty, return early with a clear response
           if (!isAvailable) {
@@ -540,7 +534,6 @@ export function registerS1TTXXCommands(program: Command): void {
               slot: {
                 powerBank: null,
                 isPowerbankPresent,
-                isSlotFilled,
                 isCharging: false,
                 isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                 index: parseInt(options.index),
@@ -594,7 +587,6 @@ export function registerS1TTXXCommands(program: Command): void {
                     cycles: powerBankInfo?.cycles,
                   },
                   isPowerbankPresent,
-                  isSlotFilled,
                   isCharging: powerBankInfo?.status === PB_STATUS_CHARGING,
                   isLocked: SLOT_IS_LOCKED_DEFAULT_VALUE,
                   index: parseInt(options.index),
