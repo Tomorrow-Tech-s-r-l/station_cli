@@ -10,3 +10,4 @@ executables/
 # Never track it: committing it adds a gitlink with no .gitmodules entry, which
 # makes actions/checkout wipe and re-clone the whole self-hosted workspace.
 station_cli.wiki/
+.test-build/

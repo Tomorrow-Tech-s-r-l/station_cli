@@ -1,31 +1,83 @@
 import {
   PB_STATUS_CUTOFF,
+  PB_STATUS_CHARGING,
   LOW_VOLTAGE_THRESHOLD_MV,
 } from "../../utils/constants";
 
 /**
- * Calculates the power level percentage based on current and total charge
- * The cutoffCharge is subtracted from both values since currentCharge will not go below cutoffCharge
- * @param currentCharge Current charge value
- * @param totalCharge Total charge value
- * @param cutoffCharge Cutoff charge value (minimum charge level)
- * @returns Power level percentage (0-100)
+ * Calculates the reported power level percentage. This is the number the
+ * fleet sees: the powerbank ships raw mAh and the station relays them without
+ * arithmetic, so no percentage exists anywhere upstream of here.
+ *
+ * The base measurement mirrors the powerbank's own SoC block (see
+ * P1TT2C-firmware/App/Src/modules/charge_module.c): the same integer-division
+ * order, multiplying by 100 before dividing, and the same flooring of both
+ * differences at zero so an inverted anchor pair cannot produce a negative
+ * denominator.
+ *
+ * It deliberately does one thing the firmware does not. While the pack
+ * reports PB_STATUS_CHARGING the denominator becomes whichever is larger of
+ * avgCapacity (the pack's learned full-charge capacity, which tracks ageing)
+ * and the calibrated span totalCharge - cutoffCharge. That caps a mid-charge
+ * projection so it cannot overshoot before the charger declares the pack
+ * full. The firmware has no equivalent because its own SoC value only drives
+ * the discharge LED ladder and is never evaluated while charging — here the
+ * value is reported in every state, so the ceiling is load-bearing.
+ *
+ * Firmware that does not report avgCapacity sends 0, in which case the
+ * denominator is always the calibrated span.
+ * @param currentCharge Current charge value (LTC2943_Status.acr_mAh on the powerbank)
+ * @param totalCharge Total charge value (flashData.totalCap on the powerbank)
+ * @param cutoffCharge Cutoff charge value (flashData.cutoffCap on the powerbank)
+ * @param avgCapacity Learned average full-charge capacity (flashData.avgCap on the powerbank, 0 on firmware that does not report it)
+ * @param status Raw powerbank firmware status byte (PB_STATUS_*), used to gate the avgCapacity ceiling to the CHARGING state only
+ * @returns Power level percentage, clamped to [0, 100]. An out-of-range raw
+ *          value is logged to stderr before clamping.
  */
 export function calculatePowerLevel(
   currentCharge: number | string | undefined,
   totalCharge: number | string | undefined,
-  cutoffCharge: number | string | undefined = 0
+  cutoffCharge: number | string | undefined = 0,
+  avgCapacity: number | string | undefined = 0,
+  status: number | undefined = undefined
 ): number {
-  const total = parseInt(String(totalCharge)) || 0;
-  const current = parseInt(String(currentCharge)) || 0;
-  const cutoff = parseInt(String(cutoffCharge)) || 0;
+  const totalCap = parseInt(String(totalCharge)) || 0;
+  const currentCap = parseInt(String(currentCharge)) || 0;
+  const cutoffCap = parseInt(String(cutoffCharge)) || 0;
+  const avgCap = parseInt(String(avgCapacity)) || 0;
 
-  // Calculate usable charge (current - cutoff) and usable total (total - cutoff)
-  const usableCharge = Math.max(0, current - cutoff);
-  const usableTotal = total - cutoff;
+  // measuredCap = (acr_mAh > cutoffCap) ? acr_mAh - cutoffCap : 0;
+  const measuredCap = currentCap > cutoffCap ? currentCap - cutoffCap : 0;
+  // prevCap = totalCap - cutoffCap;
+  const prevCap = totalCap - cutoffCap;
+  // socDenom = (status === CHARGING && avgCap > prevCap) ? avgCap : prevCap;
+  const socDenom =
+    status === PB_STATUS_CHARGING && avgCap > prevCap ? avgCap : prevCap;
 
-  // Return 0 if usableTotal is 0 or negative
-  return usableTotal > 0 ? Math.trunc((usableCharge / usableTotal) * 100) : 0;
+  // soc = 100 * measuredCap / socDenom; (guarded against socDenom <= 0,
+  // which the firmware doesn't need to guard against but JS should)
+  const raw = socDenom > 0 ? Math.trunc((100 * measuredCap) / socDenom) : 0;
+
+  // Clamp to [0, 100]. This is the percentage consumers read: the powerbank
+  // ships raw mAh and the station relays them untouched, so whatever clamping
+  // the pack does on-device never reaches this value.
+  //
+  // The clamp is a rail, not the computation: a pack whose firmware holds the
+  // coulomb counter at the full anchor while CHARGED cannot exceed 100 here.
+  // The rail covers packs running firmware without that cap, and it logs
+  // rather than silently hiding the overshoot.
+  //
+  // prevCap above is a *signed* JS number: an inverted anchor pair (cutoffCap
+  // greater than totalCap) makes socDenom negative, the socDenom > 0 guard
+  // returns 0, and a full pack reports 0%. Keep both the guard and the clamp;
+  // dropping either turns that case into a negative percentage.
+  if (raw > 100 || raw < 0) {
+    console.error(
+      `[power_level] SoC out of range, clamping: raw=${raw} ` +
+        `current=${currentCap} total=${totalCap} cutoff=${cutoffCap} avg=${avgCap}`
+    );
+  }
+  return Math.max(0, Math.min(100, raw));
 }
 
 /**
