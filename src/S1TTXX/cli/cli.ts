@@ -26,6 +26,13 @@ import { debug } from "../../utils/debug";
 import { selectPort } from "../../utils/port_selector";
 import { getStatusMessage, getStatusCode } from "../utils/status";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
+import {
+  defaultBatteryParams,
+  isBatteryInfoValid,
+  DEFAULT_TOTAL_CHARGE_MAH,
+  DEFAULT_CURRENT_CHARGE_MAH,
+  DEFAULT_CUTOFF_CHARGE_MAH,
+} from "../utils/battery_info";
 import { logger } from "../../utils/logger";
 import { SerialService } from "../services/serial";
 import { SlotsCommand } from "./commands/slots";
@@ -33,6 +40,7 @@ import { StatusCommand } from "./commands/status";
 import { UnlockCommand } from "./commands/unlock";
 import { ChargeCommand } from "./commands/charge";
 import { InitializePowerbankCommand } from "./commands/initialize_powerbank";
+import { SetBatteryInfoCommand } from "./commands/set_battery_info";
 import {
   mapBoardToSlot,
   mapSlotToBoard,
@@ -213,6 +221,7 @@ export async function runS1TTXXSlots(): Promise<void> {
     const command = new SlotsCommand(service);
     const statusCommand = new StatusCommand(service);
     const chargeCommand = new ChargeCommand(service);
+    const setBatteryInfoCommand = new SetBatteryInfoCommand(service);
 
     for (let i = 0; i <= getMaximumBoardAddress(); i++) {
       try {
@@ -260,6 +269,34 @@ export async function runS1TTXXSlots(): Promise<void> {
                   const statusResponse = await statusCommand.execute(i, j);
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
+
+                    if (!isBatteryInfoValid(powerBankInfo)) {
+                      // Impossible parameters: the pack reads 0% forever and
+                      // terminates charging against a nameplate that makes no
+                      // sense, so it reports itself full and is skipped below.
+                      // Reset it to the factory values and re-read, so it can
+                      // charge again on this very run.
+                      logger.error(
+                        `Slot ${mapBoardToSlot(i, j)}: invalid battery ` +
+                          `parameters (total=${powerBankInfo?.totalCharge}, ` +
+                          `current=${powerBankInfo?.currentCharge}, ` +
+                          `cutoff=${powerBankInfo?.cutoffCharge}) — resetting.`
+                      );
+                      const resetResponse = await setBatteryInfoCommand.execute(
+                        i,
+                        j,
+                        defaultBatteryParams()
+                      );
+                      if (resetResponse.success) {
+                        const rereadResponse = await statusCommand.execute(i, j);
+                        if (rereadResponse.success) {
+                          powerBankInfo = JSON.parse(
+                            rereadResponse.data.toString()
+                          );
+                        }
+                      }
+                    }
+
                     const currentCharge =
                       parseInt(powerBankInfo?.currentCharge) || 0;
                     const totalCharge =
@@ -533,12 +570,16 @@ export function registerS1TTXXCommands(program: Command): void {
           logger.log(JSON.stringify(error, null, 2));
           await service.disconnect();
         } else {
-          // Check if slot is available
+          // Check if slot is available.
+          // Occupancy comes from the lock bitmap, the same source `slots`
+          // uses (see runS1TTXXSlots). It used to be read from the fill
+          // bitmap here, which made the two commands disagree about the same
+          // slot: a station that sets the fill bit on an empty slot produced
+          // `state: "empty"` with `isPowerbankPresent: true` in one object.
           const slotsInfo = JSON.parse(slotsResp.data.toString());
           isAvailable =
             slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
-          const isPowerbankPresent =
-            slotsInfo.filledSlots[slotMapping.slotInBoard] === 1;
+          const isPowerbankPresent = isAvailable;
 
           // If slot is empty, return early with a clear response
           if (!isAvailable) {
@@ -596,6 +637,14 @@ export function registerS1TTXXCommands(program: Command): void {
                       powerBankInfo?.status,
                       packVoltageMv
                     ),
+                    // Raw telemetry CMD_STATUS already returned. It used to
+                    // be read only to compute powerLevel and then dropped,
+                    // which left every consumer recording zeros for it.
+                    timestamp: powerBankInfo?.timestamp,
+                    totalCharge: powerBankInfo?.totalCharge,
+                    currentCharge: powerBankInfo?.currentCharge,
+                    cutoffCharge: powerBankInfo?.cutoffCharge,
+                    cycles: powerBankInfo?.cycles,
                   },
                   isPowerbankPresent,
                   isCharging: powerBankInfo?.status === PB_STATUS_CHARGING,
@@ -755,7 +804,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--total-charge <mAh>",
-      "Total battery capacity in mAh (default: 13925)",
+      `Total battery capacity in mAh (default: ${DEFAULT_TOTAL_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -766,7 +815,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--current-charge <mAh>",
-      "Current battery charge in mAh (default: 11625)",
+      `Current battery charge in mAh (default: ${DEFAULT_CURRENT_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -777,7 +826,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--cutoff-charge <mAh>",
-      "Cutoff battery charge in mAh (default: 10625)",
+      `Cutoff battery charge in mAh (default: ${DEFAULT_CUTOFF_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -810,13 +859,13 @@ export function registerS1TTXXCommands(program: Command): void {
         const cycles = options.cycles ? parseInt(options.cycles) : 0;
         const totalCharge = options.totalCharge
           ? parseInt(options.totalCharge)
-          : 13925;
+          : DEFAULT_TOTAL_CHARGE_MAH;
         const currentCharge = options.currentCharge
           ? parseInt(options.currentCharge)
-          : 11625;
+          : DEFAULT_CURRENT_CHARGE_MAH;
         const cutoffCharge = options.cutoffCharge
           ? parseInt(options.cutoffCharge)
-          : 10625;
+          : DEFAULT_CUTOFF_CHARGE_MAH;
 
         const port = await selectPort();
         const service = new SerialService(port);

@@ -22,8 +22,10 @@ SLOT_INDEX_MAXIMUM=30
 SERIAL_LENGTH=10
 
 # Defaults for the initialize-powerbank command
-DEFAULT_TOTAL_CHARGE=13925
-DEFAULT_CURRENT_CHARGE=11625
+# Keep in step with DEFAULT_*_CHARGE_MAH in src/S1TTXX/utils/battery_info.ts,
+# which is the source of truth: a 4S 3500 mAh pack, defaulted to 30% charge.
+DEFAULT_TOTAL_CHARGE=14125
+DEFAULT_CURRENT_CHARGE=11675
 DEFAULT_CUTOFF_CHARGE=10625
 DEFAULT_CYCLES=0
 DEFAULT_DELAY_MS=100

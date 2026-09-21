@@ -26,6 +26,11 @@ import {
   CMD_FWU_EXIT_CODE,
   MAXIMUM_SLOT_ADDRESS,
 } from "../../utils/constants";
+import {
+  DEFAULT_TOTAL_CHARGE_MAH,
+  DEFAULT_CURRENT_CHARGE_MAH,
+  DEFAULT_CUTOFF_CHARGE_MAH,
+} from "../utils/battery_info";
 import { SerialMessage, CommandBuilder, CommandValidator } from "./types";
 
 /**
@@ -80,9 +85,12 @@ function buildCommand(command: BoardCommand): Buffer {
     payload = Buffer.alloc(8);
     payload.writeUInt8(command.opCode, 0);
     payload.writeUInt8(command.slotId!, 1);
-    payload.writeUInt16LE(command.totalCharge || 13925, 2);
-    payload.writeUInt16LE(command.currentCharge || 11625, 4);
-    payload.writeUInt16LE(command.cutOffCharge || 10625, 6);
+    payload.writeUInt16LE(command.totalCharge || DEFAULT_TOTAL_CHARGE_MAH, 2);
+    payload.writeUInt16LE(
+      command.currentCharge || DEFAULT_CURRENT_CHARGE_MAH,
+      4
+    );
+    payload.writeUInt16LE(command.cutOffCharge || DEFAULT_CUTOFF_CHARGE_MAH, 6);
     bytesWritten = 8;
   } else {
     // Handle existing commands
