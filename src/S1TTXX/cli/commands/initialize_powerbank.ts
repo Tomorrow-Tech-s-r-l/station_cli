@@ -8,8 +8,6 @@ import {
   DEFAULT_TOTAL_CHARGE_MAH,
   DEFAULT_CURRENT_CHARGE_MAH,
   DEFAULT_CUTOFF_CHARGE_MAH,
-  checkInitialBatteryParams,
-  describeBatteryFaults,
 } from "../../utils/battery_info";
 import { SetBatteryInfoCommand } from "./set_battery_info";
 // Buffer is a Node.js built-in, no import needed
@@ -39,26 +37,12 @@ export class InitializePowerbankCommand extends BaseCommand {
       throw new Error("Serial number must be exactly 10 characters");
     }
 
-    // Set default values. Nullish coalescing, not `||`: an explicit 0 must
-    // reach the validation below rather than being silently replaced by the
-    // default — writing a zeroed nameplate is exactly how a pack ends up
-    // stuck at 0% and never charging again.
-    const timestamp = params.timestamp ?? Math.floor(Date.now() / 1000);
-    const cycles = params.cycles ?? 0;
-    const battery = {
-      totalCharge: params.totalCharge ?? DEFAULT_TOTAL_CHARGE_MAH,
-      currentCharge: params.currentCharge ?? DEFAULT_CURRENT_CHARGE_MAH,
-      cutoffCharge: params.cutoffCharge ?? DEFAULT_CUTOFF_CHARGE_MAH,
-    };
-
-    const faults = checkInitialBatteryParams(battery);
-    if (faults.length > 0) {
-      throw new Error(
-        `Refusing to write impossible battery parameters: ` +
-          `${describeBatteryFaults(faults, battery)}. ` +
-          `Required: cutoffCharge <= currentCharge <= totalCharge.`
-      );
-    }
+    // Set default values
+    const timestamp = params.timestamp || Math.floor(Date.now() / 1000);
+    const cycles = params.cycles || 0;
+    const totalCharge = params.totalCharge || DEFAULT_TOTAL_CHARGE_MAH;
+    const currentCharge = params.currentCharge || DEFAULT_CURRENT_CHARGE_MAH;
+    const cutoffCharge = params.cutoffCharge || DEFAULT_CUTOFF_CHARGE_MAH;
 
     // Step 1: Send powerbank info (opcode 0x08)
     // Payload: [slotId, serial(10), timestamp(4), cycles(2)] = 17 bytes
@@ -86,7 +70,7 @@ export class InitializePowerbankCommand extends BaseCommand {
     return await new SetBatteryInfoCommand(this.serialService).execute(
       boardAddress,
       slotAddress,
-      battery
+      { totalCharge, currentCharge, cutoffCharge }
     );
   }
 }

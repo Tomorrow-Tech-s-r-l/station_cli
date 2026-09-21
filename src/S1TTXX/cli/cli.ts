@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import {
+  MAXIMUM_POWER_LEVEL,
   MAXIMUM_SLOT_ADDRESS,
   MINIMUM_BOARD_ADDRESS,
   SLOT_INDEX_MINIMUM,
@@ -7,6 +8,7 @@ import {
   CMD_GET_FW_VER,
   STATUS_ERR_INTERNAL,
   PB_STATUS_CHARGING,
+  PB_STATUS_PLUGGED_IN,
   CHARGE_DISABLE_SETTLE_MS,
 } from "../../utils/constants";
 import { PbLinkStatsCommand } from "./commands/pb_link_stats";
@@ -23,16 +25,9 @@ import { selectPort } from "../../utils/port_selector";
 import { getStatusMessage, getStatusCode } from "../utils/status";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import {
-  BatteryInfoFault,
-  checkBatteryInfo,
-  checkInitialBatteryParams,
   defaultBatteryParams,
-  describeBatteryFaults,
-  DEFAULT_TOTAL_CHARGE_MAH,
-  DEFAULT_CURRENT_CHARGE_MAH,
-  DEFAULT_CUTOFF_CHARGE_MAH,
+  isBatteryInfoValid,
 } from "../utils/battery_info";
-import { electChargingSlot } from "../utils/charge_election";
 import { logger } from "../../utils/logger";
 import { SerialService } from "../services/serial";
 import { SlotsCommand } from "./commands/slots";
@@ -206,89 +201,6 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
 }
 
 /**
- * Re-initialize the charge parameters of a powerbank whose stored values are
- * impossible, then re-read its status so the rest of this run sees the
- * corrected numbers.
- *
- * Only the battery nameplate is rewritten (CMD_SET_INFO_BATTERY); the serial
- * number, manufacturing timestamp and cycle count are left untouched. The
- * coulomb counter is reset along with it — a deliberate trade: the stored
- * count was already known-wrong, and a pack that believes it is emptier than
- * it is will charge and re-learn, whereas one that believes it is full never
- * charges again. Charge termination still backstops on the pack's own BMS.
- *
- * @param setBatteryInfoCommand Command used to write the nameplate.
- * @param statusCommand Command used to re-read the pack afterwards.
- * @param boardAddress Board the powerbank is docked in.
- * @param slotAddress Slot within that board (0-5).
- * @param powerBankInfo Status payload that failed the check.
- * @param faults Faults found in `powerBankInfo`.
- * @returns The refreshed info, its remaining faults, and whether the write
- *   was accepted by the pack.
- */
-async function repairBatteryInfo(
-  setBatteryInfoCommand: SetBatteryInfoCommand,
-  statusCommand: StatusCommand,
-  boardAddress: number,
-  slotAddress: number,
-  powerBankInfo: any,
-  faults: BatteryInfoFault[]
-): Promise<{
-  powerBankInfo: any;
-  faults: BatteryInfoFault[];
-  repaired: boolean;
-}> {
-  const slotIndex = mapBoardToSlot(boardAddress, slotAddress);
-  const defaults = defaultBatteryParams();
-
-  logger.error(
-    `Slot ${slotIndex}: impossible battery parameters — ` +
-      `${describeBatteryFaults(faults, powerBankInfo)}. ` +
-      `Re-initializing with the factory defaults so the pack can charge.`
-  );
-
-  try {
-    const writeResponse = await setBatteryInfoCommand.execute(
-      boardAddress,
-      slotAddress,
-      defaults
-    );
-
-    if (!writeResponse.success) {
-      logger.error(
-        `Slot ${slotIndex}: battery re-initialization refused ` +
-          `(${getStatusMessage(writeResponse.status)}).`
-      );
-      return { powerBankInfo, faults, repaired: false };
-    }
-
-    // Re-read so the reported powerLevel and the election below both use the
-    // corrected parameters. If the pack does not answer the second read the
-    // write was still ACKed, so fall back to the values we just sent.
-    let refreshed = { ...powerBankInfo, ...defaults };
-    const rereadResponse = await statusCommand.execute(
-      boardAddress,
-      slotAddress
-    );
-    if (rereadResponse.success) {
-      refreshed = JSON.parse(rereadResponse.data.toString());
-    }
-
-    return {
-      powerBankInfo: refreshed,
-      faults: checkBatteryInfo(refreshed),
-      repaired: true,
-    };
-  } catch (error) {
-    logger.error(
-      `Slot ${slotIndex}: battery re-initialization failed — ` +
-        `${error instanceof Error ? error.message : "Unknown error"}`
-    );
-    return { powerBankInfo, faults, repaired: false };
-  }
-}
-
-/**
  * Execute S1TTXX for all slots.
  */
 export async function runS1TTXXSlots(): Promise<void> {
@@ -322,9 +234,7 @@ export async function runS1TTXXSlots(): Promise<void> {
               powerBankInfo: any;
               powerLevel: number;
               packVoltageMv: number;
-              batteryInfoValid: boolean;
-              batteryInfoFaults: BatteryInfoFault[];
-              batteryInfoRepaired: boolean;
+              needsCharging: boolean;
             }> = [];
 
             for (let j = 0; j <= MAXIMUM_SLOT_ADDRESS; j++) {
@@ -332,8 +242,7 @@ export async function runS1TTXXSlots(): Promise<void> {
               let powerBankInfo = null;
               let powerLevel = 0;
               let packVoltageMv = 0;
-              let batteryInfoFaults: BatteryInfoFault[] = [];
-              let batteryInfoRepaired = false;
+              let needsCharging = false;
 
               if (isPowerbankPresent) {
                 // Get status of powerbank
@@ -342,34 +251,48 @@ export async function runS1TTXXSlots(): Promise<void> {
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
 
-                    batteryInfoFaults = checkBatteryInfo(powerBankInfo);
-                    if (batteryInfoFaults.length > 0) {
-                      // Impossible parameters: the pack is pinned at 0% and
+                    if (!isBatteryInfoValid(powerBankInfo)) {
+                      // Impossible parameters: the pack reads 0% forever and
                       // terminates charging against a nameplate that makes no
-                      // sense, so it would report itself full and be skipped
-                      // by the election below forever. Re-initialize it with
-                      // the factory defaults and re-read, so it charges again
-                      // on this very run.
-                      const repaired = await repairBatteryInfo(
-                        setBatteryInfoCommand,
-                        statusCommand,
+                      // sense, so it reports itself full and is skipped below.
+                      // Reset it to the factory values and re-read, so it can
+                      // charge again on this very run.
+                      logger.error(
+                        `Slot ${mapBoardToSlot(i, j)}: invalid battery ` +
+                          `parameters (total=${powerBankInfo?.totalCharge}, ` +
+                          `current=${powerBankInfo?.currentCharge}, ` +
+                          `cutoff=${powerBankInfo?.cutoffCharge}) — resetting.`
+                      );
+                      const resetResponse = await setBatteryInfoCommand.execute(
                         i,
                         j,
-                        powerBankInfo,
-                        batteryInfoFaults
+                        defaultBatteryParams()
                       );
-                      powerBankInfo = repaired.powerBankInfo;
-                      batteryInfoFaults = repaired.faults;
-                      batteryInfoRepaired = repaired.repaired;
+                      if (resetResponse.success) {
+                        const rereadResponse = await statusCommand.execute(i, j);
+                        if (rereadResponse.success) {
+                          powerBankInfo = JSON.parse(
+                            rereadResponse.data.toString()
+                          );
+                        }
+                      }
                     }
 
+                    const currentCharge =
+                      parseInt(powerBankInfo?.currentCharge) || 0;
+                    const totalCharge =
+                      parseInt(powerBankInfo?.totalCharge) || 0;
+                    const cutoffCharge =
+                      parseInt(powerBankInfo?.cutoffCharge) || 0;
                     packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
                     powerLevel = calculatePowerLevel(
-                      powerBankInfo?.currentCharge,
-                      powerBankInfo?.totalCharge,
-                      powerBankInfo?.cutoffCharge
+                      currentCharge,
+                      totalCharge,
+                      cutoffCharge
                     );
+
+                    needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
                   } else {
                     errors.push({
                       index: mapBoardToSlot(i, j),
@@ -399,28 +322,60 @@ export async function runS1TTXXSlots(): Promise<void> {
                 powerBankInfo,
                 powerLevel,
                 packVoltageMv,
-                batteryInfoValid: batteryInfoFaults.length === 0,
-                batteryInfoFaults,
-                batteryInfoRepaired,
+                needsCharging,
               });
             }
 
-            // Phase 2: Determine which slot (if any) should charge.
-            // See electChargingSlot for the rules — in short: only one pack
-            // per board charges, a pack already charging keeps the slot, and
-            // otherwise the emptiest candidate wins. A pack with impossible
-            // charge parameters stays a candidate whatever its status byte
-            // claims, because that claim is computed from the bad numbers.
-            const chargingSlotIndex = electChargingSlot(
-              boardSlots.map((slot) => ({
-                slotIndex: slot.slotIndex,
-                isPowerbankPresent: slot.isPowerbankPresent,
-                status: slot.powerBankInfo?.status,
-                powerLevel: slot.powerLevel,
-                batteryInfoValid: slot.batteryInfoValid,
-                batteryInfoRepaired: slot.batteryInfoRepaired,
-              }))
-            );
+            // Phase 2: Determine which slot (if any) should charge
+            // Rule: Only ONE powerbank per board can charge at a time
+            // Priority 1: Keep powerbanks that are already charging (PB_STATUS_CHARGING)
+            // Priority 2: If no powerbank is charging, charge the one with lowest currentCharge among PB_STATUS_PLUGGED_IN
+            // Note: Powerbanks in PB_STATUS_IDLE (finished charging) are excluded from charging
+            let chargingSlotIndex = -1;
+
+            // First, check if any powerbank is currently charging - keep it charging
+            for (const slot of boardSlots) {
+              if (
+                slot.isPowerbankPresent &&
+                slot.powerBankInfo &&
+                slot.powerBankInfo.status === PB_STATUS_CHARGING
+              ) {
+                chargingSlotIndex = slot.slotIndex;
+                break;
+              }
+            }
+
+            // If no powerbank is charging, find the one with lowest currentCharge among PB_STATUS_PLUGGED_IN
+            // Exclude powerbanks that are in PB_STATUS_IDLE (finished charging) - they should not be charged again
+            if (chargingSlotIndex === -1) {
+              let lowestChargeSlot: {
+                slotIndex: number;
+                currentCharge: number;
+              } | null = null;
+
+              for (const slot of boardSlots) {
+                if (
+                  slot.isPowerbankPresent &&
+                  slot.powerBankInfo &&
+                  slot.powerBankInfo.status === PB_STATUS_PLUGGED_IN
+                ) {
+                  const currentCharge = slot.powerBankInfo.currentCharge || 0;
+                  if (
+                    lowestChargeSlot === null ||
+                    currentCharge < lowestChargeSlot.currentCharge
+                  ) {
+                    lowestChargeSlot = {
+                      slotIndex: slot.slotIndex,
+                      currentCharge: currentCharge,
+                    };
+                  }
+                }
+              }
+
+              if (lowestChargeSlot !== null) {
+                chargingSlotIndex = lowestChargeSlot.slotIndex;
+              }
+            }
 
             // Phase 3: Apply charging commands and build response
             for (const slot of boardSlots) {
@@ -445,9 +400,6 @@ export async function runS1TTXXSlots(): Promise<void> {
                         slot.powerBankInfo?.status,
                         slot.packVoltageMv
                       ),
-                      batteryInfoValid: slot.batteryInfoValid,
-                      batteryInfoFaults: slot.batteryInfoFaults,
-                      batteryInfoRepaired: slot.batteryInfoRepaired,
                     }
                   : null,
                 isPowerbankPresent: slot.isPowerbankPresent,
@@ -603,9 +555,6 @@ export function registerS1TTXXCommands(program: Command): void {
                 powerBankInfo?.cutoffCharge
               );
               const packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
-              // Reported, not repaired: `status` is a read-only diagnostic.
-              // `slots` is what re-initializes a faulty pack.
-              const batteryInfoFaults = checkBatteryInfo(powerBankInfo);
 
               const endTime = Date.now();
               const executionTime = endTime - startTime;
@@ -624,8 +573,6 @@ export function registerS1TTXXCommands(program: Command): void {
                       powerBankInfo?.status,
                       packVoltageMv
                     ),
-                    batteryInfoValid: batteryInfoFaults.length === 0,
-                    batteryInfoFaults: batteryInfoFaults,
                   },
                   isPowerbankPresent,
                   isCharging: powerBankInfo?.status === PB_STATUS_CHARGING,
@@ -838,41 +785,15 @@ export function registerS1TTXXCommands(program: Command): void {
         const serialNumber = options.id;
         const timestamp = Math.floor(Date.now() / 1000);
         const cycles = options.cycles ? parseInt(options.cycles) : 0;
-        // `!== undefined`, not a truthiness test: `--total-charge 0` must be
-        // rejected by the check below rather than silently become the default.
-        const totalCharge =
-          options.totalCharge !== undefined
-            ? parseInt(options.totalCharge)
-            : DEFAULT_TOTAL_CHARGE_MAH;
-        const currentCharge =
-          options.currentCharge !== undefined
-            ? parseInt(options.currentCharge)
-            : DEFAULT_CURRENT_CHARGE_MAH;
-        const cutoffCharge =
-          options.cutoffCharge !== undefined
-            ? parseInt(options.cutoffCharge)
-            : DEFAULT_CUTOFF_CHARGE_MAH;
-
-        // The per-option validators only range-check each value on its own.
-        // An inconsistent *set* (cutoff >= total, current > total) is what
-        // leaves a pack pinned at 0% and excluded from charging, so reject it
-        // here rather than writing it to the pack.
-        const paramFaults = checkInitialBatteryParams({
-          totalCharge,
-          currentCharge,
-          cutoffCharge,
-        });
-        if (paramFaults.length > 0) {
-          logger.error(
-            `Refusing to write impossible battery parameters: ` +
-              `${describeBatteryFaults(paramFaults, {
-                totalCharge,
-                currentCharge,
-                cutoffCharge,
-              })}. Required: cutoff <= current <= total.`
-          );
-          process.exit(1);
-        }
+        const totalCharge = options.totalCharge
+          ? parseInt(options.totalCharge)
+          : 13925;
+        const currentCharge = options.currentCharge
+          ? parseInt(options.currentCharge)
+          : 11625;
+        const cutoffCharge = options.cutoffCharge
+          ? parseInt(options.cutoffCharge)
+          : 10625;
 
         const port = await selectPort();
         const service = new SerialService(port);

@@ -75,17 +75,6 @@ export interface PowerBankServer {
   // skipped by the `slots` auto-charge logic (which only charges plugged-in
   // packs), so recovery is started manually via `station_cli charge`.
   lowVoltage?: boolean;
-  // False when the pack's stored charge parameters are impossible — see
-  // BatteryInfoFault in S1TTXX/utils/battery_info. Such a pack reads 0%
-  // forever and its own "full" verdict cannot be trusted, so `slots` keeps it
-  // in the charging rotation and re-initializes its parameters.
-  batteryInfoValid?: boolean;
-  // The specific faults found, as stable BatteryInfoFault tokens. Empty when
-  // batteryInfoValid is true.
-  batteryInfoFaults?: string[];
-  // True when `slots` rewrote this pack's charge parameters with the factory
-  // defaults on this run. Absent on the read-only `status` command.
-  batteryInfoRepaired?: boolean;
 }
 
 export interface SlotsInfo {
