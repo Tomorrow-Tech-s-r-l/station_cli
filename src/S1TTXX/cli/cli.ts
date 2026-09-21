@@ -39,7 +39,11 @@ import { SlotsCommand } from "./commands/slots";
 import { StatusCommand } from "./commands/status";
 import { UnlockCommand } from "./commands/unlock";
 import { ChargeCommand } from "./commands/charge";
-import { InitializePowerbankCommand } from "./commands/initialize_powerbank";
+import {
+  InitializePowerbankCommand,
+  InitializePowerbankOutcome,
+  NothingWrittenError,
+} from "./commands/initialize_powerbank";
 import { SetBatteryInfoCommand } from "./commands/set_battery_info";
 import {
   mapBoardToSlot,
@@ -206,6 +210,37 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
 }
 
 /**
+ * Read a docked pack's status and return the parsed info, or null when the
+ * read failed or came back as something other than a status payload.
+ */
+async function readPowerbankInfo(
+  statusCommand: StatusCommand,
+  boardAddress: number,
+  slotIndex: number
+): Promise<any | null> {
+  try {
+    const response = await statusCommand.execute(boardAddress, slotIndex);
+    if (!response.success || response.data.length === 0) {
+      return null;
+    }
+    return JSON.parse(response.data.toString());
+  } catch {
+    return null;
+  }
+}
+
+/** Decode the outcome InitializePowerbankCommand packs into its response. */
+function parseInitializeOutcome(
+  data: Buffer
+): InitializePowerbankOutcome | null {
+  try {
+    return JSON.parse(data.toString()) as InitializePowerbankOutcome;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Execute S1TTXX for all slots.
  */
 export async function runS1TTXXSlots(): Promise<void> {
@@ -271,28 +306,57 @@ export async function runS1TTXXSlots(): Promise<void> {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
 
                     if (!isBatteryInfoValid(powerBankInfo)) {
-                      // Impossible parameters: the pack reads 0% forever and
-                      // terminates charging against a nameplate that makes no
-                      // sense, so it reports itself full and is skipped below.
-                      // Reset it to the factory values and re-read, so it can
-                      // charge again on this very run.
-                      logger.error(
-                        `Slot ${mapBoardToSlot(i, j)}: invalid battery ` +
-                          `parameters (total=${powerBankInfo?.totalCharge}, ` +
-                          `current=${powerBankInfo?.currentCharge}, ` +
-                          `cutoff=${powerBankInfo?.cutoffCharge}) — resetting.`
-                      );
-                      const resetResponse = await setBatteryInfoCommand.execute(
+                      // Look twice before rewriting anything. A real fault is
+                      // stored in the pack's flash and reads the same every
+                      // time; a single garbled status frame also parses as an
+                      // impossible nameplate, and acting on one is expensive —
+                      // the reset writes DEFAULT_CHARGE_PERCENT, so a full pack
+                      // starts reporting 30% and has to recharge to re-learn
+                      // its counter. Packs sit here for hours being polled, so
+                      // even a rare misread gets plenty of chances to fire.
+                      const confirmInfo = await readPowerbankInfo(
+                        statusCommand,
                         i,
-                        j,
-                        defaultBatteryParams()
+                        j
                       );
-                      if (resetResponse.success) {
-                        const rereadResponse = await statusCommand.execute(i, j);
-                        if (rereadResponse.success) {
-                          powerBankInfo = JSON.parse(
-                            rereadResponse.data.toString()
+
+                      if (confirmInfo !== null && isBatteryInfoValid(confirmInfo)) {
+                        debug.log(
+                          `Slot ${mapBoardToSlot(i, j)}: battery parameters ` +
+                            `read as invalid once and sound on re-read ` +
+                            `(total=${confirmInfo?.totalCharge}, ` +
+                            `current=${confirmInfo?.currentCharge}, ` +
+                            `cutoff=${confirmInfo?.cutoffCharge}); not resetting.`
+                        );
+                        powerBankInfo = confirmInfo;
+                      } else {
+                        // Impossible parameters: the pack reads 0% forever and
+                        // terminates charging against a nameplate that makes no
+                        // sense, so it reports itself full and is skipped below.
+                        // Reset it to the factory values and re-read, so it can
+                        // charge again on this very run.
+                        const bad = confirmInfo ?? powerBankInfo;
+                        logger.error(
+                          `Slot ${mapBoardToSlot(i, j)}: invalid battery ` +
+                            `parameters (total=${bad?.totalCharge}, ` +
+                            `current=${bad?.currentCharge}, ` +
+                            `cutoff=${bad?.cutoffCharge}) — resetting.`
+                        );
+                        const resetResponse =
+                          await setBatteryInfoCommand.execute(
+                            i,
+                            j,
+                            defaultBatteryParams()
                           );
+                        if (resetResponse.success) {
+                          const rereadInfo = await readPowerbankInfo(
+                            statusCommand,
+                            i,
+                            j
+                          );
+                          if (rereadInfo !== null) {
+                            powerBankInfo = rereadInfo;
+                          }
                         }
                       }
                     }
@@ -515,6 +579,7 @@ export async function runS1TTXXSlots(): Promise<void> {
     const executionTime = endTime - startTime;
 
     const response: SlotsResponse = {
+      success: errors.length === 0,
       slots,
       errors,
       executionTimeMs: executionTime,
@@ -856,16 +921,13 @@ export function registerS1TTXXCommands(program: Command): void {
 
         const serialNumber = options.id;
         const timestamp = Math.floor(Date.now() / 1000);
-        const cycles = options.cycles ? parseInt(options.cycles) : 0;
-        const totalCharge = options.totalCharge
-          ? parseInt(options.totalCharge)
-          : DEFAULT_TOTAL_CHARGE_MAH;
-        const currentCharge = options.currentCharge
-          ? parseInt(options.currentCharge)
-          : DEFAULT_CURRENT_CHARGE_MAH;
-        const cutoffCharge = options.cutoffCharge
-          ? parseInt(options.cutoffCharge)
-          : DEFAULT_CUTOFF_CHARGE_MAH;
+        // Forward only what the operator actually passed and let the command
+        // resolve the defaults. Resolving them here too is what made
+        // `--total-charge 0` lie: "0" is a truthy string, so this layer sent a
+        // numeric 0 and reported it, while the layer below treated that 0 as
+        // "not supplied" and wrote the default instead.
+        const optionalInt = (value: string | undefined): number | undefined =>
+          value === undefined ? undefined : parseInt(value);
 
         const port = await selectPort();
         const service = new SerialService(port);
@@ -879,17 +941,28 @@ export function registerS1TTXXCommands(program: Command): void {
           {
             serialNumber,
             timestamp,
-            cycles,
-            totalCharge,
-            currentCharge,
-            cutoffCharge,
+            cycles: optionalInt(options.cycles),
+            totalCharge: optionalInt(options.totalCharge),
+            currentCharge: optionalInt(options.currentCharge),
+            cutoffCharge: optionalInt(options.cutoffCharge),
           }
         );
 
         const endTime = Date.now();
         const executionTime = endTime - startTime;
 
+        const outcome = parseInitializeOutcome(response.data);
+        const requested = outcome?.written ?? null;
+
         if (response.success) {
+          // `powerbank` reports what the pack holds, read back after the
+          // write, not what was asked for: CMD_SET_INFO_* acknowledges that a
+          // command was accepted, never that the value landed intact. When the
+          // read-back itself fails, `verified` is false and the requested
+          // values are shown instead — flagged rather than passed off as
+          // confirmation. `requested` is kept alongside so the two can be
+          // compared; a small drift in currentCharge is the gauge, not a fault.
+          const verified = outcome?.verified ?? null;
           const result = {
             success: true,
             executionTimeMs: executionTime,
@@ -897,17 +970,27 @@ export function registerS1TTXXCommands(program: Command): void {
             slotIndex: parseInt(options.index),
             boardAddress: slotMapping.boardAddress,
             slotInBoard: slotMapping.slotInBoard,
+            verified: verified !== null,
+            verificationError: outcome?.verificationError ?? null,
             powerbank: {
-              serialNumber,
-              manufacturingTimestamp: timestamp,
-              cycles,
-              totalCharge,
-              currentCharge,
-              cutoffCharge,
+              serialNumber:
+                verified?.serial ?? requested?.serialNumber ?? serialNumber,
+              manufacturingTimestamp:
+                verified?.timestamp ??
+                requested?.manufacturingTimestamp ??
+                timestamp,
+              cycles: verified?.cycles ?? requested?.cycles ?? 0,
+              totalCharge: verified?.totalCharge ?? requested?.totalCharge,
+              currentCharge: verified?.currentCharge ?? requested?.currentCharge,
+              cutoffCharge: verified?.cutoffCharge ?? requested?.cutoffCharge,
             },
+            requested,
           };
           logger.log(JSON.stringify(result, null, 2));
         } else {
+          // Say which of the two writes landed. They commit separately, so
+          // "failed" on its own leaves the operator unable to tell a pack that
+          // was left untouched from one that was half-written.
           const result = {
             success: false,
             executionTimeMs: executionTime,
@@ -915,6 +998,10 @@ export function registerS1TTXXCommands(program: Command): void {
             slotIndex: parseInt(options.index),
             boardAddress: slotMapping.boardAddress,
             slotInBoard: slotMapping.slotInBoard,
+            failedStage: outcome?.stage ?? null,
+            batteryInfoWritten: outcome?.batteryInfoWritten ?? null,
+            powerbankInfoWritten: outcome?.powerbankInfoWritten ?? null,
+            requested,
             error: {
               code: response.status,
               message: getStatusMessage(response.status),
@@ -930,6 +1017,10 @@ export function registerS1TTXXCommands(program: Command): void {
         const executionTime = endTime - startTime;
 
         const slotMapping = mapSlotToBoard(parseInt(options.index));
+        // A refused request never reached the pack, so it can be reported as
+        // untouched. Anything else failed mid-flight, where the pack's state is
+        // genuinely unknown (null) — which is not the same as unchanged.
+        const refusedBeforeWriting = error instanceof NothingWrittenError;
         const result = {
           success: false,
           executionTimeMs: executionTime,
@@ -937,6 +1028,9 @@ export function registerS1TTXXCommands(program: Command): void {
           slotIndex: parseInt(options.index),
           boardAddress: slotMapping.boardAddress,
           slotInBoard: slotMapping.slotInBoard,
+          failedStage: refusedBeforeWriting ? "validation" : null,
+          batteryInfoWritten: refusedBeforeWriting ? false : null,
+          powerbankInfoWritten: refusedBeforeWriting ? false : null,
           error: {
             code: -1,
             message: error instanceof Error ? error.message : "Unknown error",

@@ -4,7 +4,10 @@ import {
   CMD_SET_INFO_BATTERY,
   MAXIMUM_SLOT_ADDRESS,
 } from "../../../utils/constants";
-import { BatteryChargeParams } from "../../utils/battery_info";
+import {
+  BatteryChargeParams,
+  validateBatteryParams,
+} from "../../utils/battery_info";
 // Buffer is a Node.js built-in, no import needed
 
 /**
@@ -12,6 +15,12 @@ import { BatteryChargeParams } from "../../utils/battery_info";
  * 0x09). Split out of InitializePowerbankCommand so `slots` can repair a
  * pack's impossible charge parameters without also rewriting its serial
  * number, manufacturing timestamp and cycle count (CMD_SET_INFO_PWB).
+ *
+ * Every write of the charge triple goes through here, which is why the
+ * coherence check lives here rather than in the callers: a pack running
+ * firmware older than the CMD_SET_BINFO validation accepts whatever it is
+ * sent, so the CLI is the only thing standing between an operator typo and a
+ * pack stranded at 0%.
  */
 export class SetBatteryInfoCommand extends BaseCommand {
   async execute(
@@ -23,6 +32,11 @@ export class SetBatteryInfoCommand extends BaseCommand {
       throw new Error(
         `Slot address must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
       );
+    }
+
+    const invalid = validateBatteryParams(params);
+    if (invalid) {
+      throw new Error(`Refusing to write battery info: ${invalid}`);
     }
 
     // Payload: [slotId, totalCharge(2), currentCharge(2), cutoffCharge(2)]
