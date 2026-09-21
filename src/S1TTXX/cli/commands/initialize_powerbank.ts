@@ -2,9 +2,16 @@ import { BaseCommand } from "./base";
 import { SerialMessage, CommandResponse } from "../../protocol/types";
 import {
   CMD_SET_INFO_PWB,
-  CMD_SET_INFO_BATTERY,
   MAXIMUM_SLOT_ADDRESS,
 } from "../../../utils/constants";
+import {
+  DEFAULT_TOTAL_CHARGE_MAH,
+  DEFAULT_CURRENT_CHARGE_MAH,
+  DEFAULT_CUTOFF_CHARGE_MAH,
+  checkInitialBatteryParams,
+  describeBatteryFaults,
+} from "../../utils/battery_info";
+import { SetBatteryInfoCommand } from "./set_battery_info";
 // Buffer is a Node.js built-in, no import needed
 
 interface InitializePowerbankParams {
@@ -32,12 +39,26 @@ export class InitializePowerbankCommand extends BaseCommand {
       throw new Error("Serial number must be exactly 10 characters");
     }
 
-    // Set default values
-    const timestamp = params.timestamp || Math.floor(Date.now() / 1000);
-    const cycles = params.cycles || 0;
-    const totalCharge = params.totalCharge || 13925; // Default: 13925 mAh
-    const currentCharge = params.currentCharge || 11625; // Default: 11625 mAh
-    const cutoffCharge = params.cutoffCharge || 10625; // Default: 10625 mAh
+    // Set default values. Nullish coalescing, not `||`: an explicit 0 must
+    // reach the validation below rather than being silently replaced by the
+    // default — writing a zeroed nameplate is exactly how a pack ends up
+    // stuck at 0% and never charging again.
+    const timestamp = params.timestamp ?? Math.floor(Date.now() / 1000);
+    const cycles = params.cycles ?? 0;
+    const battery = {
+      totalCharge: params.totalCharge ?? DEFAULT_TOTAL_CHARGE_MAH,
+      currentCharge: params.currentCharge ?? DEFAULT_CURRENT_CHARGE_MAH,
+      cutoffCharge: params.cutoffCharge ?? DEFAULT_CUTOFF_CHARGE_MAH,
+    };
+
+    const faults = checkInitialBatteryParams(battery);
+    if (faults.length > 0) {
+      throw new Error(
+        `Refusing to write impossible battery parameters: ` +
+          `${describeBatteryFaults(faults, battery)}. ` +
+          `Required: cutoffCharge <= currentCharge <= totalCharge.`
+      );
+    }
 
     // Step 1: Send powerbank info (opcode 0x08)
     // Payload: [slotId, serial(10), timestamp(4), cycles(2)] = 17 bytes
@@ -62,19 +83,10 @@ export class InitializePowerbankCommand extends BaseCommand {
     }
 
     // Step 2: Send battery info (opcode 0x09)
-    // Payload: [slotId, totalCharge(2), currentCharge(2), cutoffCharge(2)] = 7 bytes
-    const batteryData = Buffer.alloc(7);
-    batteryData.writeUInt8(slotAddress, 0);
-    batteryData.writeUInt16LE(totalCharge, 1);
-    batteryData.writeUInt16LE(currentCharge, 3);
-    batteryData.writeUInt16LE(cutoffCharge, 5);
-
-    const batteryMessage: SerialMessage = {
+    return await new SetBatteryInfoCommand(this.serialService).execute(
       boardAddress,
-      command: CMD_SET_INFO_BATTERY,
-      data: batteryData,
-    };
-
-    return await this.executeCommand(batteryMessage);
+      slotAddress,
+      battery
+    );
   }
 }
