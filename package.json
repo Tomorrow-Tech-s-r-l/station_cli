@@ -35,7 +35,7 @@
   },
   "scripts": {
     "clean": "node scripts/clean.js",
-    "test": "npm run build && node --test tests/unit/*.test.js",
+    "test": "npm run build && node scripts/run-unit-tests.js",
     "build": "tsc && node scripts/mark-executable.js",
     "prepublishOnly": "npm run test",
     "release": "node scripts/release.js",
