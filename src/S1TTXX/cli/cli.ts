@@ -1,7 +1,9 @@
 import { Command } from "commander";
 import {
   MAXIMUM_POWER_LEVEL,
+  MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD,
   MAXIMUM_SLOT_ADDRESS,
+  STATUS_READ_ATTEMPTS,
   MINIMUM_BOARD_ADDRESS,
   SLOT_INDEX_MINIMUM,
   SLOT_LOCKED,
@@ -24,13 +26,25 @@ import { debug } from "../../utils/debug";
 import { selectPort } from "../../utils/port_selector";
 import { getStatusMessage, getStatusCode } from "../utils/status";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
+import {
+  defaultBatteryParams,
+  isBatteryInfoValid,
+  DEFAULT_TOTAL_CHARGE_MAH,
+  DEFAULT_CURRENT_CHARGE_MAH,
+  DEFAULT_CUTOFF_CHARGE_MAH,
+} from "../utils/battery_info";
 import { logger } from "../../utils/logger";
 import { SerialService } from "../services/serial";
 import { SlotsCommand } from "./commands/slots";
 import { StatusCommand } from "./commands/status";
 import { UnlockCommand } from "./commands/unlock";
 import { ChargeCommand } from "./commands/charge";
-import { InitializePowerbankCommand } from "./commands/initialize_powerbank";
+import {
+  InitializePowerbankCommand,
+  InitializePowerbankOutcome,
+  NothingWrittenError,
+} from "./commands/initialize_powerbank";
+import { SetBatteryInfoCommand } from "./commands/set_battery_info";
 import {
   mapBoardToSlot,
   mapSlotToBoard,
@@ -196,6 +210,37 @@ export async function runS1TTXXUnlock(index: number): Promise<void> {
 }
 
 /**
+ * Read a docked pack's status and return the parsed info, or null when the
+ * read failed or came back as something other than a status payload.
+ */
+async function readPowerbankInfo(
+  statusCommand: StatusCommand,
+  boardAddress: number,
+  slotIndex: number
+): Promise<any | null> {
+  try {
+    const response = await statusCommand.execute(boardAddress, slotIndex);
+    if (!response.success || response.data.length === 0) {
+      return null;
+    }
+    return JSON.parse(response.data.toString());
+  } catch {
+    return null;
+  }
+}
+
+/** Decode the outcome InitializePowerbankCommand packs into its response. */
+function parseInitializeOutcome(
+  data: Buffer
+): InitializePowerbankOutcome | null {
+  try {
+    return JSON.parse(data.toString()) as InitializePowerbankOutcome;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Execute S1TTXX for all slots.
  */
 export async function runS1TTXXSlots(): Promise<void> {
@@ -211,6 +256,7 @@ export async function runS1TTXXSlots(): Promise<void> {
     const command = new SlotsCommand(service);
     const statusCommand = new StatusCommand(service);
     const chargeCommand = new ChargeCommand(service);
+    const setBatteryInfoCommand = new SetBatteryInfoCommand(service);
 
     for (let i = 0; i <= getMaximumBoardAddress(); i++) {
       try {
@@ -239,11 +285,82 @@ export async function runS1TTXXSlots(): Promise<void> {
               let needsCharging = false;
 
               if (isPowerbankPresent) {
+                // Retry the read before giving up on the slot. A slot whose
+                // status read fails leaves powerBankInfo null, which excludes
+                // it from both selection passes below while Phase 3 still
+                // sends it CMD_SET_CHARGE(false); without the retry a single
+                // flaky poll is enough to turn a *charging* pack's charger
+                // off. Failures are still reported via errors[], so "read
+                // failed" stays distinguishable from "idle"; only the last
+                // attempt's failure is recorded.
+                for (
+                  let attempt = 1;
+                  attempt <= STATUS_READ_ATTEMPTS && powerBankInfo === null;
+                  attempt++
+                ) {
+                const isLastAttempt = attempt === STATUS_READ_ATTEMPTS;
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);
                   if (statusResponse.success) {
                     powerBankInfo = JSON.parse(statusResponse.data.toString());
+
+                    if (!isBatteryInfoValid(powerBankInfo)) {
+                      // Look twice before rewriting anything. A real fault is
+                      // stored in the pack's flash and reads the same every
+                      // time; a single garbled status frame also parses as an
+                      // impossible nameplate, and acting on one is expensive —
+                      // the reset writes DEFAULT_CHARGE_PERCENT, so a full pack
+                      // starts reporting 30% and has to recharge to re-learn
+                      // its counter. Packs sit here for hours being polled, so
+                      // even a rare misread gets plenty of chances to fire.
+                      const confirmInfo = await readPowerbankInfo(
+                        statusCommand,
+                        i,
+                        j
+                      );
+
+                      if (confirmInfo !== null && isBatteryInfoValid(confirmInfo)) {
+                        debug.log(
+                          `Slot ${mapBoardToSlot(i, j)}: battery parameters ` +
+                            `read as invalid once and sound on re-read ` +
+                            `(total=${confirmInfo?.totalCharge}, ` +
+                            `current=${confirmInfo?.currentCharge}, ` +
+                            `cutoff=${confirmInfo?.cutoffCharge}); not resetting.`
+                        );
+                        powerBankInfo = confirmInfo;
+                      } else {
+                        // Impossible parameters: the pack reads 0% forever and
+                        // terminates charging against a nameplate that makes no
+                        // sense, so it reports itself full and is skipped below.
+                        // Reset it to the factory values and re-read, so it can
+                        // charge again on this very run.
+                        const bad = confirmInfo ?? powerBankInfo;
+                        logger.error(
+                          `Slot ${mapBoardToSlot(i, j)}: invalid battery ` +
+                            `parameters (total=${bad?.totalCharge}, ` +
+                            `current=${bad?.currentCharge}, ` +
+                            `cutoff=${bad?.cutoffCharge}) — resetting.`
+                        );
+                        const resetResponse =
+                          await setBatteryInfoCommand.execute(
+                            i,
+                            j,
+                            defaultBatteryParams()
+                          );
+                        if (resetResponse.success) {
+                          const rereadInfo = await readPowerbankInfo(
+                            statusCommand,
+                            i,
+                            j
+                          );
+                          if (rereadInfo !== null) {
+                            powerBankInfo = rereadInfo;
+                          }
+                        }
+                      }
+                    }
+
                     const currentCharge =
                       parseInt(powerBankInfo?.currentCharge) || 0;
                     const totalCharge =
@@ -252,14 +369,17 @@ export async function runS1TTXXSlots(): Promise<void> {
                       parseInt(powerBankInfo?.cutoffCharge) || 0;
                     packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
+                    const avgCapacity = powerBankInfo?.avgCapacity ?? 0;
                     powerLevel = calculatePowerLevel(
                       currentCharge,
                       totalCharge,
-                      cutoffCharge
+                      cutoffCharge,
+                      avgCapacity,
+                      powerBankInfo?.status
                     );
 
                     needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
-                  } else {
+                  } else if (isLastAttempt) {
                     errors.push({
                       index: mapBoardToSlot(i, j),
                       boardAddress: i,
@@ -269,17 +389,18 @@ export async function runS1TTXXSlots(): Promise<void> {
                     });
                   }
                 } catch (error) {
-                  errors.push({
-                    index: mapBoardToSlot(i, j),
-                    boardAddress: i,
-                    slotIndex: j,
-                    error: SlotError.CONNECTION_ERROR,
-                    message:
-                      error instanceof Error ? error.message : "Unknown error",
-                  });
+                  if (isLastAttempt) {
+                    errors.push({
+                      index: mapBoardToSlot(i, j),
+                      boardAddress: i,
+                      slotIndex: j,
+                      error: SlotError.CONNECTION_ERROR,
+                      message:
+                        error instanceof Error ? error.message : "Unknown error",
+                    });
+                  }
                 }
-                // Wait 500ms before reading next powerbank information to avoid race conditions
-                //await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
               }
 
               boardSlots.push({
@@ -299,12 +420,47 @@ export async function runS1TTXXSlots(): Promise<void> {
             // Note: Powerbanks in PB_STATUS_IDLE (finished charging) are excluded from charging
             let chargingSlotIndex = -1;
 
-            // First, check if any powerbank is currently charging - keep it charging
+            // The one-per-board rule is enforced structurally: chargingSlotIndex
+            // holds a single slot, so the constant is never read by the
+            // selection logic. Assert the two agree, so raising the constant
+            // above 1 fails loudly here instead of being silently ignored.
+            if (MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD !== 1) {
+              throw new Error(
+                "MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD is " +
+                  MAXIMUM_POWERBANK_TO_CHARGE_PER_BOARD +
+                  " but the selection logic below can only arm one slot per board"
+              );
+            }
+
+            // A pack reporting CHARGING may keep the slot, but not
+            // unconditionally: re-confirming whichever slot reports CHARGING
+            // with no ceiling, latch or timer lets a pack whose status is stuck
+            // at CHARGING pin the board's only charging slot indefinitely and
+            // starve the other five.
+            //
+            // Two independent release conditions, both computable from one poll
+            // (this command is one-shot; there is no cross-run state to lean on):
+            //   1. needsCharging — powerLevel < MAXIMUM_POWER_LEVEL.
+            //   2. the coulomb counter has reached or passed the pack's own full
+            //      anchor. On firmware without the ACR cap the integrator keeps
+            //      climbing past totalCharge while the charger tops off a pack
+            //      that is already full, so currentCharge >= totalCharge means
+            //      "stop".
+            const stillNeedsCharge = (slot: (typeof boardSlots)[number]) => {
+              if (!slot.needsCharging) return false;
+              const currentCharge = parseInt(slot.powerBankInfo?.currentCharge) || 0;
+              const totalCharge = parseInt(slot.powerBankInfo?.totalCharge) || 0;
+              if (totalCharge > 0 && currentCharge >= totalCharge) return false;
+              return true;
+            };
+
+            // First, keep a powerbank that is charging AND still needs to be
             for (const slot of boardSlots) {
               if (
                 slot.isPowerbankPresent &&
                 slot.powerBankInfo &&
-                slot.powerBankInfo.status === PB_STATUS_CHARGING
+                slot.powerBankInfo.status === PB_STATUS_CHARGING &&
+                stillNeedsCharge(slot)
               ) {
                 chargingSlotIndex = slot.slotIndex;
                 break;
@@ -423,6 +579,7 @@ export async function runS1TTXXSlots(): Promise<void> {
     const executionTime = endTime - startTime;
 
     const response: SlotsResponse = {
+      success: errors.length === 0,
       slots,
       errors,
       executionTimeMs: executionTime,
@@ -478,12 +635,16 @@ export function registerS1TTXXCommands(program: Command): void {
           logger.log(JSON.stringify(error, null, 2));
           await service.disconnect();
         } else {
-          // Check if slot is available
+          // Check if slot is available.
+          // Occupancy comes from the lock bitmap, the same source `slots`
+          // uses (see runS1TTXXSlots). It used to be read from the fill
+          // bitmap here, which made the two commands disagree about the same
+          // slot: a station that sets the fill bit on an empty slot produced
+          // `state: "empty"` with `isPowerbankPresent: true` in one object.
           const slotsInfo = JSON.parse(slotsResp.data.toString());
           isAvailable =
             slotsInfo.lockedSlots[slotMapping.slotInBoard] == SLOT_LOCKED;
-          const isPowerbankPresent =
-            slotsInfo.filledSlots[slotMapping.slotInBoard] === 1;
+          const isPowerbankPresent = isAvailable;
 
           // If slot is empty, return early with a clear response
           if (!isAvailable) {
@@ -518,7 +679,9 @@ export function registerS1TTXXCommands(program: Command): void {
               const powerLevel = calculatePowerLevel(
                 powerBankInfo?.currentCharge,
                 powerBankInfo?.totalCharge,
-                powerBankInfo?.cutoffCharge
+                powerBankInfo?.cutoffCharge,
+                powerBankInfo?.avgCapacity,
+                powerBankInfo?.status
               );
               const packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
@@ -539,6 +702,14 @@ export function registerS1TTXXCommands(program: Command): void {
                       powerBankInfo?.status,
                       packVoltageMv
                     ),
+                    // Raw telemetry CMD_STATUS already returned. It used to
+                    // be read only to compute powerLevel and then dropped,
+                    // which left every consumer recording zeros for it.
+                    timestamp: powerBankInfo?.timestamp,
+                    totalCharge: powerBankInfo?.totalCharge,
+                    currentCharge: powerBankInfo?.currentCharge,
+                    cutoffCharge: powerBankInfo?.cutoffCharge,
+                    cycles: powerBankInfo?.cycles,
                   },
                   isPowerbankPresent,
                   isCharging: powerBankInfo?.status === PB_STATUS_CHARGING,
@@ -698,7 +869,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--total-charge <mAh>",
-      "Total battery capacity in mAh (default: 13925)",
+      `Total battery capacity in mAh (default: ${DEFAULT_TOTAL_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -709,7 +880,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--current-charge <mAh>",
-      "Current battery charge in mAh (default: 11625)",
+      `Current battery charge in mAh (default: ${DEFAULT_CURRENT_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -720,7 +891,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--cutoff-charge <mAh>",
-      "Cutoff battery charge in mAh (default: 10625)",
+      `Cutoff battery charge in mAh (default: ${DEFAULT_CUTOFF_CHARGE_MAH})`,
       (value: string) => {
         const charge = parseInt(value);
         if (isNaN(charge) || charge < 0 || charge > 65535) {
@@ -750,16 +921,13 @@ export function registerS1TTXXCommands(program: Command): void {
 
         const serialNumber = options.id;
         const timestamp = Math.floor(Date.now() / 1000);
-        const cycles = options.cycles ? parseInt(options.cycles) : 0;
-        const totalCharge = options.totalCharge
-          ? parseInt(options.totalCharge)
-          : 13925;
-        const currentCharge = options.currentCharge
-          ? parseInt(options.currentCharge)
-          : 11625;
-        const cutoffCharge = options.cutoffCharge
-          ? parseInt(options.cutoffCharge)
-          : 10625;
+        // Forward only what the operator actually passed and let the command
+        // resolve the defaults. Resolving them here too is what made
+        // `--total-charge 0` lie: "0" is a truthy string, so this layer sent a
+        // numeric 0 and reported it, while the layer below treated that 0 as
+        // "not supplied" and wrote the default instead.
+        const optionalInt = (value: string | undefined): number | undefined =>
+          value === undefined ? undefined : parseInt(value);
 
         const port = await selectPort();
         const service = new SerialService(port);
@@ -773,17 +941,28 @@ export function registerS1TTXXCommands(program: Command): void {
           {
             serialNumber,
             timestamp,
-            cycles,
-            totalCharge,
-            currentCharge,
-            cutoffCharge,
+            cycles: optionalInt(options.cycles),
+            totalCharge: optionalInt(options.totalCharge),
+            currentCharge: optionalInt(options.currentCharge),
+            cutoffCharge: optionalInt(options.cutoffCharge),
           }
         );
 
         const endTime = Date.now();
         const executionTime = endTime - startTime;
 
+        const outcome = parseInitializeOutcome(response.data);
+        const requested = outcome?.written ?? null;
+
         if (response.success) {
+          // `powerbank` reports what the pack holds, read back after the
+          // write, not what was asked for: CMD_SET_INFO_* acknowledges that a
+          // command was accepted, never that the value landed intact. When the
+          // read-back itself fails, `verified` is false and the requested
+          // values are shown instead — flagged rather than passed off as
+          // confirmation. `requested` is kept alongside so the two can be
+          // compared; a small drift in currentCharge is the gauge, not a fault.
+          const verified = outcome?.verified ?? null;
           const result = {
             success: true,
             executionTimeMs: executionTime,
@@ -791,17 +970,27 @@ export function registerS1TTXXCommands(program: Command): void {
             slotIndex: parseInt(options.index),
             boardAddress: slotMapping.boardAddress,
             slotInBoard: slotMapping.slotInBoard,
+            verified: verified !== null,
+            verificationError: outcome?.verificationError ?? null,
             powerbank: {
-              serialNumber,
-              manufacturingTimestamp: timestamp,
-              cycles,
-              totalCharge,
-              currentCharge,
-              cutoffCharge,
+              serialNumber:
+                verified?.serial ?? requested?.serialNumber ?? serialNumber,
+              manufacturingTimestamp:
+                verified?.timestamp ??
+                requested?.manufacturingTimestamp ??
+                timestamp,
+              cycles: verified?.cycles ?? requested?.cycles ?? 0,
+              totalCharge: verified?.totalCharge ?? requested?.totalCharge,
+              currentCharge: verified?.currentCharge ?? requested?.currentCharge,
+              cutoffCharge: verified?.cutoffCharge ?? requested?.cutoffCharge,
             },
+            requested,
           };
           logger.log(JSON.stringify(result, null, 2));
         } else {
+          // Say which of the two writes landed. They commit separately, so
+          // "failed" on its own leaves the operator unable to tell a pack that
+          // was left untouched from one that was half-written.
           const result = {
             success: false,
             executionTimeMs: executionTime,
@@ -809,6 +998,10 @@ export function registerS1TTXXCommands(program: Command): void {
             slotIndex: parseInt(options.index),
             boardAddress: slotMapping.boardAddress,
             slotInBoard: slotMapping.slotInBoard,
+            failedStage: outcome?.stage ?? null,
+            batteryInfoWritten: outcome?.batteryInfoWritten ?? null,
+            powerbankInfoWritten: outcome?.powerbankInfoWritten ?? null,
+            requested,
             error: {
               code: response.status,
               message: getStatusMessage(response.status),
@@ -824,6 +1017,10 @@ export function registerS1TTXXCommands(program: Command): void {
         const executionTime = endTime - startTime;
 
         const slotMapping = mapSlotToBoard(parseInt(options.index));
+        // A refused request never reached the pack, so it can be reported as
+        // untouched. Anything else failed mid-flight, where the pack's state is
+        // genuinely unknown (null) — which is not the same as unchanged.
+        const refusedBeforeWriting = error instanceof NothingWrittenError;
         const result = {
           success: false,
           executionTimeMs: executionTime,
@@ -831,6 +1028,9 @@ export function registerS1TTXXCommands(program: Command): void {
           slotIndex: parseInt(options.index),
           boardAddress: slotMapping.boardAddress,
           slotInBoard: slotMapping.slotInBoard,
+          failedStage: refusedBeforeWriting ? "validation" : null,
+          batteryInfoWritten: refusedBeforeWriting ? false : null,
+          powerbankInfoWritten: refusedBeforeWriting ? false : null,
           error: {
             code: -1,
             message: error instanceof Error ? error.message : "Unknown error",
@@ -1065,7 +1265,7 @@ export function registerS1TTXXCommands(program: Command): void {
 
   // ---- Firmware-update (FWU) commands ---------------------------------
   //
-  // Three thin one-shot commands that exercise the Phase 3 bootloader
+  // Three thin one-shot commands that exercise the powerbank bootloader
   // protocol. They route by slot index just like `status`/`charge`.
   //
   //   enter-boot -i <index>   App -> ack + soft reset into the bootloader
@@ -1212,7 +1412,7 @@ export function registerS1TTXXCommands(program: Command): void {
 
   // ---- pb-firmware-update orchestrator ------------------------------
   //
-  // End-to-end Phase 5 flow: read the .bin, IEEE-802.3 CRC32 it,
+  // End-to-end flow: read the .bin, IEEE-802.3 CRC32 it,
   // PB_ENTER_BOOT → PB_FWU_HELLO → PB_FWU_BEGIN → loop PB_FWU_DATA →
   // PB_FWU_END → PB_FWU_EXIT. Honors RES_OFFSET_MISMATCH and falls back
   // to PB_FWU_ABORT on mid-stream failure so the slot is cleanly

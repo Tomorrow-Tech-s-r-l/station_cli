@@ -103,6 +103,13 @@ jobs:
           npm ci
         shell: bash
 
+      # Before the executable build so a logic regression fails as its own red
+      # step on every platform leg. `npm run build` also runs `npm test` first,
+      # so the gate holds even if this step is ever removed.
+      - name: Run logic tests
+        run: npm test
+        shell: bash
+
       - name: Build executable
         run: npm run ${{ matrix.build_script }}
         shell: bash

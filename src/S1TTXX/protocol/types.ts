@@ -59,7 +59,13 @@ export interface PowerbankInfo {
   // Pack voltage in mV (LTC2943 vtr). 0 = unknown or firmware too old.
   // Used to detect deeply-discharged packs (status==CUTOFF, vtr near 0V
   // typically means a tripped BMS that needs a recovery charge cycle).
+  // NOT sent by this S1TTXX-firmware build — see the note in status.ts.
+  // Always 0 here; kept in the type so existing callers don't break.
   packVoltageMv: number;
+  // Learned average full-charge capacity in mAh (flashData.avgCap on
+  // P1TT2C, BF-260512 adaptive-capacity fix). Tracks pack ageing; 0 on
+  // powerbank firmware that predates the field.
+  avgCapacity: number;
 }
 
 export interface PowerBankServer {
@@ -116,6 +122,15 @@ export interface SlotErrorInfo {
 }
 
 export interface SlotsResponse {
+  // True when the sweep completed with nothing to report: every board
+  // answered and every docked pack's status was read. False means `errors`
+  // is non-empty — `slots` is still populated and usable, so a consumer that
+  // wants the snapshot should read it and consult `errors` for what is
+  // missing, rather than discarding the whole response.
+  //
+  // Present so `slots` matches every other command, which all carry a
+  // top-level `success`; its absence cost each consumer a special case.
+  success: boolean;
   slots: SlotsInfo[];
   errors: SlotErrorInfo[];
   executionTimeMs: number;
