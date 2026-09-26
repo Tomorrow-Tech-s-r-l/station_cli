@@ -1,0 +1,71 @@
+{
+  "result": {
+    "success": false,
+    "imagePath": "image.bin",
+    "imageSize": 1000,
+    "imageCrc32": 2298615326,
+    "chunks": 4,
+    "retries": 0,
+    "blInfo": {
+      "blVersionMajor": 0,
+      "blVersionMinor": 1,
+      "appPresent": false,
+      "appVersion": 0,
+      "maxChunk": 32,
+      "pageSize": 1024,
+      "slotSize": 51200
+    },
+    "error": {
+      "stage": "FWU_DATA",
+      "code": 4,
+      "message": "DATA failed at offset 96"
+    }
+  },
+  "transcript": [
+    {
+      "board": 2,
+      "cmd": "0x66",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x60",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x61",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x62",
+      "data": "e80300001e16028900010300"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "00000000200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "2000000020e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "4000000020c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "6000000020a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a4968"
+    },
+    {
+      "board": 2,
+      "cmd": "0x65",
+      "data": ""
+    }
+  ]
+}
