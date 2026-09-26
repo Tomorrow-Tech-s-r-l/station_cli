@@ -63,6 +63,8 @@ const SCENARIOS = [
   { name: "image-too-large", faults: {}, slotSize: 512 },
   { name: "exit-not-acked", faults: { exitFails: true } },
   { name: "recovers-from-stuck-bootloader", faults: { startInBootloader: true } },
+  // F13: header invalid, so the device cannot leave its bootloader at all.
+  { name: "recovers-when-no-valid-app", faults: { noValidApp: true } },
 ];
 
 const KINDS = [
@@ -138,5 +140,19 @@ test("a failed run leaves the device without a valid header", async () => {
     const result = await k.run(device, writeImage(1000));
     assert.equal(result.success, false);
     assert.equal(device.headerVersion, null, `${k.kind}: header must stay erased after a failed flash`);
+  }
+});
+
+test("F13: a device stuck in its bootloader with no valid application is recovered", async () => {
+  // The state an interrupted flash leaves behind: header erased, so the
+  // bootloader cannot hand over to an application and rejects the app-side
+  // ENTER. The session must notice the bootloader is already listening and
+  // carry on, or the device can never be recovered without a programmer.
+  for (const k of KINDS) {
+    const device = k.device({ faults: { noValidApp: true } });
+    const result = await k.run(device, writeImage(1000));
+    assert.equal(result.success, true, `${k.kind}: ${JSON.stringify(result.error)}`);
+    assert.equal(device.mode, "app", `${k.kind} should boot its new application`);
+    assert.equal(device.appValid, true);
   }
 });

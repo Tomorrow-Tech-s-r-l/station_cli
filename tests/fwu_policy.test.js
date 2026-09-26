@@ -442,3 +442,59 @@ test("parseKinds defaults to both classes and accepts the usual aliases", () => 
 test("formatVersion round-trips a parsed version", () => {
   assert.equal(formatVersion(parseVersion("v10.2.30")), "10.2.30");
 });
+
+// ---------------------------------------------------------------------------
+// F13: recovery of devices stuck in their bootloader
+// ---------------------------------------------------------------------------
+
+const stuckBoard = () =>
+  iface(0, null, { reachable: false, version: null, versionRaw: null, inBootloader: true, error: "bootloader" });
+const stuckPack = (slotOverrides = {}) =>
+  pack(3, null, { powerLevel: null, powerbankId: null, ...slotOverrides }, {
+    reachable: false,
+    version: null,
+    versionRaw: null,
+    inBootloader: true,
+  });
+
+test("a board stuck in its bootloader is planned for recovery, not written off", () => {
+  const result = plan([stuckBoard()], [], { interface: candidate("interface", "1.1.0") });
+  const it = itemFor(result, "interface board 0");
+  assert.equal(it.update, true);
+  assert.equal(it.recovery, true);
+  assert.match(it.detail, /recovery/);
+});
+
+test("a stuck pack is recovered although its charge cannot be read", () => {
+  const result = plan([], [stuckPack()], { powerbank: candidate("powerbank", "1.1.0") });
+  assert.equal(itemFor(result, "powerbank slot 3").update, true);
+});
+
+test("recovery still honours a charge that IS known and too low", () => {
+  const result = plan([], [stuckPack({ powerLevel: 5 })], { powerbank: candidate("powerbank", "1.1.0") });
+  assert.equal(reasonFor(result, "powerbank slot 3"), "BATTERY_TOO_LOW");
+});
+
+test("recovery still refuses a pack that is not retained", () => {
+  const result = plan([], [stuckPack({ locked: false })], { powerbank: candidate("powerbank", "1.1.0") });
+  assert.equal(reasonFor(result, "powerbank slot 3"), "SLOT_UNLOCKED");
+});
+
+test("recovery needs a release like any other flash", () => {
+  const result = plan([stuckBoard()], [], { interface: null });
+  assert.equal(reasonFor(result, "interface board 0"), "NO_RELEASE");
+});
+
+test("a device that keeps failing recovery is quarantined", () => {
+  const state = emptyState();
+  const target = { kind: "interface", boardAddress: 0, slotIndex: null };
+  for (let i = 0; i < 3; i++) recordFailure(state, target, "1.1.0");
+  const result = plan([stuckBoard()], [], { interface: candidate("interface", "1.1.0") }, {}, state);
+  assert.equal(reasonFor(result, "interface board 0"), "QUARANTINED");
+});
+
+test("an unreachable device with no bootloader is still UNREACHABLE", () => {
+  const dead = iface(0, null, { reachable: false, version: null, versionRaw: null, error: "no answer" });
+  const result = plan([dead], [], { interface: candidate("interface", "1.1.0") });
+  assert.equal(reasonFor(result, "interface board 0"), "UNREACHABLE");
+});

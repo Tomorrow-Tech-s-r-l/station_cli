@@ -335,3 +335,78 @@ test("a quarantined device is skipped, and a fresh release lifts the quarantine"
   );
   assert.equal(report.results[0].success, true);
 });
+
+// --- F13: devices stuck in their bootloader -------------------------------
+
+test("F13: a board stuck in its bootloader is found and flashed back to life", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { noValidApp: true }, slots: [] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const inv = report.inventory.interfaces[0];
+  assert.equal(inv.inBootloader, true);
+  const it = item(report, "interface board 0");
+  assert.equal(it.update, true);
+  assert.equal(it.recovery, true, "planned as a recovery, not a routine update");
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [["interface board 0", true, "3.1.0"]]
+  );
+});
+
+test("F13: a pack stuck in its bootloader is recovered even though its charge cannot be read", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { faults: { noValidApp: true } })] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(report.inventory.powerbanks[0].inBootloader, true);
+  assert.equal(report.inventory.powerbanks[0].slot.powerLevel, null);
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [["powerbank slot 1", true, "3.0.4"]]
+  );
+});
+
+test("F13: a board with no bootloader either is still unreachable, and never flashed", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", dead: true, slots: [] } } });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(item(report, "interface board 0").skipReason, "UNREACHABLE");
+  assert.equal(report.results.length, 0);
+});
+
+test("F13: a recovery that keeps failing is quarantined like any other flash", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] }, gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0, maxFailures: 2 }) });
+  const faults = { noValidApp: true, corruptCrc: true };
+  for (let run = 0; run < 2; run++) {
+    await runEngine(new FakeStation({ boards: { 0: { version: "3.0.3", faults, slots: [] } } }), "S1TT30", opts);
+  }
+  const report = await runEngine(
+    new FakeStation({ boards: { 0: { version: "3.0.3", faults, slots: [] } } }),
+    "S1TT30",
+    opts
+  );
+  assert.equal(item(report, "interface board 0").skipReason, "QUARANTINED");
+});
+
+test("F5 + F13: an interrupted flash is counted, and the stranded device recovered, in one run", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const state = emptyState();
+  state.inFlight = {
+    target: { kind: "interface", boardAddress: 0, slotIndex: null },
+    version: "3.1.0",
+    startedAt: "2026-09-20T02:00:00.000Z",
+  };
+  saveState(opts.stateFile, state);
+
+  // What the interrupted flash left behind: a board with an erased header.
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { noValidApp: true }, slots: [] } },
+  });
+  const report = await runEngine(station, "S1TT30", opts);
+
+  assert.ok(report.warnings.some((w) => /interrupted while flashing interface board 0/.test(w)));
+  assert.equal(report.results[0].success, true, "and the board is running again");
+  const after = loadState(opts.stateFile);
+  assert.equal(after.inFlight, null);
+  assert.equal(after.quarantine["interface:board0"], undefined, "a success clears the failure");
+});

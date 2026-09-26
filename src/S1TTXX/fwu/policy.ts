@@ -107,7 +107,11 @@ export interface GateVerdict {
  * the pack or returned a different one. Sharing the function guarantees the
  * last-second check can never be laxer than the plan.
  */
-export function slotGateVerdict(slot: SlotCondition | undefined, gates: PolicyGates): GateVerdict | null {
+export function slotGateVerdict(
+  slot: SlotCondition | undefined,
+  gates: PolicyGates,
+  options: { recovery?: boolean } = {}
+): GateVerdict | null {
   if (!slot || !slot.present) {
     return { reason: "SLOT_EMPTY", detail: "no powerbank docked" };
   }
@@ -121,6 +125,13 @@ export function slotGateVerdict(slot: SlotCondition | undefined, gates: PolicyGa
     return { reason: "LOW_VOLTAGE", detail: "pack reports a low-voltage condition" };
   }
   if (slot.powerLevel === null) {
+    // A pack stuck in its bootloader cannot report its charge — STATUS is an
+    // application command. Refusing to flash it on that ground would leave it
+    // stuck for ever. And the usual reason for the floor does not apply: an
+    // application flash never writes the bootloader, so a brown-out mid-way
+    // leaves the pack exactly where it already is — in its bootloader, still
+    // recoverable. A charge that IS known and too low still blocks, below.
+    if (options.recovery) return null;
     return { reason: "BATTERY_UNKNOWN", detail: "state of charge could not be read" };
   }
   if (slot.powerLevel < gates.minBatteryPercent) {
@@ -247,16 +258,24 @@ function evaluate(
   //
   // Checked before the version comparison so an empty slot reports SLOT_EMPTY
   // rather than the UNREADABLE_VERSION that trivially follows from it.
+  // A device whose application is silent but whose bootloader answers has no
+  // valid application: an earlier flash was interrupted. It is flashed back to
+  // life (F13) — the version checks below do not apply, as there is no
+  // installed version to compare, but availability and quarantine still do.
+  const recovery = installed.inBootloader === true;
+
   if (installed.kind === "powerbank") {
-    const verdict = slotGateVerdict(installed.slot, gates);
+    const verdict = slotGateVerdict(installed.slot, gates, { recovery });
     if (verdict) return skip(verdict.reason, verdict.detail);
   }
 
   // --- Reachability and version readability -------------------------------
-  if (!installed.reachable) {
+  if (recovery) {
+    // handled below: reachable through its bootloader, no version to read
+  } else if (!installed.reachable) {
     return skip("UNREACHABLE", installed.error ?? "device did not answer");
   }
-  if (!installed.version) {
+  if (!installed.version && !recovery) {
     // Without a parseable installed version there is no way to tell an update
     // from a downgrade. `--force` is the deliberate escape hatch.
     if (!gates.force) {
@@ -284,7 +303,7 @@ function evaluate(
   }
 
   // --- Version comparison -------------------------------------------------
-  if (installed.version) {
+  if (installed.version && !recovery) {
     const delta = compareVersions(installed.version, candidate.version);
     if (delta === 0 && !gates.force) {
       return skip("UP_TO_DATE", `already on ${formatVersion(candidate.version)}`);
@@ -317,6 +336,15 @@ function evaluate(
     );
   }
 
+  if (recovery) {
+    return {
+      ...base,
+      update: true,
+      skipReason: null,
+      detail: "recovery: stuck in its bootloader with no valid application",
+      recovery: true,
+    };
+  }
   return { ...base, update: true, skipReason: null, detail: null };
 }
 

@@ -13,6 +13,8 @@ import {
 import { getMaximumBoardAddress } from "../../utils/model";
 import { parseVersion } from "./version";
 import { InstalledTarget, SlotCondition } from "./types";
+import { FwuWire } from "./session/wire";
+import { powerbankTarget, stationTarget } from "./session/target";
 
 /**
  * Reads what is actually installed and what physical condition each slot is
@@ -154,6 +156,7 @@ export async function readInterfaceVersion(
     const ok = response[2] === 0 && response.length > 3;
     if (!ok) {
       target.error = `Board did not return a version (status ${response[2]})`;
+      await probeBootloader(new FwuWire(service, stationTarget(boardAddress)), target);
       return target;
     }
     target.reachable = true;
@@ -164,9 +167,31 @@ export async function readInterfaceVersion(
     }
   } catch (e) {
     target.error = e instanceof Error ? e.message : String(e);
+    await probeBootloader(new FwuWire(service, stationTarget(boardAddress)), target);
   }
 
   return target;
+}
+
+/**
+ * Asks whether a bootloader is answering where the application is silent.
+ *
+ * HELLO is harmless to send to a running application — it is an unknown
+ * opcode there and simply rejected — and it changes nothing in a bootloader.
+ * A yes means the device has no valid application (the state an interrupted
+ * flash leaves behind) and can be recovered by flashing it (F13); without this
+ * probe it would be reported unreachable, run after run, forever.
+ */
+async function probeBootloader(wire: FwuWire, target: InstalledTarget): Promise<void> {
+  try {
+    const hello = await wire.hello();
+    if (hello.success && hello.data.length > 0) {
+      target.inBootloader = true;
+      target.error = "application not running; bootloader answering (no valid application)";
+    }
+  } catch {
+    // no bootloader either: genuinely unreachable
+  }
 }
 
 /**
@@ -284,6 +309,7 @@ async function enrichWithPackVersion(
     target.status = r.status;
     if (!r.success || !r.info) {
       target.error = `Powerbank did not return a version (status ${r.status})`;
+      await probeBootloader(new FwuWire(service, powerbankTarget(boardAddress, slotInBoard)), target);
       return;
     }
     target.reachable = true;

@@ -344,7 +344,7 @@ export async function runEngine(
     // F4: the plan is minutes old. Re-check the pack with the plan's own gates.
     if (item.target.kind === "powerbank") {
       const planned = packByslot.get(item.target.slotIndex as number);
-      const verdict = await reverifyPowerbank(service, item, planned, opts.gates);
+      const verdict = await reverifyPowerbank(service, item, planned, opts.gates, item.recovery === true);
       if (verdict) {
         skipAtApply(item, "SLOT_CHANGED", `${verdict.reason}: ${verdict.detail}`);
         continue;
@@ -420,7 +420,8 @@ async function reverifyPowerbank(
   service: SerialService,
   item: PlanItem,
   planned: InstalledTarget | undefined,
-  gates: PolicyGates
+  gates: PolicyGates,
+  recovery: boolean
 ): Promise<GateVerdict | null> {
   const mapping = mapSlotToBoard(item.target.slotIndex as number);
   let now;
@@ -431,7 +432,7 @@ async function reverifyPowerbank(
   }
   if (!now) return { reason: "UNREACHABLE", detail: "board did not answer the re-check" };
 
-  const verdict = slotGateVerdict(now, gates);
+  const verdict = slotGateVerdict(now, gates, { recovery });
   if (verdict) return verdict;
 
   const plannedId = planned?.slot?.powerbankId ?? null;

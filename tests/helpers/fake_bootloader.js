@@ -23,6 +23,9 @@
  *   exitFails         the bootloader does not acknowledge EXIT
  *   slotSize          advertise a smaller application slot than the image
  *   startInBootloader the device is already stuck in its bootloader
+ *   noValidApp        the application header is invalid (an earlier flash was
+ *                     interrupted), so the device cannot leave its bootloader
+ *                     until a new image is written
  */
 
 const STATUS_OK = 0x00;
@@ -57,7 +60,10 @@ class FakeBootloaderDevice {
     this.maxChunk = opts.maxChunk ?? 32;
     this.faults = opts.faults ?? {};
 
-    this.mode = this.faults.startInBootloader ? "bl" : "app";
+    this.mode = this.faults.startInBootloader || this.faults.noValidApp ? "bl" : "app";
+    // Whether the application header is valid. A real bootloader boots the
+    // application after EXIT only if it is; otherwise it stays put.
+    this.appValid = !this.faults.noValidApp;
     this.session = null;
     this.dataCalls = 0;
     this.headerVersion = null;
@@ -90,7 +96,9 @@ class FakeBootloaderDevice {
     switch (step) {
       case STEP.EXIT:
         if (this.mode !== "bl" || this.faults.exitFails) return reply(STATUS_ERR_INVALID_CMD);
-        this.mode = "app";
+        // Acknowledged either way; after the reset the bootloader only hands
+        // over to an application whose header is valid.
+        this.mode = this.appValid ? "app" : "bl";
         this.session = null;
         return reply(STATUS_OK);
 
@@ -128,6 +136,7 @@ class FakeBootloaderDevice {
         // Real bootloaders erase the header on BEGIN: until END succeeds the
         // device has no valid application.
         this.headerVersion = null;
+        this.appValid = false;
         return reply(STATUS_OK);
       }
 
@@ -166,6 +175,7 @@ class FakeBootloaderDevice {
           return reply(STATUS_ERR_INTERNAL);
         }
         this.headerVersion = s.version;
+        this.appValid = true;
         this.session = null;
         return reply(STATUS_OK);
       }

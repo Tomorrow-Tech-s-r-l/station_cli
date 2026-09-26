@@ -107,16 +107,30 @@ export async function runFwuSession(
   await sleep(RESET_SETTLE_MS);
 
   // ------- Step 1: ENTER ---------------------------------------------
+  //
+  // ENTER is an application-side command. A device whose application header
+  // is invalid — the state any interrupted flash leaves behind — cannot run
+  // its application at all: the pre-flight EXIT resets it straight back into
+  // its bootloader, which rejects ENTER. That device is exactly the one most
+  // in need of a flash, and its bootloader is already listening. So when
+  // ENTER is refused, ask the bootloader directly: if HELLO is answered, carry
+  // on from there (F13). If not, fail exactly as before, with ENTER's status.
   log(`${label.enter} (${target.addressLabel})`);
   const enter = await wire.enter();
-  if (!enter.success) {
-    return fail({ stage: stages.enter, code: enter.status, message: "App did not ack" });
+  let hello;
+  if (enter.success) {
+    await sleep(RESET_SETTLE_MS);
+    // ------- Step 2: HELLO -------------------------------------------
+    log(label.hello);
+    hello = await wire.hello();
+  } else {
+    log(`${label.enter} refused — probing for a bootloader that is already listening`);
+    hello = await wire.hello();
+    if (!hello.success || hello.data.length === 0) {
+      return fail({ stage: stages.enter, code: enter.status, message: "App did not ack" });
+    }
+    log("bootloader already active (no valid application?) — recovering");
   }
-  await sleep(RESET_SETTLE_MS);
-
-  // ------- Step 2: HELLO ---------------------------------------------
-  log(label.hello);
-  const hello = await wire.hello();
   if (!hello.success || hello.data.length === 0) {
     return fail({
       stage: stages.hello,

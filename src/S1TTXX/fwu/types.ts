@@ -46,6 +46,12 @@ export interface InstalledTarget extends TargetRef {
   slot?: SlotCondition;
   /** Why the version could not be read, when `reachable` is false. */
   error: string | null;
+  /**
+   * The application did not answer but the bootloader did: the device has no
+   * valid application — the state an interrupted flash leaves behind — and is
+   * planned for a recovery flash rather than written off as unreachable.
+   */
+  inBootloader?: boolean;
 }
 
 /**
@@ -124,8 +130,13 @@ export interface PlanItem {
   update: boolean;
   /** Set when `update` is false. */
   skipReason: SkipReason | null;
-  /** Free-text detail for the skip, e.g. the measured battery level. */
+  /**
+   * Free-text detail: for a skip, why (e.g. the measured battery level); for a
+   * recovery flash, what state the device was found in.
+   */
   detail: string | null;
+  /** True when this update rescues a device stuck in its bootloader. */
+  recovery?: boolean;
 }
 
 /** Full plan: everything the engine looked at, with a verdict per target. */
