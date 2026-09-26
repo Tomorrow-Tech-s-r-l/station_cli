@@ -1,6 +1,10 @@
 import { BaseCommand } from "./base";
-import { SerialMessage, CommandResponse } from "../../protocol/types";
-import { CMD_FWU_ABORT_CODE } from "../../../utils/constants";
+import { CommandResponse } from "../../protocol/types";
+import { FwuWire } from "../../fwu/session/wire";
+import { stationTarget } from "../../fwu/session/target";
+
+// Thin wrapper over FwuWire (fwu/session/wire.ts). Behaviour pinned by
+// tests/golden/fwu/ and tests/fwu_wire_validation.test.js.
 
 /**
  * CMD_FWU_ABORT (0x65): bootloader-side. Tears down the active
@@ -11,11 +15,6 @@ import { CMD_FWU_ABORT_CODE } from "../../../utils/constants";
  */
 export class FwuAbortCommand extends BaseCommand {
   async execute(boardAddress: number): Promise<CommandResponse> {
-    const message: SerialMessage = {
-      boardAddress,
-      command: CMD_FWU_ABORT_CODE,
-      data: Buffer.alloc(0),
-    };
-    return this.executeCommand(message);
+    return new FwuWire(this.serialService, stationTarget(boardAddress)).abort();
   }
 }
