@@ -103,10 +103,17 @@ jobs:
           npm ci
         shell: bash
 
-      # The one leg that gates behaviour. The tests need no hardware — they
-      # drive in-memory fake devices through the real firmware-update code —
-      # so they run on the build box like any other step. A failure fails this
-      # leg, and the release job below needs every leg, so nothing ships.
+      # Before the executable build so a logic regression fails as its own red
+      # step on every platform leg. `npm run build` also runs `npm test` first,
+      # so the gate holds even if this step is ever removed.
+      - name: Run logic tests
+        run: npm test
+        shell: bash
+
+      # The firmware-update and config tests (tests/*.test.js), on the Linux
+      # leg. They need no hardware — they drive in-memory fake devices through
+      # the real firmware-update code. A failure fails this leg, and the
+      # release job below needs every leg, so nothing ships.
       # Also re-checks that no workflow exposes a self-hosted runner to a
       # fork-controllable trigger (see CONTRIBUTING.md).
       - name: Test (Linux x64)
