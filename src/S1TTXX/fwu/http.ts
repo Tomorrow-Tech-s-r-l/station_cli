@@ -2,6 +2,8 @@ import * as https from "node:https";
 import * as fs from "node:fs";
 import { URL } from "node:url";
 
+import { Secret } from "../../config/secret";
+
 /**
  * Minimal HTTPS helpers for the firmware catalog.
  *
@@ -15,11 +17,26 @@ const USER_AGENT = "amperry-station-cli";
 const MAX_REDIRECTS = 5;
 
 export interface HttpOptions {
-  /** GitHub token. Sent only to api.github.com / *.github.com hosts. */
-  token?: string | null;
+  /**
+   * GitHub credential. Sent only to GitHub's own API hosts, and revealed only
+   * at the moment the header is built. A plain string is accepted for tests.
+   */
+  token?: Secret | string | null;
   /** Value for the Accept header. */
   accept?: string;
+  /** Socket idle timeout: fires when no bytes arrive for this long. */
   timeoutMs?: number;
+  /**
+   * Wall-clock ceiling on the whole request, redirects included. The idle
+   * timeout alone cannot stop a link that trickles a byte every few seconds
+   * forever; this can.
+   */
+  deadlineMs?: number;
+}
+
+function tokenValue(token: HttpOptions["token"]): string | null {
+  if (!token) return null;
+  return typeof token === "string" ? token : token.reveal();
 }
 
 export class HttpError extends Error {
@@ -75,8 +92,9 @@ function request(
       "User-Agent": USER_AGENT,
       Accept: opts.accept ?? "application/vnd.github+json",
     };
-    if (opts.token && isGitHubApiHost(parsed.hostname)) {
-      headers.Authorization = `Bearer ${opts.token}`;
+    const token = tokenValue(opts.token);
+    if (token && isGitHubApiHost(parsed.hostname)) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
     const req = https.get(
@@ -143,15 +161,28 @@ function request(
   });
 }
 
+/** Applies `opts.deadlineMs` to a request, if set. */
+function withDeadline<T>(p: Promise<T>, opts: HttpOptions, url: string): Promise<T> {
+  if (!opts.deadlineMs) return p;
+  let timer: NodeJS.Timeout;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Request exceeded ${Math.round(opts.deadlineMs! / 1000)}s deadline: ${url}`)),
+      opts.deadlineMs
+    );
+  });
+  return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
+}
+
 /** GETs `url` and parses the body as JSON. */
 export async function httpGetJson<T>(url: string, opts: HttpOptions = {}): Promise<T> {
-  const res = await request(url, opts, MAX_REDIRECTS);
+  const res = await withDeadline(request(url, opts, MAX_REDIRECTS), opts, url);
   return JSON.parse(res.body.toString("utf8")) as T;
 }
 
 /** GETs `url` and returns the raw body. */
 export async function httpGetBuffer(url: string, opts: HttpOptions = {}): Promise<Buffer> {
-  const res = await request(url, opts, MAX_REDIRECTS);
+  const res = await withDeadline(request(url, opts, MAX_REDIRECTS), opts, url);
   return res.body;
 }
 
@@ -171,7 +202,11 @@ export async function httpDownloadToFile(
   await fs.promises.rm(tmpPath, { force: true });
   const sink = fs.createWriteStream(tmpPath);
   try {
-    await request(url, { ...opts, accept: opts.accept ?? "application/octet-stream" }, MAX_REDIRECTS, sink);
+    await withDeadline(
+      request(url, { ...opts, accept: opts.accept ?? "application/octet-stream" }, MAX_REDIRECTS, sink),
+      opts,
+      url
+    );
   } catch (e) {
     sink.destroy();
     await fs.promises.rm(tmpPath, { force: true });

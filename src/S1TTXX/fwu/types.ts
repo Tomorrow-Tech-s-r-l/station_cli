@@ -82,6 +82,8 @@ export interface ReleaseCandidate {
   assetSizeBytes: number;
   /** Minimum station-cli version this firmware requires, when declared. */
   minCliVersion: Version | null;
+  /** `sha256:<hex>` digest GitHub reports for the asset, when it reports one. */
+  digest: string | null;
 }
 
 /** Why a target was excluded from the plan. Stable, greppable tokens. */
@@ -100,7 +102,15 @@ export type SkipReason =
   | "VERSION_OVERFLOW"
   | "QUARANTINED"
   | "FILTERED_OUT"
-  | "MAX_TARGETS_REACHED";
+  | "MAX_TARGETS_REACHED"
+  /** No firmware source is configured for this device class. */
+  | "NO_SOURCE"
+  /** The interface board this pack is docked in failed its own update this run. */
+  | "BOARD_UPDATE_FAILED"
+  /** The slot changed between planning and flashing (pack removed, swapped, or drained). */
+  | "SLOT_CHANGED"
+  /** The run reached its time budget before this device's turn. */
+  | "DEADLINE_REACHED";
 
 /** One decided item: either an update to perform or a documented skip. */
 export interface PlanItem {
@@ -162,8 +172,21 @@ export interface QuarantineEntry {
   lastFailedVersion: string;
 }
 
+/**
+ * Written before a device is flashed and cleared after, so a run killed
+ * mid-flash still leaves a record. The next run — which holds the firmware
+ * lock, so cannot be racing the old one — counts it as a failure.
+ */
+export interface InFlightEntry {
+  target: TargetRef;
+  version: string;
+  startedAt: string;
+}
+
 /** Shape of the engine's on-disk state file. */
 export interface EngineState {
   version: 1;
   quarantine: Record<string, QuarantineEntry>;
+  /** Present only while a flash is underway, or after one was interrupted. */
+  inFlight?: InFlightEntry | null;
 }

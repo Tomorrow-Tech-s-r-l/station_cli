@@ -170,6 +170,40 @@ export async function readInterfaceVersion(
 }
 
 /**
+ * Re-reads one docked pack's physical condition, using exactly the same reads
+ * the inventory used: occupancy and retention from SLOTS, then charge, voltage
+ * and serial from STATUS.
+ *
+ * The engine calls this immediately before flashing a pack, because the plan
+ * was built minutes earlier and a customer may have taken the pack or returned
+ * a different one since. Returns null when the board does not answer.
+ */
+export async function readPowerbankCondition(
+  service: SerialService,
+  boardAddress: number,
+  slotInBoard: number
+): Promise<SlotCondition | null> {
+  const conditions = await readSlotConditions(service, boardAddress, []);
+  if (!conditions) return null;
+  const slot = { ...conditions[slotInBoard] };
+  if (!slot.present) return slot;
+  const probe: InstalledTarget = {
+    kind: "powerbank",
+    boardAddress,
+    slotIndex: null,
+    name: null,
+    versionRaw: null,
+    version: null,
+    status: -1,
+    reachable: false,
+    slot,
+    error: null,
+  };
+  await enrichWithPackStatus(service, boardAddress, slotInBoard, probe);
+  return probe.slot ?? slot;
+}
+
+/**
  * Reads occupancy and retention for a board's six slots.
  *
  * Returns null when the board does not answer; the caller treats that as "no

@@ -5,6 +5,7 @@ import {
   PlanItem,
   ReleaseCandidate,
   SkipReason,
+  SlotCondition,
   TargetKind,
   TargetRef,
   UpdatePlan,
@@ -84,6 +85,54 @@ export interface PlanInput {
   gates: PolicyGates;
   state: EngineState;
   warnings?: string[];
+  /**
+   * Whether a firmware source is configured per device class. A class marked
+   * false reports NO_SOURCE instead of NO_RELEASE, which tells an operator the
+   * fix is configuration rather than a missing release. Omitted means configured.
+   */
+  sourceConfigured?: Partial<Record<TargetKind, boolean>>;
+}
+
+/** A gate verdict: why a device must not be flashed, or null to proceed. */
+export interface GateVerdict {
+  reason: SkipReason;
+  detail: string;
+}
+
+/**
+ * The physical safety gates for a powerbank, in one place.
+ *
+ * Used twice: once when the plan is built, and again immediately before each
+ * pack is flashed — minutes later, by which time a customer may have taken
+ * the pack or returned a different one. Sharing the function guarantees the
+ * last-second check can never be laxer than the plan.
+ */
+export function slotGateVerdict(slot: SlotCondition | undefined, gates: PolicyGates): GateVerdict | null {
+  if (!slot || !slot.present) {
+    return { reason: "SLOT_EMPTY", detail: "no powerbank docked" };
+  }
+  if (!slot.locked) {
+    // A slot mid-eject is about to lose pogo contact. Starting a flash here
+    // would drop the link between BEGIN and END and leave the pack's app
+    // header erased — i.e. a pack that only boots to its bootloader.
+    return { reason: "SLOT_UNLOCKED", detail: "slot is not retaining the pack (mid-eject?)" };
+  }
+  if (slot.lowVoltage) {
+    return { reason: "LOW_VOLTAGE", detail: "pack reports a low-voltage condition" };
+  }
+  if (slot.powerLevel === null) {
+    return { reason: "BATTERY_UNKNOWN", detail: "state of charge could not be read" };
+  }
+  if (slot.powerLevel < gates.minBatteryPercent) {
+    // The pack runs its own MCU off the cell during the flash; a brown-out
+    // mid-write is the one failure the bootloader cannot recover from
+    // unattended.
+    return {
+      reason: "BATTERY_TOO_LOW",
+      detail: `${slot.powerLevel}% < required ${gates.minBatteryPercent}%`,
+    };
+  }
+  return null;
 }
 
 /**
@@ -132,19 +181,29 @@ export function buildPlan(input: PlanInput): UpdatePlan {
   for (const i of interfaces) consider(i);
   for (const p of powerbanks) consider(p);
 
-  const toUpdate = items.filter((i) => i.update);
   return {
     channel: gates.channel,
     cliVersion: formatVersion(gates.cliVersion),
     items,
-    summary: {
-      total: items.length,
-      toUpdate: toUpdate.length,
-      skipped: items.length - toUpdate.length,
-      interfaceToUpdate: toUpdate.filter((i) => i.target.kind === "interface").length,
-      powerbankToUpdate: toUpdate.filter((i) => i.target.kind === "powerbank").length,
-    },
+    summary: summarizeItems(items),
     warnings,
+  };
+}
+
+/**
+ * Counts for a list of plan items. Exported because the engine recomputes the
+ * summary after a run, when items skipped at the last second (slot changed,
+ * board failed, deadline) have been re-marked — so the printed plan stays
+ * internally consistent.
+ */
+export function summarizeItems(items: PlanItem[]): UpdatePlan["summary"] {
+  const toUpdate = items.filter((i) => i.update);
+  return {
+    total: items.length,
+    toUpdate: toUpdate.length,
+    skipped: items.length - toUpdate.length,
+    interfaceToUpdate: toUpdate.filter((i) => i.target.kind === "interface").length,
+    powerbankToUpdate: toUpdate.filter((i) => i.target.kind === "powerbank").length,
   };
 }
 
@@ -189,31 +248,8 @@ function evaluate(
   // Checked before the version comparison so an empty slot reports SLOT_EMPTY
   // rather than the UNREADABLE_VERSION that trivially follows from it.
   if (installed.kind === "powerbank") {
-    const slot = installed.slot;
-    if (!slot || !slot.present) {
-      return skip("SLOT_EMPTY", "no powerbank docked");
-    }
-    if (!slot.locked) {
-      // A slot mid-eject is about to lose pogo contact. Starting a flash here
-      // would drop the link between BEGIN and END and leave the pack's app
-      // header erased — i.e. a pack that only boots to its bootloader.
-      return skip("SLOT_UNLOCKED", "slot is not retaining the pack (mid-eject?)");
-    }
-    if (slot.lowVoltage) {
-      return skip("LOW_VOLTAGE", "pack reports a low-voltage condition");
-    }
-    if (slot.powerLevel === null) {
-      return skip("BATTERY_UNKNOWN", "state of charge could not be read");
-    }
-    if (slot.powerLevel < gates.minBatteryPercent) {
-      // The pack runs its own MCU off the cell during the flash; a brown-out
-      // mid-write is the one failure the bootloader cannot recover from
-      // unattended.
-      return skip(
-        "BATTERY_TOO_LOW",
-        `${slot.powerLevel}% < required ${gates.minBatteryPercent}%`
-      );
-    }
+    const verdict = slotGateVerdict(installed.slot, gates);
+    if (verdict) return skip(verdict.reason, verdict.detail);
   }
 
   // --- Reachability and version readability -------------------------------
@@ -230,6 +266,12 @@ function evaluate(
 
   // --- Availability -------------------------------------------------------
   if (!candidate) {
+    if (input.sourceConfigured?.[installed.kind] === false) {
+      return skip(
+        "NO_SOURCE",
+        `no firmware source configured for ${installed.kind} devices (set firmware.sources.${installed.kind})`
+      );
+    }
     return skip("NO_RELEASE", `no ${gates.channel} release offers an image for this device`);
   }
   if (overflowsHeaderWord(candidate.version)) {

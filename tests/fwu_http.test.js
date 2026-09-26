@@ -205,7 +205,7 @@ test("ensureImage rejects a body shorter than the size GitHub reported", suite, 
             assetSizeBytes: IMAGE.length,
             minCliVersion: null,
           },
-          { channel: "stable", token: null, cliVersion: [0, 4, 0], cacheDir, warnings: [] }
+          { channel: "stable", sources: {}, token: null, cliVersion: [0, 4, 0], cacheDir, cacheKeepPerKind: 2, warnings: [] }
         ),
       /refusing to flash a partial image/
     );
@@ -235,7 +235,7 @@ test("ensureImage rejects an empty body", suite, async () => {
             assetSizeBytes: 0,
             minCliVersion: null,
           },
-          { channel: "stable", token: null, cliVersion: [0, 4, 0], cacheDir, warnings: [] }
+          { channel: "stable", sources: {}, token: null, cliVersion: [0, 4, 0], cacheDir, cacheKeepPerKind: 2, warnings: [] }
         ),
       /is empty/
     );
@@ -260,15 +260,17 @@ test("ensureImage rejects a body whose digest does not match", suite, async () =
       assetUrl: `${s.origin}/asset`,
       assetSizeBytes: 0, // unknown size, so only the digest can catch this
       minCliVersion: null,
-      __digest: `sha256:${IMAGE_SHA}`,
+      digest: `sha256:${IMAGE_SHA}`,
     };
     await assert.rejects(
       () =>
         ensureImage(candidate, {
           channel: "stable",
+          sources: {},
           token: null,
           cliVersion: [0, 4, 0],
           cacheDir,
+          cacheKeepPerKind: 2,
           warnings: [],
         }),
       /does not match the digest/
@@ -297,13 +299,15 @@ test("a verified image is cached and the second run does not re-download", suite
       assetUrl: `${s.origin}/asset`,
       assetSizeBytes: IMAGE.length,
       minCliVersion: null,
-      __digest: `sha256:${IMAGE_SHA}`,
+      digest: `sha256:${IMAGE_SHA}`,
     };
     const opts = {
       channel: "stable",
+      sources: {},
       token: null,
       cliVersion: [0, 4, 0],
       cacheDir,
+      cacheKeepPerKind: 2,
       warnings: [],
     };
 
@@ -338,7 +342,7 @@ test("a cached file of the wrong size is discarded and re-fetched", suite, async
       assetSizeBytes: IMAGE.length,
       minCliVersion: null,
     };
-    const opts = { channel: "stable", token: null, cliVersion: [0, 4, 0], cacheDir, warnings: [] };
+    const opts = { channel: "stable", sources: {}, token: null, cliVersion: [0, 4, 0], cacheDir, cacheKeepPerKind: 2, warnings: [] };
 
     // Plant a stale, truncated file where the cache expects the image.
     const cachePath = path.join(

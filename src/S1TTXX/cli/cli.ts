@@ -46,7 +46,7 @@ import { FwuHelloCommand, FwuHelloInfo } from "./commands/fwu_hello";
 import { FwuEnterCommand } from "./commands/fwu_enter";
 import { FwuExitCommand } from "./commands/fwu_exit";
 import { PbFirmwareCommand } from "./commands/pb_firmware";
-import { registerFwuCommands } from "./commands/fwu_commands";
+import { registerFwuCommands, withFirmwareLock } from "./commands/fwu_commands";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
@@ -1276,14 +1276,18 @@ export function registerS1TTXXCommands(program: Command): void {
           const service = new SerialService(port);
           await service.connect();
 
-          const r = await runPbFirmwareUpdate(service, {
-            boardAddress: slotMapping.boardAddress,
-            slotInBoard: slotMapping.slotInBoard,
-            imagePath: options.image,
-            version,
-            verbose: options.verbose === true,
-            interChunkDelayMs,
-          });
+          // Held for the flash so the kiosk app stands down instead of
+          // killing this process when it finds the serial port busy.
+          const r = await withFirmwareLock(`pb-firmware-update -i ${index}`, () =>
+            runPbFirmwareUpdate(service, {
+              boardAddress: slotMapping.boardAddress,
+              slotInBoard: slotMapping.slotInBoard,
+              imagePath: options.image as string,
+              version,
+              verbose: options.verbose === true,
+              interChunkDelayMs,
+            })
+          );
 
           const out = {
             success: r.success,
@@ -1537,13 +1541,17 @@ export function registerS1TTXXCommands(program: Command): void {
         const service = new SerialService(port);
         await service.connect();
 
-        const r = await runStationFirmwareUpdate(service, {
-          boardAddress,
-          imagePath: options.image,
-          version,
-          verbose: options.verbose === true,
-          interChunkDelayMs,
-        });
+        // Held for the flash so the kiosk app stands down instead of
+        // killing this process when it finds the serial port busy.
+        const r = await withFirmwareLock(`firmware-update -b ${boardAddress}`, () =>
+          runStationFirmwareUpdate(service, {
+            boardAddress,
+            imagePath: options.image as string,
+            version,
+            verbose: options.verbose === true,
+            interChunkDelayMs,
+          })
+        );
 
         const out = {
           success: r.success,
