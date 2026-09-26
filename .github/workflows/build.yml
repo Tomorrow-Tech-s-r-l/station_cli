@@ -103,6 +103,19 @@ jobs:
           npm ci
         shell: bash
 
+      # The one leg that gates behaviour. The tests need no hardware — they
+      # drive in-memory fake devices through the real firmware-update code —
+      # so they run on the build box like any other step. A failure fails this
+      # leg, and the release job below needs every leg, so nothing ships.
+      # Also re-checks that no workflow exposes a self-hosted runner to a
+      # fork-controllable trigger (see CONTRIBUTING.md).
+      - name: Test (Linux x64)
+        if: matrix.os == 'linux-x64'
+        run: |
+          node scripts/check-workflows.js
+          npm run test:unit
+        shell: bash
+
       - name: Build executable
         run: npm run ${{ matrix.build_script }}
         shell: bash
