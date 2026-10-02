@@ -23,6 +23,7 @@ import {
 } from "./utils/model";
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 import { convertFrame } from "./S1TTXX/cli/commands/convert";
+import { registerConfigCommands } from "./config/cli";
 
 // Parse optional positional mode token before any command.
 // Accepted: S1TT30 (default), S1TT6, S0TT6, S0TT12, S0TT18
@@ -79,6 +80,8 @@ process.on("SIGTERM", () => {
 // Register commands from both device types
 registerS1TTXXCommands(program);
 registerS0TTXXCommands(program);
+// Model-independent: inspects the layered configuration (src/config).
+registerConfigCommands(program);
 
 // Unified routed commands
 interface RoutedOptions {

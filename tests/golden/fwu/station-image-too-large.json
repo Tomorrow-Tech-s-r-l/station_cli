@@ -1,0 +1,40 @@
+{
+  "result": {
+    "success": false,
+    "imagePath": "image.bin",
+    "imageSize": 1000,
+    "imageCrc32": 2298615326,
+    "chunks": 0,
+    "retries": 0,
+    "blInfo": {
+      "blVersionMajor": 0,
+      "blVersionMinor": 1,
+      "appPresent": false,
+      "appVersion": 0,
+      "maxChunk": 32,
+      "pageSize": 1024,
+      "slotSize": 512
+    },
+    "error": {
+      "stage": "FWU_HELLO",
+      "message": "Image too large: 1000 B > slot 512 B"
+    }
+  },
+  "transcript": [
+    {
+      "board": 2,
+      "cmd": "0x66",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x60",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x61",
+      "data": ""
+    }
+  ]
+}

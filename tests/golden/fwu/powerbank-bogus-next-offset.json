@@ -1,0 +1,66 @@
+{
+  "result": {
+    "success": false,
+    "imagePath": "image.bin",
+    "imageSize": 1000,
+    "imageCrc32": 2298615326,
+    "chunks": 3,
+    "retries": 0,
+    "blInfo": {
+      "blVersionMajor": 0,
+      "blVersionMinor": 1,
+      "appPresent": false,
+      "appVersion": 0,
+      "maxChunk": 32,
+      "pageSize": 1024,
+      "slotSize": 51200
+    },
+    "error": {
+      "stage": "PB_FWU_DATA",
+      "code": 0,
+      "message": "Powerbank returned next_expected_offset=4294967295 > imageSize=1000 (V-19)"
+    }
+  },
+  "transcript": [
+    {
+      "board": 2,
+      "cmd": "0x16",
+      "data": "04"
+    },
+    {
+      "board": 2,
+      "cmd": "0x10",
+      "data": "04"
+    },
+    {
+      "board": 2,
+      "cmd": "0x11",
+      "data": "04"
+    },
+    {
+      "board": 2,
+      "cmd": "0x12",
+      "data": "04e80300001e16028904000300"
+    },
+    {
+      "board": 2,
+      "cmd": "0x13",
+      "data": "0400000000200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x13",
+      "data": "042000000020e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x13",
+      "data": "044000000020c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988"
+    },
+    {
+      "board": 2,
+      "cmd": "0x15",
+      "data": "04"
+    }
+  ]
+}

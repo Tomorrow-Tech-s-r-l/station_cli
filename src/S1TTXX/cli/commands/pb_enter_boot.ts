@@ -1,9 +1,10 @@
 import { BaseCommand } from "./base";
-import { SerialMessage, CommandResponse } from "../../protocol/types";
-import {
-  CMD_PB_ENTER_BOOT_CODE,
-  MAXIMUM_SLOT_ADDRESS,
-} from "../../../utils/constants";
+import { CommandResponse } from "../../protocol/types";
+import { FwuWire } from "../../fwu/session/wire";
+import { powerbankTarget } from "../../fwu/session/target";
+
+// Thin wrapper over FwuWire (fwu/session/wire.ts). Behaviour pinned by
+// tests/golden/fwu/ and tests/fwu_wire_validation.test.js.
 
 /**
  * CMD_PB_ENTER_BOOT (0x10): app-side opcode. Tells the running powerbank
@@ -17,22 +18,7 @@ import {
  * unresponsive for ~30 ms while it resets into the bootloader.
  */
 export class PbEnterBootCommand extends BaseCommand {
-  async execute(
-    boardAddress: number,
-    slotAddress: number
-  ): Promise<CommandResponse> {
-    if (slotAddress < 0 || slotAddress > MAXIMUM_SLOT_ADDRESS) {
-      throw new Error(
-        `Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
-      );
-    }
-
-    const message: SerialMessage = {
-      boardAddress,
-      command: CMD_PB_ENTER_BOOT_CODE,
-      data: Buffer.from([slotAddress]),
-    };
-
-    return this.executeCommand(message);
+  async execute(boardAddress: number, slotAddress: number): Promise<CommandResponse> {
+    return new FwuWire(this.serialService, powerbankTarget(boardAddress, slotAddress)).enter();
   }
 }

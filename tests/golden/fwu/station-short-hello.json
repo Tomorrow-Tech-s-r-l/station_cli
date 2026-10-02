@@ -1,0 +1,32 @@
+{
+  "result": {
+    "success": false,
+    "imagePath": "image.bin",
+    "imageSize": 1000,
+    "imageCrc32": 2298615326,
+    "chunks": 0,
+    "retries": 0,
+    "blInfo": null,
+    "error": {
+      "stage": "FWU_HELLO",
+      "message": "Malformed HELLO payload"
+    }
+  },
+  "transcript": [
+    {
+      "board": 2,
+      "cmd": "0x66",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x60",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x61",
+      "data": ""
+    }
+  ]
+}

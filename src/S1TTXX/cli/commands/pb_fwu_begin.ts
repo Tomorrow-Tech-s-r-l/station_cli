@@ -1,9 +1,10 @@
 import { BaseCommand } from "./base";
-import { SerialMessage, CommandResponse } from "../../protocol/types";
-import {
-  CMD_PB_FWU_BEGIN_CODE,
-  MAXIMUM_SLOT_ADDRESS,
-} from "../../../utils/constants";
+import { CommandResponse } from "../../protocol/types";
+import { FwuWire } from "../../fwu/session/wire";
+import { powerbankTarget } from "../../fwu/session/target";
+
+// Thin wrapper over FwuWire (fwu/session/wire.ts). Behaviour pinned by
+// tests/golden/fwu/ and tests/fwu_wire_validation.test.js.
 
 /**
  * CMD_PB_FWU_BEGIN (0x12): powerbank-bootloader-side. Tears down any
@@ -19,23 +20,6 @@ export class PbFwuBeginCommand extends BaseCommand {
     slotAddress: number,
     params: { imgSize: number; imgCrc32: number; version: number }
   ): Promise<CommandResponse> {
-    if (slotAddress < 0 || slotAddress > MAXIMUM_SLOT_ADDRESS) {
-      throw new Error(
-        `Slot index must be between 0 and ${MAXIMUM_SLOT_ADDRESS}`
-      );
-    }
-
-    const data = Buffer.alloc(13);
-    data.writeUInt8(slotAddress, 0);
-    data.writeUInt32LE(params.imgSize, 1);
-    data.writeUInt32LE(params.imgCrc32 >>> 0, 5);
-    data.writeUInt32LE(params.version >>> 0, 9);
-
-    const message: SerialMessage = {
-      boardAddress,
-      command: CMD_PB_FWU_BEGIN_CODE,
-      data,
-    };
-    return this.executeCommand(message);
+    return new FwuWire(this.serialService, powerbankTarget(boardAddress, slotAddress)).begin(params);
   }
 }

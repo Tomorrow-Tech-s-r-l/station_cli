@@ -1,0 +1,216 @@
+{
+  "result": {
+    "success": false,
+    "imagePath": "image.bin",
+    "imageSize": 1000,
+    "imageCrc32": 2298615326,
+    "chunks": 32,
+    "retries": 0,
+    "blInfo": {
+      "blVersionMajor": 0,
+      "blVersionMinor": 1,
+      "appPresent": false,
+      "appVersion": 0,
+      "maxChunk": 32,
+      "pageSize": 1024,
+      "slotSize": 51200
+    },
+    "error": {
+      "stage": "FWU_END",
+      "code": 4,
+      "message": "BL rejected END (CRC mismatch?)"
+    }
+  },
+  "transcript": [
+    {
+      "board": 2,
+      "cmd": "0x66",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x60",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x61",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x62",
+      "data": "e80300001e16028900010300"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "00000000200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "2000000020e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "4000000020c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "6000000020a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a4968"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "800000002087a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a2948"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "a0000000206786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "c000000020476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae908"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "e00000002027466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "00010000200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "2001000020e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "4001000020c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "6001000020a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a4968"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "800100002087a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a2948"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "a0010000206786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "c001000020476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae908"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "e00100002027466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "00020000200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "2002000020e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "4002000020c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "6002000020a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a4968"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "800200002087a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a2948"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "a0020000206786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "c002000020476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae908"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "e00200002027466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "00030000200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "2003000020e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "4003000020c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "6003000020a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a4968"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "800300002087a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a2948"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "a0030000206786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "c003000020476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae908"
+    },
+    {
+      "board": 2,
+      "cmd": "0x63",
+      "data": "e00300000827466584a3c2e100"
+    },
+    {
+      "board": 2,
+      "cmd": "0x64",
+      "data": ""
+    },
+    {
+      "board": 2,
+      "cmd": "0x65",
+      "data": ""
+    }
+  ]
+}
