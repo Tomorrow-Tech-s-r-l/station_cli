@@ -36,8 +36,8 @@ export function registerConfigCommands(program: Command): void {
         derived: {
           lockFile: effectiveLockFile(fw),
           firmwareSources: {
-            interface: fw.sources.interface?.repo ?? null,
-            powerbank: fw.sources.powerbank?.repo ?? null,
+            interface: fw.sources.interface?.repo ?? fw.sources.interface?.path ?? null,
+            powerbank: fw.sources.powerbank?.repo ?? fw.sources.powerbank?.path ?? null,
           },
           credentialPresent: loaded.config.credentials.github.token !== null,
         },

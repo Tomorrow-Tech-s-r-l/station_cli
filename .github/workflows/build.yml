@@ -162,8 +162,108 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
         shell: bash
 
-  release:
+  # Release gate for the firmware engine: THIS build's fw-status / fw-plan /
+  # fw-apply flash an emulated station (boards + packs down to their
+  # bootloaders) with the current firmware releases — happy path, power loss
+  # and recovery, lost acks, CRC failures, version verification, quarantine,
+  # the per-run cap, channels and the exact report the kiosk parses.
+  #
+  # station_emulator is private and this repository is public, so its
+  # reusable workflow cannot be called from here: the job checks the harness
+  # out with RELEASE_TOKEN instead. Push-only, like every job in this file.
+  fwu-e2e:
     needs: build
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    steps:
+      - name: Token available?
+        id: token
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::warning::RELEASE_TOKEN is not set — skipping the firmware OTA e2e (it needs read access to station_emulator and the firmware releases)"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Build this CLI
+        if: steps.token.outputs.ok == 'true'
+        run: npm ci && npm run build
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          repository: Tomorrow-Tech-s-r-l/station_emulator
+          ref: main
+          path: station_emulator
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: dart-lang/setup-dart@v1
+        if: steps.token.outputs.ok == 'true'
+
+      - name: Emulator dependencies
+        if: steps.token.outputs.ok == 'true'
+        working-directory: station_emulator
+        env:
+          TT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          cat > pubspec_overrides.yaml <<EOF
+          dependency_overrides:
+            tomorrowtech_station:
+              git:
+                url: https://x-access-token:${TT_TOKEN}@github.com/Tomorrow-Tech-s-r-l/tomorrowtech_station.git
+                ref: main
+          EOF
+          dart pub get
+
+      - name: Firmware images (current releases)
+        if: steps.token.outputs.ok == 'true'
+        working-directory: station_emulator
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          CLI_CMD: node ${{ github.workspace }}/dist/cli.js
+          BOARD_CHANNEL: ${{ github.ref_name == 'development' && 'development' || 'main' }}
+          PACK_CHANNEL: ${{ github.ref_name == 'development' && 'development' || 'main' }}
+          OUT_DIR: ${{ runner.temp }}/fwu-inputs
+        # pipefail: without it the step is green when the resolver fails.
+        run: |
+          set -o pipefail
+          tool/fwu_ci_resolve.sh | tee -a "$GITHUB_ENV"
+
+      - name: Firmware OTA e2e
+        if: steps.token.outputs.ok == 'true'
+        working-directory: station_emulator
+        run: |
+          dart run tool/fwu_e2e.dart \
+            --cli="$FWU_CLI" \
+            --board-image="$FWU_BOARD_IMAGE" \
+            --pack-image="$FWU_PACK_IMAGE" \
+            --report=fwu-report/report.json \
+            --logs=fwu-report \
+            --summary="$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always() && steps.token.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fwu-e2e-report
+          path: station_emulator/fwu-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  release:
+    needs: [build, fwu-e2e]
     runs-on: [self-hosted, Linux, X64]
     permissions:
       contents: write

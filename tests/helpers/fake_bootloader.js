@@ -23,6 +23,9 @@
  *   exitFails         the bootloader does not acknowledge EXIT
  *   slotSize          advertise a smaller application slot than the image
  *   startInBootloader the device is already stuck in its bootloader
+ *   powerLossAt       the Nth DATA never answers (the transport throws, as
+ *                     SerialService does on a 5 s timeout) and the device
+ *                     comes back up in its bootloader with no valid app
  *   noValidApp        the application header is invalid (an earlier flash was
  *                     interrupted), so the device cannot leave its bootloader
  *                     until a new image is written
@@ -141,6 +144,14 @@ class FakeBootloaderDevice {
       }
 
       case STEP.DATA: {
+        if (this.faults.powerLossAt && this.dataCalls + 1 === this.faults.powerLossAt) {
+          this.dataCalls++;
+          delete this.faults.powerLossAt; // one-shot: the next power-up is healthy
+          this.session = null;
+          this.mode = "bl";
+          this.appValid = false;
+          throw new Error("Request timeout - no response received");
+        }
         const s = this.session;
         if (this.mode !== "bl" || !s || body.length < 5) return reply(STATUS_ERR_INVALID_ARGS);
         this.dataCalls++;

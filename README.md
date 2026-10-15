@@ -140,6 +140,29 @@ One JSON document, assembled from layers — later wins:
 }
 ```
 
+**A local release folder** (`"provider": "dir"`) takes the place of a GitHub
+repository, for testing a firmware build before it is published — on a bench
+station or the station emulator (its firmware OTA e2e serves releases this
+way). It is laid out like a set of Releases, one folder per tag, and goes
+through the same path as GitHub: the channel filter, the `metadata.json` CLI
+floor, the merged/bootloader refusal, the cache and read-back verification.
+
+```json
+"sources": {
+  "interface": { "provider": "dir", "path": "/home/pi/fw-test/interface" },
+  "powerbank": { "provider": "dir", "path": "/home/pi/fw-test/powerbank" }
+}
+```
+```
+/home/pi/fw-test/powerbank/v3.2.0/P1TT2C-firmware-3.2.0.bin      stable
+/home/pi/fw-test/powerbank/dev-v3.3.0/P1TT2C-firmware-3.3.0.bin  beta only (dev- tag, or a PRERELEASE file)
+/home/pi/fw-test/powerbank/P1TT2C-firmware-3.1.0.bin             flat: tag v3.1.0 from the name
+```
+
+The kiosk only fills in `sources` the station config leaves out, so a `dir`
+source in `/etc/station-cli/config.json` makes the kiosk's own scheduled
+update install that build.
+
 **Credentials.** A credential passed as a flag would be readable by every user
 on the machine through the process list, so the CLI refuses one. Pipe it in
 with `--config-stdin`, or set `STATION_CLI_GITHUB_TOKEN`. Inside the CLI a
