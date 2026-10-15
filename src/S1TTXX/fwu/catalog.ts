@@ -109,8 +109,9 @@ export async function resolveCandidate(
 ): Promise<ReleaseCandidate | null> {
   const source = opts.sources[kind];
   if (!source) return null;
+  if (source.provider === "dir") return resolveLocalCandidate(kind, source, opts);
 
-  const repo = source.repo;
+  const repo = source.repo ?? "";
   const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
 
   let releases: GitHubRelease[];
@@ -190,6 +191,125 @@ export async function resolveCandidate(
 }
 
 /**
+ * The `dir` provider: a local folder laid out like a set of releases, so a
+ * firmware build can go through the exact production path — channel filter,
+ * CLI floor from `metadata.json`, version gates, cache, flash, read-back —
+ * on the emulator or a bench station before it is published.
+ *
+ * Accepted layouts, mixable:
+ *   <path>/<tag>/<asset>.bin [+ metadata.json] [+ PRERELEASE]
+ *   <path>/<asset>.bin                         (tag `v<version from name>`)
+ */
+async function resolveLocalCandidate(
+  kind: TargetKind,
+  source: FirmwareSourceConfig,
+  opts: CatalogOptions
+): Promise<ReleaseCandidate | null> {
+  const root = source.path ?? "";
+  const rules = assetRules(kind, source);
+  let entries: fs.Dirent[];
+  try {
+    entries = await fs.promises.readdir(root, { withFileTypes: true });
+  } catch (e) {
+    opts.warnings.push(
+      `Cannot read firmware folder ${root}: ${e instanceof Error ? e.message : String(e)}`
+    );
+    return null;
+  }
+
+  interface LocalRelease {
+    tag: string;
+    version: Version;
+    prerelease: boolean;
+    dir: string;
+    asset: string;
+  }
+  const found: LocalRelease[] = [];
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      const dir = path.join(root, e.name);
+      const files = await fs.promises.readdir(dir).catch(() => [] as string[]);
+      const asset = files.find((f) => rules.accepts(f));
+      const version = parseVersion(versionStringFromTag(e.name));
+      if (!version) continue;
+      if (!asset) {
+        opts.warnings.push(`Release ${e.name} in ${root} has no asset matching ${rules.describe} — skipping.`);
+        continue;
+      }
+      found.push({
+        tag: e.name,
+        version,
+        prerelease: e.name.startsWith("dev-") || files.includes("PRERELEASE"),
+        dir,
+        asset,
+      });
+    } else if (e.isFile() && rules.accepts(e.name)) {
+      const m = /(\d+\.\d+(?:\.\d+)?)/.exec(e.name);
+      const version = m ? parseVersion(m[1]) : null;
+      if (!version) continue;
+      found.push({ tag: `v${formatVersion(version)}`, version, prerelease: false, dir: root, asset: e.name });
+    }
+  }
+
+  const eligible = found
+    .filter((r) => (opts.channel === "stable" ? !r.prerelease : true))
+    .sort((a, b) => compareVersions(b.version, a.version));
+
+  for (const r of eligible) {
+    const minCliVersion = await readLocalMinCliVersion(r.dir, r.tag, opts);
+    if (minCliVersion && !isAtLeast(opts.cliVersion, minCliVersion)) {
+      opts.warnings.push(
+        `Release ${r.tag} in ${root} needs station-cli >= ${formatVersion(minCliVersion)}, ` +
+          `running ${formatVersion(opts.cliVersion)} — skipping.`
+      );
+      continue;
+    }
+    const file = path.join(r.dir, r.asset);
+    const stat = await fs.promises.stat(file);
+    return {
+      kind,
+      tag: r.tag,
+      version: r.version,
+      prerelease: r.prerelease,
+      assetName: r.asset,
+      assetUrl: `file://${file}`,
+      assetSizeBytes: stat.size,
+      minCliVersion,
+      digest: null,
+    };
+  }
+  return null;
+}
+
+async function readLocalMinCliVersion(
+  dir: string,
+  tag: string,
+  opts: CatalogOptions
+): Promise<Version | null> {
+  const file = path.join(dir, "metadata.json");
+  let body: string;
+  try {
+    body = await fs.promises.readFile(file, "utf8");
+  } catch {
+    return null;
+  }
+  try {
+    const raw = (JSON.parse(body) as Record<string, unknown>).min_cli_version;
+    if (typeof raw !== "string") return null;
+    const parsed = parseVersion(raw);
+    if (!parsed) {
+      opts.warnings.push(`metadata.json of ${tag} has unparseable min_cli_version "${raw}" — ignoring.`);
+    }
+    return parsed;
+  } catch (e) {
+    opts.warnings.push(
+      `Cannot read metadata.json of ${tag}: ${e instanceof Error ? e.message : String(e)} — assuming no CLI floor.`
+    );
+    return null;
+  }
+}
+
+/**
  * Reads `min_cli_version` from the release's `metadata.json` asset. Absent
  * asset or field means "no declared floor".
  */
@@ -255,12 +375,22 @@ export async function ensureImage(
   }
 
   await fs.promises.rm(cachePath, { force: true });
-  const written = await httpDownloadToFile(candidate.assetUrl, cachePath, {
-    token: opts.token,
-    accept: "application/octet-stream",
-    timeoutMs: 120_000,
-    deadlineMs: DOWNLOAD_DEADLINE_MS,
-  });
+  let written: number;
+  if (candidate.assetUrl.startsWith("file://")) {
+    // `dir` provider: copied through a .part file like a download, so a
+    // half-copied image can never be mistaken for a cached one.
+    const part = `${cachePath}.part`;
+    await fs.promises.copyFile(candidate.assetUrl.slice("file://".length), part);
+    await fs.promises.rename(part, cachePath);
+    written = (await fs.promises.stat(cachePath)).size;
+  } else {
+    written = await httpDownloadToFile(candidate.assetUrl, cachePath, {
+      token: opts.token,
+      accept: "application/octet-stream",
+      timeoutMs: 120_000,
+      deadlineMs: DOWNLOAD_DEADLINE_MS,
+    });
+  }
 
   const refuse = async (why: string): Promise<never> => {
     await fs.promises.rm(cachePath, { force: true });

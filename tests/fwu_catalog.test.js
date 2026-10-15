@@ -90,3 +90,93 @@ test("pruning keeps the newest images per class and never the one just resolved"
   assert.ok(left.includes("powerbank-v3.0.0-b.bin"), "another class is untouched");
   assert.ok(left.includes("interface-v9.9.9-a.bin.part"), "a partial download is untouched");
 });
+
+// ---------------------------------------------------------------------------
+// `dir` provider: a local release folder, for emulator and bench tests of a
+// firmware build before it is published.
+// ---------------------------------------------------------------------------
+
+const { ensureImage } = require("../dist/S1TTXX/fwu/catalog");
+
+function localReleases(layout) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "fwu-dir-"));
+  for (const [rel, body] of Object.entries(layout)) {
+    const p = path.join(root, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, body);
+  }
+  return root;
+}
+
+function dirOpts(root, extra = {}) {
+  return {
+    channel: "stable",
+    sources: { interface: { provider: "dir", path: root }, powerbank: { provider: "dir", path: root } },
+    token: null,
+    cliVersion: [0, 4, 0],
+    cacheDir: fs.mkdtempSync(path.join(os.tmpdir(), "fwu-cache-")),
+    cacheKeepPerKind: 2,
+    warnings: [],
+    ...extra,
+  };
+}
+
+test("dir: the newest stable tag folder wins, pre-releases only on beta", async () => {
+  const root = localReleases({
+    "v3.1.0/S1TTXX-firmware-3.1.0.bin": "a",
+    "v3.2.0/S1TTXX-firmware-3.2.0.bin": "bb",
+    "dev-v3.3.0/S1TTXX-firmware-3.3.0.bin": "ccc",
+    "v3.4.0/S1TTXX-firmware-3.4.0.bin": "dddd",
+    "v3.4.0/PRERELEASE": "",
+  });
+  const stable = await resolveCandidate("interface", dirOpts(root));
+  assert.equal(stable.tag, "v3.2.0");
+  assert.equal(stable.prerelease, false);
+  assert.equal(stable.assetSizeBytes, 2);
+  const beta = await resolveCandidate("interface", dirOpts(root, { channel: "beta" }));
+  assert.equal(beta.tag, "v3.4.0");
+  assert.equal(beta.prerelease, true);
+});
+
+test("dir: flat .bin files take their version from the file name", async () => {
+  const root = localReleases({
+    "P1TT2C-firmware-3.1.0.bin": "x",
+    "P1TT2C-firmware-3.2.5.bin": "yy",
+    "P1TT2C-firmware-9.9.9-merged.bin": "never",
+  });
+  const c = await resolveCandidate("powerbank", dirOpts(root));
+  assert.equal(c.tag, "v3.2.5");
+  assert.equal(c.assetName, "P1TT2C-firmware-3.2.5.bin");
+});
+
+test("dir: the merged/bootloader floor and the CLI floor still apply", async () => {
+  const root = localReleases({
+    "v4.0.0/S1TTXX-merged-4.0.0.bin": "never",
+    "v3.9.0/S1TTXX-firmware-3.9.0.bin": "z",
+    "v3.9.0/metadata.json": JSON.stringify({ min_cli_version: "9.0.0" }),
+    "v3.8.0/S1TTXX-firmware-3.8.0.bin": "ok",
+  });
+  const o = dirOpts(root);
+  const c = await resolveCandidate("interface", o);
+  assert.equal(c.tag, "v3.8.0");
+  assert.ok(o.warnings.some((w) => /v4\.0\.0.*no asset/.test(w)));
+  assert.ok(o.warnings.some((w) => /v3\.9\.0.*needs station-cli >= 9\.0\.0/.test(w)));
+});
+
+test("dir: the image is copied into the cache and reused when intact", async () => {
+  const root = localReleases({ "v3.2.0/S1TTXX-firmware-3.2.0.bin": Buffer.from([1, 2, 3, 4]) });
+  const o = dirOpts(root);
+  const c = await resolveCandidate("interface", o);
+  const p1 = await ensureImage(c, o);
+  assert.deepEqual([...fs.readFileSync(p1)], [1, 2, 3, 4]);
+  assert.ok(p1.startsWith(o.cacheDir));
+  const p2 = await ensureImage(c, o);
+  assert.equal(p2, p1);
+  assert.equal(fs.existsSync(`${p1}.part`), false);
+});
+
+test("dir: a missing folder is a warning, not a crash", async () => {
+  const o = dirOpts("/nonexistent/fwu-dir");
+  assert.equal(await resolveCandidate("interface", o), null);
+  assert.ok(o.warnings[0].startsWith("Cannot read firmware folder /nonexistent/fwu-dir"));
+});

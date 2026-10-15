@@ -255,6 +255,11 @@ export async function runEngine(
     sourceConfigured,
   });
   const plannedCount = plan.summary.toUpdate;
+  // Devices that do need the update but were left for a later run by the
+  // per-run cap. They are still pending: without counting them, a capped run
+  // (the kiosk passes --max-targets 6, an S1TT30 has 35 devices) reported
+  // "nothing pending" while most of the station was still on the old build.
+  const deferredByCap = plan.items.filter((i) => i.skipReason === "MAX_TARGETS_REACHED").length;
   log.info("plan built", { ...plan.summary });
 
   const report: EngineReport = {
@@ -274,7 +279,7 @@ export async function runEngine(
     },
     plan,
     results: [],
-    summary: { attempted: 0, succeeded: 0, failed: 0, updatesPending: plannedCount > 0 },
+    summary: { attempted: 0, succeeded: 0, failed: 0, updatesPending: plannedCount + deferredByCap > 0 },
     warnings,
     error: null,
   };
@@ -394,7 +399,8 @@ export async function runEngine(
   }
 
   plan.summary = summarizeItems(plan.items);
-  report.summary.updatesPending = plannedCount > report.summary.succeeded;
+  report.summary.updatesPending =
+    deferredByCap > 0 || plannedCount > report.summary.succeeded;
   log.info("firmware run finished", {
     planned: plannedCount,
     ...report.summary,
@@ -445,6 +451,32 @@ async function reverifyPowerbank(
   return null;
 }
 
+/** One flash attempt of one target through its bootloader. */
+function flashOnce(
+  service: SerialService,
+  item: PlanItem,
+  imagePath: string,
+  headerVersion: number,
+  opts: EngineOptions
+) {
+  return item.target.kind === "interface"
+    ? runStationFirmwareUpdate(service, {
+        boardAddress: item.target.boardAddress,
+        imagePath,
+        version: headerVersion,
+        verbose: opts.verbose,
+        interChunkDelayMs: opts.interChunkDelayMs,
+      })
+    : runPbFirmwareUpdate(service, {
+        boardAddress: item.target.boardAddress,
+        slotInBoard: mapSlotToBoard(item.target.slotIndex as number).slotInBoard,
+        imagePath,
+        version: headerVersion,
+        verbose: opts.verbose,
+        interChunkDelayMs: opts.interChunkDelayMs,
+      });
+}
+
 /**
  * Flashes one target, retrying up to `attemptsPerTarget` times, then reads the
  * version back from the running application. Only that read-back proves the
@@ -489,23 +521,22 @@ async function applyOne(
     result.attempts = attempt;
     debug.log(`[FWU] ${item.label}: flashing ${candidate.tag} (attempt ${attempt}/${attempts})`);
 
-    const flash =
-      item.target.kind === "interface"
-        ? await runStationFirmwareUpdate(service, {
-            boardAddress: item.target.boardAddress,
-            imagePath,
-            version: headerVersion,
-            verbose: opts.verbose,
-            interChunkDelayMs: opts.interChunkDelayMs,
-          })
-        : await runPbFirmwareUpdate(service, {
-            boardAddress: item.target.boardAddress,
-            slotInBoard: mapSlotToBoard(item.target.slotIndex as number).slotInBoard,
-            imagePath,
-            version: headerVersion,
-            verbose: opts.verbose,
-            interChunkDelayMs: opts.interChunkDelayMs,
-          });
+    // A device that stops answering mid-flash (power loss, a lost reply on the
+    // bus) makes the transport throw. That is one failed attempt on one
+    // device — never the end of the whole run: without this the exception
+    // escaped the engine, the other devices were never attempted and the
+    // kiosk got no report at all.
+    let flash: Awaited<ReturnType<typeof runStationFirmwareUpdate>>;
+    try {
+      flash = await flashOnce(service, item, imagePath, headerVersion, opts);
+    } catch (e) {
+      result.error = {
+        stage: "TRANSPORT",
+        message: `device stopped answering mid-flash: ${e instanceof Error ? e.message : String(e)}`,
+      };
+      if (attempt < attempts) await sleep(settle);
+      continue;
+    }
 
     if (!flash.success) {
       result.error = flash.error ?? { stage: "UNKNOWN", message: "flash failed" };

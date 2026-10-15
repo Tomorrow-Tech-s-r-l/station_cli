@@ -410,3 +410,58 @@ test("F5 + F13: an interrupted flash is counted, and the stranded device recover
   assert.equal(after.inFlight, null);
   assert.equal(after.quarantine["interface:board0"], undefined, "a success clears the failure");
 });
+
+test("a board that stops answering mid-flash fails that device, not the whole run", async () => {
+  // Board 0 loses power on its 3rd DATA chunk: the transport throws (5 s
+  // timeout). Before the fix this exception escaped runEngine, board 1 was
+  // never attempted and the kiosk got no report.
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", faults: { powerLossAt: 3 }, slots: [] },
+      1: { version: "3.0.3", slots: [] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0, 1], slots: [] } }));
+
+  const b0 = report.results.find((r) => r.label === "interface board 0");
+  const b1 = report.results.find((r) => r.label === "interface board 1");
+  assert.equal(b0.success, false);
+  assert.equal(b0.error.stage, "TRANSPORT");
+  assert.match(b0.error.message, /stopped answering mid-flash/);
+  assert.equal(b1.success, true, "the other board is still updated");
+  assert.equal(report.summary.failed, 1);
+  assert.equal(report.summary.succeeded, 1);
+});
+
+test("a device that lost power mid-flash is recovered by the next attempt", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { powerLossAt: 2 }, slots: [] } },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, attemptsPerTarget: 2 })
+  );
+  const b0 = report.results[0];
+  assert.equal(b0.success, true);
+  assert.equal(b0.attempts, 2);
+  assert.equal(b0.verifiedVersion, "3.1.0");
+});
+
+test("devices left over by the per-run cap are still reported as pending", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", slots: [] },
+      1: { version: "3.0.3", slots: [] },
+    },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 1 }) })
+  );
+  assert.equal(report.summary.attempted, 1);
+  assert.equal(report.summary.succeeded, 1);
+  assert.equal(item(report, "interface board 1").skipReason, "MAX_TARGETS_REACHED");
+  assert.equal(report.summary.updatesPending, true, "board 1 still needs its update");
+});

@@ -25,12 +25,22 @@ export const CONFIG_VERSION = 1;
 export type Channel = "stable" | "beta";
 export type FirmwareKind = "interface" | "powerbank";
 
-/** Where one device class's firmware images come from. */
+/**
+ * Where one device class's firmware images come from.
+ *
+ * - `github`: the Releases of `repo` (the production path).
+ * - `dir`: a local folder laid out like a set of releases — one sub-folder per
+ *   tag (`v3.2.0/`, `dev-v3.3.0/` …) holding the assets, or the `.bin` files
+ *   directly (version read from the file name). For bench and emulator tests
+ *   of a firmware build before it is published; a `dev-` tag or a `PRERELEASE`
+ *   marker file makes a release beta-only, exactly like a GitHub pre-release.
+ */
 export interface FirmwareSourceConfig {
-  /** Only `github` today; the field exists so others can be added without a schema break. */
-  provider: "github";
-  /** `owner/name` of the repository whose Releases carry the images. */
-  repo: string;
+  provider: "github" | "dir";
+  /** `owner/name` of the repository whose Releases carry the images (`github`). */
+  repo?: string;
+  /** Absolute path of the release folder (`dir`). */
+  path?: string;
   /** Regex (source text, case-insensitive) an asset name must match. Defaults per device class. */
   assetPattern?: string;
   /**
@@ -146,7 +156,7 @@ const KNOWN_KEYS: Record<string, readonly string[]> = {
     "sources",
   ],
   "firmware.sources": ["interface", "powerbank"],
-  "firmware.sources.*": ["provider", "repo", "assetPattern", "rejectPattern"],
+  "firmware.sources.*": ["provider", "repo", "path", "assetPattern", "rejectPattern"],
   logging: ["jsonlFile"],
   credentials: ["github"],
   "credentials.github": ["token"],
@@ -248,8 +258,16 @@ export function validateRaw(doc: unknown): { errors: ValidationIssue[]; warnings
               continue;
             }
             unknown(s, scope, KNOWN_KEYS["firmware.sources.*"]);
-            if (s.provider !== "github") err(`${scope}.provider`, 'must be "github"');
-            if (typeof s.repo !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(s.repo)) {
+            if (s.provider === "dir") {
+              if (typeof s.path !== "string" || !s.path.startsWith("/")) {
+                err(`${scope}.path`, "must be an absolute path");
+              }
+            } else if (s.provider !== "github") {
+              err(`${scope}.provider`, 'must be "github" or "dir"');
+            } else if (
+              typeof s.repo !== "string" ||
+              !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(s.repo)
+            ) {
               err(`${scope}.repo`, 'must be "owner/name"');
             }
             regex(s, "assetPattern", scope);
@@ -299,10 +317,19 @@ export function validateRaw(doc: unknown): { errors: ValidationIssue[]; warnings
 const source = {
   type: "object",
   additionalProperties: false,
-  required: ["provider", "repo"],
+  required: ["provider"],
+  oneOf: [
+    { properties: { provider: { const: "github" } }, required: ["repo"] },
+    { properties: { provider: { const: "dir" } }, required: ["path"] },
+  ],
   properties: {
-    provider: { const: "github" },
+    provider: { enum: ["github", "dir"] },
     repo: { type: "string", pattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    path: {
+      type: "string",
+      pattern: "^/",
+      description: "Local release folder (one sub-folder per tag, or the .bin files directly).",
+    },
     assetPattern: { type: "string", minLength: 1, description: "Case-insensitive regex an asset name must match." },
     rejectPattern: {
       type: "string",

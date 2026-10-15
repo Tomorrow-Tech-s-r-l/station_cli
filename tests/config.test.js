@@ -184,6 +184,8 @@ test("validation catches bad values", () => {
     [{ firmware: { attemptsPerTarget: 0 } }, /between 1 and 10/],
     [{ firmware: { sources: { interface: { provider: "github", repo: "no-slash" } } } }, /owner\/name/],
     [{ firmware: { sources: { interface: { provider: "s3", repo: "a/b" } } } }, /must be "github"/],
+    [{ firmware: { sources: { interface: { provider: "dir", path: "relative/dir" } } } }, /absolute path/],
+    [{ firmware: { sources: { interface: { provider: "dir" } } } }, /absolute path/],
     [{ firmware: { sources: { interface: { provider: "github", repo: "a/b", assetPattern: "(" } } } }, /invalid regular expression/],
     [{ credentials: { github: { token: 42 } } }, /string or null/],
     [[], /JSON object/],
