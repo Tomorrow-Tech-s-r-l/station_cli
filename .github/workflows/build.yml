@@ -236,7 +236,10 @@ jobs:
           BOARD_CHANNEL: ${{ github.ref_name == 'development' && 'development' || 'main' }}
           PACK_CHANNEL: ${{ github.ref_name == 'development' && 'development' || 'main' }}
           OUT_DIR: ${{ runner.temp }}/fwu-inputs
-        run: tool/fwu_ci_resolve.sh | tee -a "$GITHUB_ENV"
+        # pipefail: without it the step is green when the resolver fails.
+        run: |
+          set -o pipefail
+          tool/fwu_ci_resolve.sh | tee -a "$GITHUB_ENV"
 
       - name: Firmware OTA e2e
         if: steps.token.outputs.ok == 'true'
