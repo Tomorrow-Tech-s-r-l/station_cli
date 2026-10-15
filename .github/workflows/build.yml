@@ -174,7 +174,7 @@ jobs:
   fwu-e2e:
     needs: build
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Token available?
         id: token
