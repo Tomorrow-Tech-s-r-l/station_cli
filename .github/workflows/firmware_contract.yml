@@ -119,6 +119,15 @@ jobs:
           FW: ${{ matrix.fw }}
         run: |
           skip=""
+          # A harness from before release.js cannot test release pairs or
+          # other firmware trees: say so instead of failing on it.
+          if [ ! -f harness/tests/cli_contract/release.js ]; then
+            skip="S1TTXX-firmware@$HARNESS_REF has an older contract harness; it runs here once that branch has tests/cli_contract/release.js"
+            echo "::warning::$skip"
+            echo "$LEG: not tested ($skip)" > "$REPORTS/leg.skipped"
+            echo "skip=$skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           case "$FW" in
             main|development) ref="$FW"; label="$FW" ;;
             *) ref=$(node harness/tests/cli_contract/release.js tag "$FW_REPO" "$FW")
