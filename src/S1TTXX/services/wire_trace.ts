@@ -1,37 +1,43 @@
-// --raw: read back what the station itself did on the pogo link during the
-// last powerbank exchange (HOST_CMD_PB_WIRE_TRACE, 0x53) and print it next
-// to the CLI's own frames.
+// --raw: read back what the station itself did on the pogo link for the last
+// powerbank request (HOST_CMD_PB_WIRE_TRACE, 0x53) and print it next to the
+// CLI's own frames.
 //
-// Only station firmware built with CONFIG_AMPERRY_TRACE_WIRE (the CI
-// "trace-binaries" artifact) records this; other builds answer
+// Only station firmware built with CONFIG_AMPERRY_TRACE_WIRE (debug_trace.conf;
+// the -trace image of a dev release) records this; other builds answer
 // ERR_INVALID_TYPE and a one-line notice is printed instead.
+//
+// One host request can take several pogo exchanges: STATUS first sends
+// PB_CMD_INFO_EXT and, when an older powerbank rejects it, PB_CMD_INFO. Every
+// exchange is shown, with every attempt of the station's retry chain.
 //
 // Two limits shape what is shown:
 // - Paging: one station reply on the host link carries at most 50 bytes, so
-//   the station returns its record in pages of 40 bytes and the CLI joins
-//   them. Every trace says how many bytes and pages were read, and flags a
-//   record that could not be read completely.
-// - RAM: the station keeps at most 128 bytes (the F030 has ~200 B spare).
-//   The request is stored once (retries re-send the identical frame); reply
-//   bytes that did not fit are marked "cut short", and attempts that did not
-//   fit at all are counted. A STATUS exchange (35-byte request, 51-byte
-//   reply, three attempts) always fits.
+//   the station returns its log in pages of 40 bytes and the CLI joins them.
+//   Every trace says how many bytes and pages were read, and flags a log that
+//   could not be read completely.
+// - RAM: the station keeps at most 192 bytes per request. Each request frame
+//   is stored once (retries re-send it unchanged); bytes, attempts and
+//   exchanges that did not fit are reported as such. A STATUS with the
+//   fallback (two exchanges, 178 bytes) always fits.
 //
-// Record layout, version 2 (S1TTXX-firmware inc/pb_wire_log.h):
-//   [version][slot][pb_cmd_type][n_recorded][n_seen][tx_len][tx bytes]
-//   n_recorded × [outcome | 0x80 if cut][drained u16 LE][rx_len][rx bytes]
+// Log layout, version 3 (S1TTXX-firmware inc/pb_wire_log.h):
+//   [version][slot][n_ex_recorded][n_ex_seen]
+//   exchange: [pb_cmd][flags][tx_len][tx bytes][n_att_recorded][n_att_seen]
+//   attempt:  [outcome | 0x80 if cut][drained u16 LE][rx_len][rx bytes]
 
 import type { SerialService } from "./serial";
 import { CMD_PB_WIRE_TRACE, STATUS_ERR_INVALID_CMD } from "../../utils/constants";
 import { hex, rawTrace } from "../../utils/test_modes";
 
 export const WIRE_TRACE_PAGE_LEN = 40;
-export const STATION_LOG_BUDGET = 128;
-const MAX_PAGES = 8; // 128 bytes = 4 pages; a little slack for future builds
-const TRUNCATED = 0x80;
+export const STATION_LOG_BUDGET = 192;
+const LOG_VERSION = 3;
+const MAX_PAGES = 8; // 192 bytes = 5 pages; a little slack for future builds
+const RX_CUT = 0x80;
+const TX_CUT = 0x01;
 
 const OUTCOMES: Record<number, string> = {
-  0: "reply decoded OK",
+  0: "reply received and decoded",
   1: "nothing received within the reply timeout",
   2: "bytes kept coming without a pause, dropped as line noise",
   3: "bytes received but rejected (start byte, length, CRC or decryption)",
@@ -52,58 +58,84 @@ export interface WireAttempt {
   outcome: number;
   drained: number;
   rx: Buffer;
-  /** reply bytes were cut to fit the station's 128-byte log */
+  /** reply bytes were cut to fit the station's log */
   truncated: boolean;
+}
+
+export interface WireExchange {
+  pbCommand: number;
+  tx: Buffer;
+  /** request frame was cut to fit the station's log */
+  txCut: boolean;
+  /** attempts the station made; more than attempts.length when some did not fit */
+  seen: number;
+  attempts: WireAttempt[];
 }
 
 export interface WireRecord {
   version: number;
   slot: number;
-  pbCommand: number;
-  tx: Buffer;
-  /** attempts the station made; more than attempts.length when some did not fit */
+  /** exchanges the station made; more than exchanges.length when some did not fit */
   seen: number;
-  attempts: WireAttempt[];
-  /** the record itself ended early (a page was not read) */
+  exchanges: WireExchange[];
+  /** the log itself ended early (a page was not read) */
   incomplete: boolean;
 }
 
-/** Parse a (possibly incomplete) version-2 record; never throws. */
+/** Parse a (possibly incomplete) version-3 log; never throws. */
 export function parseWireRecord(record: Buffer): WireRecord | null {
-  if (record.length < 6 || record[0] !== 2) return null;
-  const txLen = record[5];
-  const out: WireRecord = {
-    version: record[0],
-    slot: record[1],
-    pbCommand: record[2],
-    seen: record[4],
-    tx: record.subarray(6, Math.min(6 + txLen, record.length)),
-    attempts: [],
-    incomplete: 6 + txLen > record.length,
-  };
-  let p = 6 + txLen;
-  for (let i = 0; i < record[3]; i++) {
-    if (p + 4 > record.length) {
+  if (record.length < 4 || record[0] !== LOG_VERSION) return null;
+  const out: WireRecord = { version: record[0], slot: record[1], seen: record[3], exchanges: [], incomplete: false };
+  let p = 4;
+  for (let e = 0; e < record[2]; e++) {
+    if (p + 3 > record.length) {
       out.incomplete = true;
       break;
     }
-    const outcome = record[p] & ~TRUNCATED;
-    const truncated = (record[p] & TRUNCATED) !== 0;
-    const drained = record.readUInt16LE(p + 1);
-    const rxLen = record[p + 3];
-    p += 4;
-    const rx = record.subarray(p, Math.min(p + rxLen, record.length));
-    if (rx.length < rxLen) out.incomplete = true;
-    p += rxLen;
-    out.attempts.push({ outcome, drained, rx, truncated });
+    const txLen = record[p + 2];
+    const ex: WireExchange = {
+      pbCommand: record[p],
+      txCut: (record[p + 1] & TX_CUT) !== 0,
+      tx: record.subarray(p + 3, Math.min(p + 3 + txLen, record.length)),
+      seen: 0,
+      attempts: [],
+    };
+    out.exchanges.push(ex);
+    p += 3 + txLen;
+    if (p + 2 > record.length) {
+      out.incomplete = true;
+      break;
+    }
+    const recorded = record[p];
+    ex.seen = record[p + 1];
+    p += 2;
+    for (let a = 0; a < recorded; a++) {
+      if (p + 4 > record.length) {
+        out.incomplete = true;
+        break;
+      }
+      const rxLen = record[p + 3];
+      const rx = record.subarray(p + 4, Math.min(p + 4 + rxLen, record.length));
+      if (rx.length < rxLen) out.incomplete = true;
+      ex.attempts.push({
+        outcome: record[p] & ~RX_CUT,
+        truncated: (record[p] & RX_CUT) !== 0,
+        drained: record.readUInt16LE(p + 1),
+        rx,
+      });
+      p += 4 + rxLen;
+    }
+    if (out.incomplete) break;
   }
   return out;
 }
 
+const cmdName = (c: number) => `0x${c.toString(16).padStart(2, "0")} ${PB_COMMANDS[c] ?? "unknown"}`;
+
 let unsupportedNoticeShown = false;
 
 /**
- * Fetch the station's record of the last powerbank exchange on `board` and
+ * Fetch the station's log of the last powerbank request on `board` and
  * print it (--raw only). Failures are reported on stderr, never thrown.
  */
 export async function printStationTrace(service: SerialService, board: number): Promise<void> {
@@ -129,7 +161,7 @@ export async function printStationTrace(service: SerialService, board: number): 
         rawTrace(
           "STATION",
           "pogo-link trace not available: this station firmware is not a trace build " +
-            "(needs CONFIG_AMPERRY_TRACE_WIRE, e.g. the S1TTXX-firmware CI \"trace-binaries\" artifact)"
+            "(needs CONFIG_AMPERRY_TRACE_WIRE: the -trace image of an S1TTXX-firmware dev release, or debug_trace.conf)"
         );
       }
       return;
@@ -148,54 +180,75 @@ export async function printStationTrace(service: SerialService, board: number): 
   const complete = failure === null && record.length >= total;
   rawTrace(
     "STATION",
-    `board ${board}: station's own pogo-link log of the last powerbank exchange — ` +
+    `board ${board}: station's own pogo-link log of the last powerbank request — ` +
       `${record.length}${complete ? "" : ` of ${total}`} bytes in ${pages.length} page(s) of ` +
       `${WIRE_TRACE_PAGE_LEN} bytes (a station reply carries at most 50 bytes, so the CLI reads the ` +
-      `log in pages and joins them; the station keeps at most ${STATION_LOG_BUDGET} bytes per exchange)`
+      `log in pages and joins them; the station keeps at most ${STATION_LOG_BUDGET} bytes per request)`
   );
   if (!complete) {
-    rawTrace("STATION", `INCOMPLETE log: ${failure ?? "fewer bytes than announced"}; frames below may be cut short`);
+    rawTrace("STATION", `INCOMPLETE log: ${failure ?? "fewer bytes than announced"}; entries below may be cut short`);
   }
 
   const rec = parseWireRecord(record);
   if (rec === null) {
     rawTrace(
       "STATION",
-      record.length === 0 || record[0] === 2
-        ? "no powerbank exchange recorded yet"
-        : `log format v${record[0]} not understood by this CLI (expects v2): update station-cli`
+      record.length === 0 || record[0] === LOG_VERSION
+        ? "no powerbank request recorded yet"
+        : `log format v${record[0]} not understood by this CLI (expects v${LOG_VERSION}): use the matching station-cli`
     );
     return;
   }
-  const name = PB_COMMANDS[rec.pbCommand] ?? "unknown";
   rawTrace(
     "STATION",
-    `slot ${rec.slot + 1} (station slot ${rec.slot}) cmd=0x${rec.pbCommand.toString(16).padStart(2, "0")} ${name}: ` +
-      `${rec.seen} attempt(s) on the pogo link`
+    `slot ${rec.slot + 1} (station slot ${rec.slot}): ${rec.seen} pogo exchange(s) for this request`
   );
-  rawTrace(
-    "STATION",
-    `pogo TX ${rec.tx.length} bytes [${hex(rec.tx)}] (same frame on every attempt)` +
-      (rec.incomplete && rec.attempts.length === 0 ? " (log incomplete)" : "")
-  );
-  rec.attempts.forEach((a, i) => {
-    const n = `#${i + 1}`;
-    if (a.drained > 0) {
-      rawTrace("STATION", `${n} ${a.drained} noise byte(s) were discarded before the reply window`);
-    }
-    if (a.rx.length > 0 || a.truncated) {
-      const cut = a.truncated ? ` (cut short: only the first ${a.rx.length} bytes fit the station's ${STATION_LOG_BUDGET}-byte log)` : "";
-      rawTrace("STATION", `${n} pogo RX ${a.rx.length} bytes [${hex(a.rx)}]${cut}`);
-    }
-    rawTrace("STATION", `${n} result: ${OUTCOMES[a.outcome] ?? `outcome ${a.outcome}`}`);
-  });
-  if (rec.seen > rec.attempts.length && !rec.incomplete) {
+
+  rec.exchanges.forEach((ex, e) => {
+    const x = `[${e + 1}]`;
     rawTrace(
       "STATION",
-      `attempts #${rec.attempts.length + 1}-#${rec.seen} not shown: they did not fit the station's ${STATION_LOG_BUDGET}-byte log`
+      `${x} cmd=${cmdName(ex.pbCommand)}: ${ex.seen} attempt(s); pogo TX ${ex.tx.length} bytes [${hex(ex.tx)}]` +
+        (ex.txCut ? ` (cut short to fit the station's ${STATION_LOG_BUDGET}-byte log)` : "") +
+        (ex.seen > 1 ? " (same frame on every attempt)" : "")
+    );
+    ex.attempts.forEach((a, i) => {
+      const n = `${x}#${i + 1}`;
+      if (a.drained > 0) {
+        rawTrace("STATION", `${n} ${a.drained} noise byte(s) were discarded before the reply window`);
+      }
+      if (a.rx.length > 0 || a.truncated) {
+        const cut = a.truncated
+          ? ` (cut short: only the first ${a.rx.length} bytes fit the station's ${STATION_LOG_BUDGET}-byte log)`
+          : "";
+        rawTrace("STATION", `${n} pogo RX ${a.rx.length} bytes [${hex(a.rx)}]${cut}`);
+      }
+      rawTrace("STATION", `${n} result: ${OUTCOMES[a.outcome] ?? `outcome ${a.outcome}`}`);
+    });
+    if (ex.seen > ex.attempts.length && !rec.incomplete) {
+      rawTrace(
+        "STATION",
+        `${x} attempts #${ex.attempts.length + 1}-#${ex.seen} not shown: they did not fit the station's ${STATION_LOG_BUDGET}-byte log`
+      );
+    }
+    // The station decrypts the reply, the log keeps the wire bytes: a
+    // rejected INFO_EXT is only visible as the INFO exchange that follows it.
+    const next = rec.exchanges[e + 1];
+    if (ex.pbCommand === 0x08 && next && next.pbCommand === 0x01) {
+      rawTrace(
+        "STATION",
+        `${x} the powerbank rejected PB_CMD_INFO_EXT (firmware older than the extended status), ` +
+          `so the station fell back to PB_CMD_INFO`
+      );
+    }
+  });
+  if (rec.seen > rec.exchanges.length && !rec.incomplete) {
+    rawTrace(
+      "STATION",
+      `exchanges [${rec.exchanges.length + 1}]-[${rec.seen}] not shown: they did not fit the station's ${STATION_LOG_BUDGET}-byte log`
     );
   }
   if (rec.incomplete) {
-    rawTrace("STATION", "log ends early (a page was not read): the attempts above may be incomplete");
+    rawTrace("STATION", "log ends early (a page was not read): the entries above may be incomplete");
   }
 }
