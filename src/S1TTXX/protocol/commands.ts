@@ -25,6 +25,7 @@ import {
   CMD_FWU_ABORT_CODE,
   CMD_FWU_EXIT_CODE,
   MAXIMUM_SLOT_ADDRESS,
+  CMD_PB_WIRE_TRACE,
 } from "../../utils/constants";
 import {
   DEFAULT_TOTAL_CHARGE_MAH,
@@ -459,6 +460,7 @@ export class CommandFactory {
     if (
       message.command === CMD_PB_FWU_BEGIN_CODE ||
       message.command === CMD_PB_FWU_DATA_CODE ||
+      message.command === CMD_PB_WIRE_TRACE ||
       message.command === CMD_FWU_ENTER_CODE ||
       message.command === CMD_FWU_HELLO_CODE ||
       message.command === CMD_FWU_BEGIN_CODE ||

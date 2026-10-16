@@ -28,7 +28,18 @@ import {
   CMD_FWU_EXIT_CODE,
   STATUS_TIMEOUT,
 } from "../../../utils/constants";
-import { isNoRetryMode, rawTrace } from "../../../utils/test_modes";
+import { isNoRetryMode, isRawMode, rawTrace } from "../../../utils/test_modes";
+import { printStationTrace } from "../../services/wire_trace";
+
+// Opcodes the station forwards to a powerbank over the pogo link: after
+// each of them --raw also prints the station's own log of that exchange.
+const POWERBANK_ROUTED = new Set([
+  CMD_STATUS_CODE, CMD_SET_CHARGE_CODE, CMD_RESET_CODE, CMD_SET_PDO_CODE,
+  CMD_SET_INFO_PWB, CMD_SET_INFO_BATTERY, CMD_PB_FW_VER_CODE,
+  CMD_PB_ENTER_BOOT_CODE, CMD_PB_FWU_HELLO_CODE, CMD_PB_FWU_BEGIN_CODE,
+  CMD_PB_FWU_DATA_CODE, CMD_PB_FWU_END_CODE, CMD_PB_FWU_ABORT_CODE,
+  CMD_PB_FWU_EXIT_CODE,
+]);
 
 // Retry on transient powerbank-link timeouts (HOST_CMD_STATUS_ERR_TIMEOUT).
 // The interface board returns this status when it didn't get a reply from the
@@ -96,6 +107,9 @@ export abstract class BaseCommand {
       let result: CommandResponse | undefined;
       for (let attempt = 0; attempt <= retries; attempt++) {
         const response = await this.serialService.sendMessage(message);
+        if (isRawMode() && POWERBANK_ROUTED.has(message.command)) {
+          await printStationTrace(this.serialService, message.boardAddress);
+        }
         result = {
           success: response[2] === 0,
           status: response[2],

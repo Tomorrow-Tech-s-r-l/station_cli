@@ -60,7 +60,7 @@ program
   .addOption(
     new Option(
       "--raw",
-      "Print every frame sent to / received from the station (hex, with timing and decoded status) on stderr"
+      "Print every frame sent to / received from the station (hex, timing, decoded status) on stderr; with a trace build of the station firmware also the station's own pogo-link frames for each powerbank exchange (read in 40-byte pages and joined)"
     ).helpGroup("Testing options (not for production):")
   )
   .addOption(

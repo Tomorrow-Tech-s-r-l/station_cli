@@ -14,6 +14,9 @@ export class SerialService {
   private readonly responseTimeout = 5000; // 5 second timeout
   private readonly INTER_BYTE_TIMEOUT_MS = 50; // 5ms inter-byte timeout
   private sentAt = 0;
+  // Set while sending a --raw bookkeeping request (station trace pages), so
+  // those frames do not clutter the trace they are fetching.
+  private quiet = false;
 
   constructor(private portPath: string) {
     debug.info(`Initializing SerialService with port: ${portPath}`);
@@ -67,7 +70,7 @@ export class SerialService {
 
         this.parser.on("data", (data: Buffer) => {
           debug.hex("Received raw data", data);
-          rawTrace("RX frame", `${hex(data)}  (${Math.round(performance.now() - this.sentAt)}ms after TX)`);
+          if (!this.quiet) rawTrace("RX frame", `${hex(data)}  (${Math.round(performance.now() - this.sentAt)}ms after TX)`);
           if (this.responseResolver) {
             const payload = TransportProtocol.parseFrame(data);
             if (payload) {
@@ -128,7 +131,7 @@ export class SerialService {
 
     const frame = TransportProtocol.buildFrame(commandBuffer);
     debug.frame("TX", frame);
-    rawTrace(
+    if (!this.quiet) rawTrace(
       "TX",
       `board=${message.boardAddress} cmd=0x${message.command.toString(16).padStart(2, "0")} ` +
         `payload=[${hex(commandBuffer)}] frame=[${hex(frame)}]`
@@ -147,7 +150,7 @@ export class SerialService {
         cleanup();
         const error = new Error("Request timeout - no response received");
         debug.error("Send message failed:", error);
-        rawTrace("TIMEOUT", `no reply after ${this.responseTimeout}ms`);
+        if (!this.quiet) rawTrace("TIMEOUT", `no reply after ${this.responseTimeout}ms`);
         reject(error);
       }, this.responseTimeout);
 
@@ -168,7 +171,7 @@ export class SerialService {
           debug.hex("Response Payload", payload);
         }
         // Frame body is [board][cmd][status][data...].
-        if (response.length >= 3) {
+        if (response.length >= 3 && !this.quiet) {
           rawTrace(
             "RX",
             `board=${response[0]} cmd=0x${response[1].toString(16).padStart(2, "0")} ` +
@@ -192,8 +195,14 @@ export class SerialService {
     });
   }
 
-  async sendMessage(message: SerialMessage): Promise<Buffer> {
-    const response = await this.attemptSendMessage(message);
+  async sendMessage(message: SerialMessage, options: { quiet?: boolean } = {}): Promise<Buffer> {
+    this.quiet = options.quiet === true;
+    let response: Buffer;
+    try {
+      response = await this.attemptSendMessage(message);
+    } finally {
+      this.quiet = false;
+    }
     // Add delay between commands for USB serial stability
     await new Promise((resolve) => setTimeout(resolve, INTER_COMMAND_DELAY_MS));
     return response;

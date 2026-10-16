@@ -42,6 +42,9 @@ export const CMD_PB_FWU_EXIT_CODE   = 0x16;
 export const CMD_GET_FW_VER = 0x50;
 export const CMD_PB_LINK_STATS = 0x51;
 export const CMD_STATS = 0x52;
+// DEV-ONLY (S1TTXX trace builds): read the station's log of the last
+// powerbank exchange on the pogo link, one 40-byte page per request.
+export const CMD_PB_WIRE_TRACE = 0x53;
 
 // Station-side firmware-update opcodes (CMD_FWU_*, no PB_ prefix — these
 // target the station board itself, no slot routing). FWU_ENTER is served

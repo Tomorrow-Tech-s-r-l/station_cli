@@ -35,6 +35,15 @@ station-cli pb-link-stats -b 0 --reset   # station-side link attempts/retries/ti
 - `--raw` prints, per exchange, the request (command, board, slot), the bytes
   sent (payload and full frame with SOF/CRC), the raw frame received with its
   latency, and the decoded reply (status and data bytes).
+- With a **trace build of the station firmware** (S1TTXX-firmware built with
+  `CONFIG_AMPERRY_TRACE_WIRE`, the CI `trace-binaries` artifact), `--raw` also
+  prints `STATION` lines after every powerbank request: what the station itself
+  sent and received on the pogo link, per attempt, and why an attempt failed
+  (nothing received, line noise, or bytes rejected). A pogo frame can be up to
+  85 bytes but one station reply carries at most 50, so the CLI reads this log
+  in 40-byte pages and joins them; each trace says how many bytes and pages
+  were read and flags a log that could not be read completely. Release
+  firmware prints a one-line "trace not available" notice instead.
 - `--no-retry` turns off the CLI's retries: the 150/400 ms re-sends after a
   powerbank timeout and the second status read in `slots`. The station firmware
   still retries the pogo link internally; `pb-link-stats` shows those retries.
