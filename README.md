@@ -21,7 +21,9 @@ Add `--log` to any command to save output to a timestamped file. For build-from-
 ## Testing and debugging
 
 Not for production — the kiosk app never uses these. `station-cli --help` lists
-them under *Testing modes*, *Testing commands* and *Experimental (S0TTXX)*.
+commands in three groups: *Production commands* (what the kiosk app runs, plus
+`ports` and `config`), *Testing commands* and *Experimental commands (S0TTXX)*;
+the testing modes are under *Testing options*.
 Traces go to stderr; stdout stays the one JSON result.
 
 ```bash

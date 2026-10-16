@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Command, Option } from "commander";
+import { Command, Help, Option } from "commander";
 import packageJson from "../package.json";
 import { logger } from "./utils/logger";
 import {
@@ -61,13 +61,13 @@ program
     new Option(
       "--raw",
       "Print every frame sent to / received from the station (hex, with timing and decoded status) on stderr"
-    ).helpGroup("Testing modes:")
+    ).helpGroup("Testing options (not for production):")
   )
   .addOption(
     new Option(
       "--no-retry",
       "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads (the station firmware still retries the pogo link internally)"
-    ).helpGroup("Testing modes:")
+    ).helpGroup("Testing options (not for production):")
   )
   .hook("preAction", (thisCommand) => {
     const options = thisCommand.opts();
@@ -223,25 +223,40 @@ for (const command of program.commands) {
   }
 }
 
-// Help groups. Production = what the kiosk app (amperry_kiosk_local) runs;
-// anything else is a utility, a testing aid, or experimental (S0TTXX).
+// Help groups. Production = what the kiosk app (amperry_kiosk_local) runs,
+// plus the setup utilities; Testing = debugging aids, never used in the
+// field; Experimental = the S0TTXX gateway commands.
+const PRODUCTION = "Production commands:";
+const TESTING = "Testing commands (not for production):";
+const EXPERIMENTAL = "Experimental commands (S0TTXX):";
 const COMMAND_GROUPS: Record<string, string[]> = {
-  "Station commands (used by the kiosk app):": [
+  [PRODUCTION]: [
     "slots", "unlock", "status", "charge", "initialize-powerbank", "firmware", "stats",
     "fw-status", "fw-plan", "fw-apply",
     "firmware-update", "fwu-enter", "fwu-hello", "fwu-exit",
     "pb-firmware-update", "pb-enter-boot", "pb-fwu-hello", "pb-fwu-exit",
+    "ports", "config",
   ],
-  "Utilities:": ["ports", "config"],
-  "Testing commands (not for production):": ["pb-firmware", "pb-link-stats", "convert"],
-  "Experimental (S0TTXX):": ["s0ttxx-query", "s0ttxx-unlock"],
+  [TESTING]: ["pb-firmware", "pb-link-stats", "convert"],
+  [EXPERIMENTAL]: ["s0ttxx-query", "s0ttxx-unlock"],
 };
 for (const [heading, names] of Object.entries(COMMAND_GROUPS)) {
   for (const name of names) {
     program.commands.find((c) => c.name() === name)?.helpGroup(heading);
   }
 }
-program.commandsGroup("Utilities:").helpCommand(true);
+// Commander lists groups in the order their commands were registered, which
+// is not this order: sort the listing into Production, Testing, Experimental.
+const groupOrder = [PRODUCTION, TESTING, EXPERIMENTAL];
+const rank = (c: Command) => {
+  const g = groupOrder.indexOf(c.helpGroup());
+  const i = COMMAND_GROUPS[c.helpGroup()]?.indexOf(c.name()) ?? -1;
+  return (g < 0 ? groupOrder.length : g) * 1000 + (i < 0 ? 999 : i); // help last
+};
+program.configureHelp({
+  visibleCommands: (cmd) => new Help().visibleCommands(cmd).sort((a, b) => rank(a) - rank(b)),
+});
+program.commandsGroup(PRODUCTION).helpCommand(true);
 program.addHelpText(
   "after",
   [
