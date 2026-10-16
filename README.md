@@ -18,6 +18,28 @@ The model is `S1TT30` (default), `S1TT6`, `S0TT6`, `S0TT12` or `S0TT18`; `statio
 
 Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0TTXX), the serial port options and Windows usage, follow the wiki.
 
+## Testing and debugging
+
+Not for production — the kiosk app never uses these. `station-cli --help` lists
+them under *Testing modes*, *Testing commands* and *Experimental (S0TTXX)*.
+Traces go to stderr; stdout stays the one JSON result.
+
+```bash
+station-cli status -i 3 --raw            # every TX/RX frame, hex + timing + status
+station-cli slots --no-retry --raw       # ask each powerbank once, no CLI retries
+station-cli pb-link-stats -b 0 --reset   # station-side link attempts/retries/timeouts
+```
+
+- `--raw` prints, per exchange, the request (command, board, slot), the bytes
+  sent (payload and full frame with SOF/CRC), the raw frame received with its
+  latency, and the decoded reply (status and data bytes).
+- `--no-retry` turns off the CLI's retries: the 150/400 ms re-sends after a
+  powerbank timeout and the second status read in `slots`. The station firmware
+  still retries the pogo link internally; `pb-link-stats` shows those retries.
+- Testing commands: `pb-firmware`, `pb-link-stats`, `convert`.
+- Experimental: the S0TTXX commands (`s0ttxx-query`, `s0ttxx-unlock`) and the
+  `S0TT6`/`S0TT12`/`S0TT18` models.
+
 ## Headless firmware updates
 
 The CLI can keep a station's own hardware up to date without a person present:

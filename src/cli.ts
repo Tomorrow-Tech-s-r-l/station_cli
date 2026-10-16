@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import packageJson from "../package.json";
 import { logger } from "./utils/logger";
 import {
@@ -25,6 +25,7 @@ import { convertFrame } from "./S1TTXX/cli/commands/convert";
 import { registerConfigCommands } from "./config/cli";
 import { takeFlag } from "./utils/argv";
 import { setPortOverride, pickPort } from "./utils/port_selector";
+import { setRawMode, setNoRetryMode } from "./utils/test_modes";
 import { SerialPort } from "serialport";
 import {
   extractModelFromArgv,
@@ -56,8 +57,22 @@ program
   .usage("[model] [options] <command>")
   .addHelpText("after", programModelHelp())
   .option("--log", "Enable logging to file (creates timestamp-cli-logs.log)")
+  .addOption(
+    new Option(
+      "--raw",
+      "Print every frame sent to / received from the station (hex, with timing and decoded status) on stderr"
+    ).helpGroup("Testing modes:")
+  )
+  .addOption(
+    new Option(
+      "--no-retry",
+      "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads (the station firmware still retries the pogo link internally)"
+    ).helpGroup("Testing modes:")
+  )
   .hook("preAction", (thisCommand) => {
     const options = thisCommand.opts();
+    setRawMode(options.raw === true);
+    setNoRetryMode(options.retry === false);
     if (options.log) {
       logger.enableFileLogging();
       logger.log(`Logging enabled. Log file: ${logger.getLogFilePath()}`);
@@ -207,5 +222,35 @@ for (const command of program.commands) {
     }
   }
 }
+
+// Help groups. Production = what the kiosk app (amperry_kiosk_local) runs;
+// anything else is a utility, a testing aid, or experimental (S0TTXX).
+const COMMAND_GROUPS: Record<string, string[]> = {
+  "Station commands (used by the kiosk app):": [
+    "slots", "unlock", "status", "charge", "initialize-powerbank", "firmware", "stats",
+    "fw-status", "fw-plan", "fw-apply",
+    "firmware-update", "fwu-enter", "fwu-hello", "fwu-exit",
+    "pb-firmware-update", "pb-enter-boot", "pb-fwu-hello", "pb-fwu-exit",
+  ],
+  "Utilities:": ["ports", "config"],
+  "Testing commands (not for production):": ["pb-firmware", "pb-link-stats", "convert"],
+  "Experimental (S0TTXX):": ["s0ttxx-query", "s0ttxx-unlock"],
+};
+for (const [heading, names] of Object.entries(COMMAND_GROUPS)) {
+  for (const name of names) {
+    program.commands.find((c) => c.name() === name)?.helpGroup(heading);
+  }
+}
+program.commandsGroup("Utilities:").helpCommand(true);
+program.addHelpText(
+  "after",
+  [
+    "",
+    "Testing (not for production; stdout stays one JSON result, traces go to stderr):",
+    "  station-cli status -i 3 --raw              every TX/RX frame of the exchange",
+    "  station-cli slots --no-retry --raw         each powerbank asked once, failures not retried",
+    "  station-cli pb-link-stats -b 0 --reset     link attempts/retries/timeouts per slot",
+  ].join("\n")
+);
 
 program.parse();

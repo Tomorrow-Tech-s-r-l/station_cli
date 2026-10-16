@@ -17,9 +17,9 @@ export const DEFAULT_MODEL: StationModel = "S1TT30";
 const MODEL_SUMMARY: Record<StationModel, string> = {
   S1TT30: "5 boards (0-4), slots 1-30 (default)",
   S1TT6: "1 board (0), slots 1-6",
-  S0TT6: "S0TTXX gateway, slots 1-6",
-  S0TT12: "S0TTXX gateway, slots 1-12",
-  S0TT18: "S0TTXX gateway, slots 1-18",
+  S0TT6: "S0TTXX gateway, slots 1-6 (experimental)",
+  S0TT12: "S0TTXX gateway, slots 1-12 (experimental)",
+  S0TT18: "S0TTXX gateway, slots 1-18 (experimental)",
 };
 
 function isStationModel(value: string): value is StationModel {

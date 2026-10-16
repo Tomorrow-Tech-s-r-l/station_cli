@@ -24,6 +24,7 @@ import {
 } from "../protocol/types";
 import { debug } from "../../utils/debug";
 import { selectPort } from "../../utils/port_selector";
+import { isNoRetryMode } from "../../utils/test_modes";
 import { getStatusMessage, getStatusCode } from "../utils/status";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import {
@@ -245,6 +246,9 @@ function parseInitializeOutcome(
  * Execute S1TTXX for all slots.
  */
 export async function runS1TTXXSlots(): Promise<void> {
+  // --no-retry (testing): read each slot once, so a failed read is reported
+  // instead of being retried away.
+  const statusReadAttempts = isNoRetryMode() ? 1 : STATUS_READ_ATTEMPTS;
   const startTime = Date.now();
   try {
     const slots: SlotsInfo[] = [];
@@ -296,10 +300,10 @@ export async function runS1TTXXSlots(): Promise<void> {
                 // attempt's failure is recorded.
                 for (
                   let attempt = 1;
-                  attempt <= STATUS_READ_ATTEMPTS && powerBankInfo === null;
+                  attempt <= statusReadAttempts && powerBankInfo === null;
                   attempt++
                 ) {
-                const isLastAttempt = attempt === STATUS_READ_ATTEMPTS;
+                const isLastAttempt = attempt === statusReadAttempts;
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);

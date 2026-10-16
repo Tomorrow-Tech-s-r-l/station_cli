@@ -28,6 +28,7 @@ import {
   CMD_FWU_EXIT_CODE,
   STATUS_TIMEOUT,
 } from "../../../utils/constants";
+import { isNoRetryMode, rawTrace } from "../../../utils/test_modes";
 
 // Retry on transient powerbank-link timeouts (HOST_CMD_STATUS_ERR_TIMEOUT).
 // The interface board returns this status when it didn't get a reply from the
@@ -83,8 +84,17 @@ export abstract class BaseCommand {
       const commandName = getCommandName(message.command);
       debug.slotRequest(commandName, message.boardAddress, slotIndex);
 
+      // --no-retry (testing): a single attempt, so a link timeout surfaces
+      // as-is instead of being absorbed here.
+      const retries = isNoRetryMode() ? 0 : PB_TIMEOUT_RETRIES;
+      rawTrace(
+        "REQUEST",
+        `${commandName} board=${message.boardAddress}` +
+          (slotIndex !== undefined ? ` slot=${slotIndex}` : "")
+      );
+
       let result: CommandResponse | undefined;
-      for (let attempt = 0; attempt <= PB_TIMEOUT_RETRIES; attempt++) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
         const response = await this.serialService.sendMessage(message);
         result = {
           success: response[2] === 0,
@@ -94,8 +104,9 @@ export abstract class BaseCommand {
         if (result.status !== STATUS_TIMEOUT) {
           break;
         }
-        if (attempt < PB_TIMEOUT_RETRIES) {
+        if (attempt < retries) {
           const delayMs = PB_TIMEOUT_RETRY_DELAYS_MS[attempt];
+          rawTrace("RETRY", `${commandName} link timeout, CLI retry ${attempt + 1}/${retries} in ${delayMs}ms`);
           debug.log(
             `Powerbank link timeout on ${commandName} (board=${message.boardAddress}, slot=${slotIndex}), retrying ${attempt + 1}/${PB_TIMEOUT_RETRIES} after ${delayMs}ms`
           );

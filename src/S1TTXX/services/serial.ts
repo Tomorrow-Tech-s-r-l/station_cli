@@ -5,6 +5,7 @@ import { TransportProtocol } from "./transport";
 import { CommandFactory } from "../protocol/commands";
 import { SerialMessage } from "../protocol/types";
 import { BAUD_RATE, INTER_COMMAND_DELAY_MS } from "../../utils/constants";
+import { hex, rawTrace } from "../../utils/test_modes";
 
 export class SerialService {
   private port: SerialPort | null = null;
@@ -12,6 +13,7 @@ export class SerialService {
   private responseResolver: ((value: Buffer) => void) | null = null;
   private readonly responseTimeout = 5000; // 5 second timeout
   private readonly INTER_BYTE_TIMEOUT_MS = 50; // 5ms inter-byte timeout
+  private sentAt = 0;
 
   constructor(private portPath: string) {
     debug.info(`Initializing SerialService with port: ${portPath}`);
@@ -65,6 +67,7 @@ export class SerialService {
 
         this.parser.on("data", (data: Buffer) => {
           debug.hex("Received raw data", data);
+          rawTrace("RX frame", `${hex(data)}  (${Math.round(performance.now() - this.sentAt)}ms after TX)`);
           if (this.responseResolver) {
             const payload = TransportProtocol.parseFrame(data);
             if (payload) {
@@ -125,6 +128,12 @@ export class SerialService {
 
     const frame = TransportProtocol.buildFrame(commandBuffer);
     debug.frame("TX", frame);
+    rawTrace(
+      "TX",
+      `board=${message.boardAddress} cmd=0x${message.command.toString(16).padStart(2, "0")} ` +
+        `payload=[${hex(commandBuffer)}] frame=[${hex(frame)}]`
+    );
+    this.sentAt = performance.now();
 
     return await new Promise((resolve, reject) => {
       let timeoutId: NodeJS.Timeout;
@@ -138,6 +147,7 @@ export class SerialService {
         cleanup();
         const error = new Error("Request timeout - no response received");
         debug.error("Send message failed:", error);
+        rawTrace("TIMEOUT", `no reply after ${this.responseTimeout}ms`);
         reject(error);
       }, this.responseTimeout);
 
@@ -156,6 +166,14 @@ export class SerialService {
         debug.response("Full Response", response, status);
         if (payload.length > 0) {
           debug.hex("Response Payload", payload);
+        }
+        // Frame body is [board][cmd][status][data...].
+        if (response.length >= 3) {
+          rawTrace(
+            "RX",
+            `board=${response[0]} cmd=0x${response[1].toString(16).padStart(2, "0")} ` +
+              `status=${response[2]} data=[${hex(response.subarray(3))}] (${response.length - 3} bytes)`
+          );
         }
 
         // Accept response regardless of payload presence
