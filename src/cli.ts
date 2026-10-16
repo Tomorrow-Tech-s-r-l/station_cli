@@ -23,6 +23,9 @@ import {
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 import { convertFrame } from "./S1TTXX/cli/commands/convert";
 import { registerConfigCommands } from "./config/cli";
+import { takeFlag } from "./utils/argv";
+import { setPortOverride, pickPort } from "./utils/port_selector";
+import { SerialPort } from "serialport";
 import {
   extractModelFromArgv,
   addModelOption,
@@ -33,8 +36,12 @@ import {
 
 // Resolve the station model (first-argument token or -m/--model) before any
 // command is registered: option help and validators depend on its ranges.
+// The serial port (-p/--port) is resolved the same way so every command that
+// talks to the station honours it, not only the S0TTXX ones.
 try {
   setModel(extractModelFromArgv(process.argv));
+  const ports = takeFlag(process.argv, "-p", "--port", "a serial port (e.g. COM3, /dev/ttyUSB0)");
+  setPortOverride(ports[ports.length - 1]);
 } catch (error) {
   console.error(`error: ${error instanceof Error ? error.message : error}`);
   process.exit(1);
@@ -95,7 +102,6 @@ interface RoutedOptions {
 program
   .command("slots")
   .description("Get slots information")
-  .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
   .action(async (options: RoutedOptions) => {
     if (isS0TTModel(getModel())) {
       await runS0TTXXSlots(options.port);
@@ -113,7 +119,6 @@ program
     `Slot index (${getSlotIndexMinimum()}-${getSlotIndexMaximum()})`,
     cliInputValidatorIndex
   )
-  .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
   .action(async (options: RoutedOptions) => {
     const index = parseInt(options.index as string);
     if (isS0TTModel(getModel())) {
@@ -121,6 +126,31 @@ program
     } else {
       await runS1TTXXUnlock(index);
     }
+  });
+
+// Ports command: what auto-detect sees, to find the station's COM port.
+program
+  .command("ports")
+  .description("List serial ports and show which one auto-detect would use")
+  .action(async () => {
+    const ports = await SerialPort.list();
+    const picked = pickPort(ports);
+    logger.log(
+      JSON.stringify(
+        {
+          autoDetected: picked ?? null,
+          ports: ports.map((p) => ({
+            path: p.path,
+            manufacturer: p.manufacturer ?? null,
+            vendorId: p.vendorId ?? null,
+            productId: p.productId ?? null,
+            pnpId: p.pnpId ?? null,
+          })),
+        },
+        null,
+        2
+      )
+    );
   });
 
 // Convert command (available globally, works with S1TTXX protocol)
@@ -136,6 +166,14 @@ program
     const hex = hexParts.join(" ");
     convertFrame(hex);
   });
+
+// Every station command takes -p/--port (consumed before parsing, above).
+const PORT_OPTION_FLAGS = "-p, --port <port>";
+const PORT_OPTION_HELP =
+  'Serial port, e.g. COM3 or /dev/ttyUSB0 (default: STATION_CLI_PORT, else auto-detect; see "station-cli ports")';
+for (const command of program.commands) {
+  if (["slots", "unlock"].includes(command.name())) command.option(PORT_OPTION_FLAGS, PORT_OPTION_HELP);
+}
 
 // Model-dependent commands: document the model choice in their help.
 const MODEL_DEPENDENT_COMMANDS: Record<string, typeof STATION_MODELS> = {
@@ -162,7 +200,12 @@ const MODEL_DEPENDENT_COMMANDS: Record<string, typeof STATION_MODELS> = {
 };
 for (const command of program.commands) {
   const models = MODEL_DEPENDENT_COMMANDS[command.name()];
-  if (models) addModelOption(command, models, getModel());
+  if (models) {
+    addModelOption(command, models, getModel());
+    if (!command.options.some((o) => o.long === "--port")) {
+      command.option(PORT_OPTION_FLAGS, PORT_OPTION_HELP);
+    }
+  }
 }
 
 program.parse();

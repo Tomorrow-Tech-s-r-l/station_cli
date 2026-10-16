@@ -1,5 +1,6 @@
 import { Command, Option } from "commander";
 import type { StationModel } from "./model";
+import { takeFlag } from "./argv";
 
 // Command-line handling for the station model.
 //
@@ -44,28 +45,12 @@ export function extractModelFromArgv(argv: string[]): StationModel {
   }
 
   let flag: StationModel | undefined;
-  for (let i = 2; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--") break;
-    let value: string | undefined;
-    let consumed: number;
-    if (arg === "-m" || arg === "--model") {
-      value = argv[i + 1];
-      if (value === undefined) throw new Error(`${arg} requires a model (${STATION_MODELS.join(", ")})`);
-      consumed = 2;
-    } else if (arg.startsWith("--model=")) {
-      value = arg.slice("--model=".length);
-      consumed = 1;
-    } else {
-      continue;
-    }
+  for (const value of takeFlag(argv, "-m", "--model", `a model (${STATION_MODELS.join(", ")})`)) {
     if (!isStationModel(value)) throw invalidModel(value);
     if (flag !== undefined && flag !== value) {
       throw new Error(`Conflicting station models: ${flag} and ${value}`);
     }
     flag = value;
-    argv.splice(i, consumed);
-    i--;
   }
 
   if (positional !== undefined && flag !== undefined && positional !== flag) {
@@ -93,6 +78,11 @@ export function programModelHelp(): string {
     "",
     "  Commands whose slot/board ranges depend on the model show a -m, --model",
     "  option in their own help (station-cli <command> --help).",
+    "",
+    "Serial port:",
+    "  Station commands auto-detect the port. To choose it, pass -p/--port",
+    "  (e.g. --port COM3) or set STATION_CLI_PORT. \"station-cli ports\" lists",
+    "  the ports and shows which one auto-detect would use.",
   ].join("\n");
 }
 
