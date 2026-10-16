@@ -1,0 +1,254 @@
+name: Firmware contract
+
+# The station_cli <-> S1TTXX-firmware command contract, from this side: THIS
+# CLI against the station firmware's protocol code — every command the kiosk
+# app uses in production, plus the diagnostics and the testing modes, down to
+# the values in the JSON. The harness lives in S1TTXX-firmware
+# (tests/cli_contract: a simulated station built from the firmware's own
+# host_protocol.c / protocol_utils.c / pb_protocol.c); the firmware runs the
+# same harness the other way round (its cli_contract.yml).
+#
+# One matrix leg per firmware:
+#   development, main      the firmware branches (what ships next)
+#   release                newest firmware release (what stations run)
+#   dev-release            newest dev-v* pre-release (beta channel)
+#
+# When:
+#   - every push to a feature branch (this CLI built from source);
+#   - main / development: called from build.yml with the linux-x64 executable
+#     that build just made, and the release waits for it;
+#   - nightly, so a firmware change that breaks this CLI is reported on a day
+#     nothing is pushed here;
+#   - on request from S1TTXX-firmware right after it publishes a release.
+#
+# Push, schedule and dispatch only (never pull_request): it runs on
+# self-hosted runners, see CONTRIBUTING.md.
+on:
+  push:
+    branches-ignore: [main, development]
+  workflow_call:
+    inputs:
+      cli_artifact:
+        description: "Artifact of this run holding the station-cli-linux-x64 executable (empty: build from source)"
+        required: false
+        type: string
+        default: ''
+      fw_refs:
+        description: "JSON list of firmware refs"
+        required: false
+        type: string
+        default: '["development", "main", "release", "dev-release"]'
+    outputs:
+      report:
+        description: "Markdown table of every pair tested"
+        value: ${{ jobs.report.outputs.report }}
+  workflow_dispatch:
+    inputs:
+      fw_refs:
+        description: "JSON list of firmware refs (development, main, release, dev-release, or a tag)"
+        required: false
+        type: string
+        default: '["development", "main", "release", "dev-release"]'
+  schedule:
+    - cron: '37 3 * * *'
+
+permissions:
+  contents: read
+
+env:
+  FW_REPO: Tomorrow-Tech-s-r-l/S1TTXX-firmware
+  # The harness is versioned with the firmware; development has the newest
+  # checks and builds against any firmware from 3.0.3 on.
+  HARNESS_REF: ${{ vars.CONTRACT_HARNESS_REF || 'development' }}
+
+jobs:
+  contract:
+    name: fw ${{ matrix.fw }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        fw: ${{ fromJSON(inputs.fw_refs || '["development", "main", "release", "dev-release"]') }}
+    env:
+      LEG: station-cli ${{ github.ref_name }} × fw ${{ matrix.fw }}
+    steps:
+      # (the runner context is not available in a job's env)
+      - name: Work folders
+        run: |
+          echo "OUT=$RUNNER_TEMP/fw-contract" >> "$GITHUB_ENV"
+          echo "REPORTS=$RUNNER_TEMP/fw-contract/reports" >> "$GITHUB_ENV"
+          rm -rf "$RUNNER_TEMP/fw-contract" && mkdir -p "$RUNNER_TEMP/fw-contract/reports"
+
+      - name: Token available?
+        id: token
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::warning::RELEASE_TOKEN is not set — skipping the firmware contract (it needs read access to S1TTXX-firmware)"
+            echo "$LEG: not tested (RELEASE_TOKEN not set)" > "$REPORTS/leg.skipped"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          path: cli
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          repository: ${{ env.FW_REPO }}
+          ref: ${{ env.HARNESS_REF }}
+          path: harness
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: '22'
+
+      - name: Resolve the firmware
+        id: fw
+        if: steps.token.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          FW: ${{ matrix.fw }}
+        run: |
+          skip=""
+          case "$FW" in
+            main|development) ref="$FW"; label="$FW" ;;
+            *) ref=$(node harness/tests/cli_contract/release.js tag "$FW_REPO" "$FW")
+               label="$FW $ref"
+               [ -n "$ref" ] || skip="no firmware $FW release" ;;
+          esac
+          { echo "ref=$ref"; echo "label=$label"; echo "skip=$skip"; } | tee -a "$GITHUB_OUTPUT"
+          if [ -n "$skip" ]; then
+            echo "::notice::$LEG not tested: $skip"
+            echo "$LEG: not tested ($skip)" > "$REPORTS/leg.skipped"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        with:
+          repository: ${{ env.FW_REPO }}
+          ref: ${{ steps.fw.outputs.ref }}
+          path: fw
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      # main / development: the executable build.yml just made, the file the
+      # release ships. Elsewhere: this checkout, built by the harness.
+      - uses: actions/download-artifact@v4
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && inputs.cli_artifact != ''
+        with:
+          name: ${{ inputs.cli_artifact }}
+          path: ${{ env.OUT }}/bin
+
+      # Compiled in a container, statically and as the runner user, so it
+      # needs no toolchain on the runner and leaves no root-owned files.
+      - name: Build station_sim (firmware protocol code)
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        run: |
+          for i in 1 2 3; do
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "${PWD}:/w:ro" -v "$OUT:/out" -w /w -e FW_SRC=/w/fw gcc:13 \
+              sh harness/tests/cli_contract/build_sim.sh /out/station_sim -static && exit 0
+            echo "::warning::station_sim build attempt $i failed, retrying"
+            sleep $((i * 15))
+          done
+          exit 1
+
+      - name: Run this CLI's commands against the firmware
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        env:
+          STATION_SIM: ${{ env.OUT }}/station_sim
+          FW_SRC: fw
+          CLI_ARTIFACT: ${{ inputs.cli_artifact }}
+          FW_LABEL: ${{ steps.fw.outputs.label }}
+        run: |
+          if [ -n "$CLI_ARTIFACT" ]; then
+            CLI="$OUT/bin/station-cli-linux-x64"
+            CLI_LABEL="${GITHUB_REF_NAME} ${GITHUB_SHA:0:7}, linux-x64 executable"
+          else
+            CLI=cli
+            CLI_LABEL="${GITHUB_REF_NAME} ${GITHUB_SHA:0:7}"
+          fi
+          sh harness/tests/cli_contract/run.sh "$CLI" --label "$CLI_LABEL" --fw-label "$FW_LABEL" \
+            --report "$REPORTS/leg.json" --summary "$GITHUB_STEP_SUMMARY"
+
+      # A leg that died before the checks ran still shows up in the table.
+      - name: Mark a leg without a report
+        if: always() && steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        run: |
+          mkdir -p "$REPORTS"
+          [ -f "$REPORTS/leg.json" ] || echo "$LEG ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" > "$REPORTS/leg.missing"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fw-contract-${{ strategy.job-index }}
+          path: ${{ env.REPORTS }}
+          retention-days: 14
+          if-no-files-found: ignore
+
+  report:
+    needs: [contract]
+    if: always()
+    runs-on: [self-hosted, Linux, X64]
+    outputs:
+      report: ${{ steps.join.outputs.report }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Harness available?
+        id: token
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: echo "ok=$([ -n "$RELEASE_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          repository: ${{ env.FW_REPO }}
+          ref: ${{ env.HARNESS_REF }}
+          path: harness
+          token: ${{ secrets.RELEASE_TOKEN }}
+          sparse-checkout: tests/cli_contract
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fw-contract-*
+          path: reports
+
+      - name: Join the reports
+        id: join
+        run: |
+          if [ -f harness/tests/cli_contract/aggregate.js ]; then
+            node harness/tests/cli_contract/aggregate.js reports report.md "station-cli ↔ S1TTXX-firmware command contract" >/dev/null
+          else
+            echo "Firmware contract not run (RELEASE_TOKEN not set)." > report.md
+          fi
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "report<<CONTRACT_EOF"
+            cat report.md
+            echo "CONTRACT_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fw-contract-report
+          path: report.md
+          retention-days: 30
+
+      # The run goes red when any pair failed, whichever way the legs ended.
+      - name: Result
+        if: needs.contract.result != 'success'
+        run: |
+          echo "::error::firmware contract: at least one pair failed (table above)"
+          exit 1

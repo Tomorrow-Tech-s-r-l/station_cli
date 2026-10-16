@@ -263,6 +263,37 @@ protocol, so the real code runs end to end. CI runs the suite on every build.
 If a golden test fails, the wire protocol changed. Regenerate only when that
 change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
 
+### Firmware contract (CLI ↔ station firmware)
+
+`.github/workflows/firmware_contract.yml` runs this CLI against the S1TTXX
+station firmware's own protocol code (a simulated station built from
+`host_protocol.c` / `protocol_utils.c` / `pb_protocol.c`, harness in
+S1TTXX-firmware `tests/cli_contract`). It checks every command the kiosk app
+uses (`slots`, `status`, `charge`, `initialize-powerbank` with read-back,
+`unlock`, `firmware`, `stats`), plus `pb-firmware`, `pb-link-stats` and the
+testing modes (`--raw`, `--no-retry`, `pb-link-attempts`), down to the values
+in the JSON. One leg per firmware: `development`, `main`, the newest release
+and the newest dev release.
+
+| When | CLI under test |
+|---|---|
+| push to a feature branch | this branch, built from source |
+| push to `main` / `development` (`build.yml`) | the linux-x64 executable just built; the release waits for it, and its notes end with the table |
+| nightly 03:37 UTC, or *Run workflow* | the branch it runs on |
+| after an S1TTXX-firmware release | `main` and `development`, against that release |
+
+S1TTXX-firmware runs the same harness the other way round on every push:
+its firmware against this CLI's newest release and dev release executables
+and `main` / `development`. After a CLI release, `build.yml` asks it to
+re-run against the new executable. Both requests need `RELEASE_TOKEN` to
+have `actions: write` on the other repository; without it, the nightly runs
+cover the pair within a day. Locally, from an S1TTXX-firmware checkout:
+
+```bash
+tests/cli_contract/run.sh ../station_cli                # this checkout, built
+tests/cli_contract/run.sh ./station-cli-linux-x64       # a release executable
+```
+
 ## Documentation
 
 The full documentation lives in the wiki—use it as the source of truth:

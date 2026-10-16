@@ -262,8 +262,20 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  # Release gate for the station commands: the linux-x64 executable this
+  # build just made, against the station firmware's protocol code
+  # (development, main, the newest release and dev release) — every command
+  # the kiosk app uses, down to the values in the JSON. See
+  # firmware_contract.yml; its table goes into the release notes.
+  fw-contract:
+    needs: build
+    uses: ./.github/workflows/firmware_contract.yml
+    with:
+      cli_artifact: station-cli-linux-x64
+    secrets: inherit
+
   release:
-    needs: [build, fwu-e2e]
+    needs: [build, fwu-e2e, fw-contract]
     runs-on: [self-hosted, Linux, X64]
     permissions:
       contents: write
@@ -333,6 +345,10 @@ jobs:
             
             ### Windows x64
             - [station-cli-windows-x64.exe](https://github.com/${{ github.repository }}/releases/download/${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}/station-cli-windows-x64.exe)
+
+            ## Tested with S1TTXX-firmware
+
+            ${{ needs.fw-contract.outputs.report }}
           draft: false
           prerelease: ${{ needs.build.outputs.is_development == 'true' }}
           files: |
@@ -342,3 +358,20 @@ jobs:
             station-cli-windows-x64.exe
             metadata.json 
           tag_name: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
+
+      # The other direction: S1TTXX-firmware re-runs its station-cli contract
+      # with the executable just published, on its development and main.
+      # Best effort: the nightly runs in both repositories cover a token
+      # without actions:write on S1TTXX-firmware.
+      - name: Re-test S1TTXX-firmware with this release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TARGET: ${{ needs.build.outputs.is_development == 'true' && 'dev-release' || 'release' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "::notice::RELEASE_TOKEN not set — S1TTXX-firmware will pick this release up in its nightly contract run"; exit 0; fi
+          for ref in development main; do
+            gh workflow run cli_contract.yml --repo Tomorrow-Tech-s-r-l/S1TTXX-firmware --ref "$ref" \
+              -f cli_targets="[\"$TARGET\"]" -f fw_refs='["self", "release", "dev-release"]' \
+              && echo "::notice::S1TTXX-firmware@$ref: station-cli contract re-run requested" \
+              || echo "::warning::could not start S1TTXX-firmware@$ref cli_contract.yml (token needs actions:write there); the nightly run covers it"
+          done
