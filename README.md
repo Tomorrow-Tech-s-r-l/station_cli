@@ -9,6 +9,7 @@ Download the latest release binary, connect the station over USB, and run:
 ```bash
 station-cli slots           # default model S1TT30
 station-cli S1TT6 slots     # single-board model
+station-cli slots -m S1TT6  # same, as a flag (--model also works)
 ```
 
 Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0RUXX), follow the wiki.

@@ -17,28 +17,28 @@ import {
   setModel,
   getModel,
   isS0TTModel,
-  type StationModel,
   getSlotIndexMinimum,
   getSlotIndexMaximum,
 } from "./utils/model";
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 import { convertFrame } from "./S1TTXX/cli/commands/convert";
 import { registerConfigCommands } from "./config/cli";
+import {
+  extractModelFromArgv,
+  addModelOption,
+  programModelHelp,
+  STATION_MODELS,
+  S1TT_MODELS,
+} from "./utils/model_cli";
 
-// Parse optional positional mode token before any command.
-// Accepted: S1TT30 (default), S1TT6, S0TT6, S0TT12, S0TT18
-(() => {
-  const token = process.argv[2];
-  const allowed: StationModel[] = ["S1TT30", "S1TT6", "S0TT6", "S0TT12", "S0TT18"];
-  if (allowed.includes(token as StationModel)) {
-    setModel(token as StationModel);
-    // Remove the token so Commander sees the command next
-    process.argv.splice(2, 1);
-  } else {
-    // Default for backward compatibility
-    setModel("S1TT30");
-  }
-})();
+// Resolve the station model (first-argument token or -m/--model) before any
+// command is registered: option help and validators depend on its ranges.
+try {
+  setModel(extractModelFromArgv(process.argv));
+} catch (error) {
+  console.error(`error: ${error instanceof Error ? error.message : error}`);
+  process.exit(1);
+}
 
 const program = new Command();
 
@@ -46,6 +46,8 @@ program
   .name(packageJson.name)
   .description(packageJson.description)
   .version(packageJson.version)
+  .usage("[model] [options] <command>")
+  .addHelpText("after", programModelHelp())
   .option("--log", "Enable logging to file (creates timestamp-cli-logs.log)")
   .hook("preAction", (thisCommand) => {
     const options = thisCommand.opts();
@@ -134,5 +136,33 @@ program
     const hex = hexParts.join(" ");
     convertFrame(hex);
   });
+
+// Model-dependent commands: document the model choice in their help.
+const MODEL_DEPENDENT_COMMANDS: Record<string, typeof STATION_MODELS> = {
+  slots: STATION_MODELS,
+  unlock: STATION_MODELS,
+  status: S1TT_MODELS,
+  charge: S1TT_MODELS,
+  "initialize-powerbank": S1TT_MODELS,
+  firmware: S1TT_MODELS,
+  "pb-firmware": S1TT_MODELS,
+  "pb-link-stats": S1TT_MODELS,
+  stats: S1TT_MODELS,
+  "pb-enter-boot": S1TT_MODELS,
+  "pb-fwu-hello": S1TT_MODELS,
+  "pb-firmware-update": S1TT_MODELS,
+  "pb-fwu-exit": S1TT_MODELS,
+  "fwu-enter": S1TT_MODELS,
+  "fwu-hello": S1TT_MODELS,
+  "fwu-exit": S1TT_MODELS,
+  "firmware-update": S1TT_MODELS,
+  "fw-status": S1TT_MODELS,
+  "fw-plan": S1TT_MODELS,
+  "fw-apply": S1TT_MODELS,
+};
+for (const command of program.commands) {
+  const models = MODEL_DEPENDENT_COMMANDS[command.name()];
+  if (models) addModelOption(command, models, getModel());
+}
 
 program.parse();

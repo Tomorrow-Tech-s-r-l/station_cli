@@ -1052,7 +1052,7 @@ export function registerS1TTXXCommands(program: Command): void {
   program
     .command("firmware")
     .description("Get firmware version")
-    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .action(async (options: CommandOptions) => {
       const startTime = Date.now();
       const boardAddress = parseInt(options.board);
@@ -1175,7 +1175,7 @@ export function registerS1TTXXCommands(program: Command): void {
   program
     .command("pb-link-stats")
     .description("Get per-slot powerbank link retry telemetry")
-    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .option("--reset", "Clear counters after reading", false)
     .action(async (options: CommandOptions & { reset?: boolean }) => {
       try {
@@ -1233,7 +1233,7 @@ export function registerS1TTXXCommands(program: Command): void {
   program
     .command("stats")
     .description("Get per-slot solenoid usage counters")
-    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .option("--reset", "Clear counters after reading and flush to flash", false)
     .action(async (options: CommandOptions & { reset?: boolean }) => {
       try {
