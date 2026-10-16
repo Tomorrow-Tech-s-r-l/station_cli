@@ -48,10 +48,15 @@ station-cli pb-link-stats -b 0 --reset   # station-side link attempts/retries/ti
   RAM is nearly full): the request is shown once, and reply bytes or attempts
   that did not fit are marked as such. Release
   firmware prints a one-line "trace not available" notice instead.
-- `--no-retry` turns off the CLI's retries: the 150/400 ms re-sends after a
-  powerbank timeout and the second status read in `slots`. The station firmware
-  still retries the pogo link internally; `pb-link-stats` shows those retries.
-- Testing commands: `pb-firmware`, `pb-link-stats`, `convert`.
+- `--no-retry` turns off the CLI's retries (the 150/400 ms re-sends after a
+  powerbank timeout and the second status read in `slots`) and, on
+  S1TTXX-firmware 3.2.0+, the station's own pogo-link retries too: it lowers
+  them to 1 attempt on each board the command talks to and restores them when
+  the command ends (the station also restores them on every boot). On older
+  firmware only the CLI retries are off, and a `[TEST]` line says so.
+- `pb-link-attempts -b <n> [--set 1|2|3] [--reset]` reads or sets the station's
+  retries by hand (testing command, S1TTXX-firmware 3.2.0+).
+- Testing commands: `pb-firmware`, `pb-link-stats`, `pb-link-attempts`, `convert`.
 - Experimental: the S0TTXX commands (`s0ttxx-query`, `s0ttxx-unlock`) and the
   `S0TT6`/`S0TT12`/`S0TT18` models.
 

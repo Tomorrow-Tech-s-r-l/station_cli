@@ -1232,6 +1232,73 @@ export function registerS1TTXXCommands(program: Command): void {
       }
     });
 
+  // Testing: read or lower the station's own powerbank-link attempts
+  // (HOST_CMD_PB_LINK_ATTEMPTS, S1TTXX-firmware 3.2.0+). RAM only on the
+  // station: a power cycle restores the default.
+  program
+    .command("pb-link-attempts")
+    .description(
+      "Read or set how many times the station tries each powerbank exchange (1 = no retry; S1TTXX-firmware 3.2.0+; RAM only, reboot restores)"
+    )
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
+    .option("--set <n>", "Attempts per powerbank exchange, 1-3 (1 = station retries off)")
+    .option("--reset", "Restore the firmware default", false)
+    .action(async (options: CommandOptions & { set?: string; reset?: boolean }) => {
+      const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
+      let set = 0;
+      if (options.set !== undefined) {
+        set = Number(options.set);
+        if (!Number.isInteger(set) || set < 1 || set > 3) {
+          logger.error("--set must be 1, 2 or 3");
+          process.exit(1);
+        }
+      }
+      try {
+        const service = new SerialService(await selectPort());
+        await service.connect();
+        let result = await service.linkAttempts(boardAddress, set);
+        if (result !== null && options.reset && result[0] !== result[1]) {
+          result = await service.linkAttempts(boardAddress, result[1]);
+        }
+        await service.disconnect();
+        const out = {
+          success: result !== null,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          attempts: result ? result[0] : null,
+          defaultAttempts: result ? result[1] : null,
+          ...(result === null
+            ? {
+                error: {
+                  code: -1,
+                  message:
+                    "Not supported by this station firmware (needs S1TTXX-firmware 3.2.0+)",
+                },
+              }
+            : {}),
+        };
+        logger.log(JSON.stringify(out, null, 2));
+        if (result === null) process.exit(1);
+      } catch (error) {
+        logger.log(
+          JSON.stringify(
+            {
+              success: false,
+              executionTimeMs: Date.now() - startTime,
+              timestamp: new Date().toISOString(),
+              boardAddress,
+              error: { code: -1, message: error instanceof Error ? error.message : "Unknown error" },
+            },
+            null,
+            2
+          )
+        );
+        process.exit(1);
+      }
+    });
+
   // Lifetime per-slot solenoid trigger counters. Persisted to flash hourly.
   // Use --reset to read+clear+flush in one shot.
   program

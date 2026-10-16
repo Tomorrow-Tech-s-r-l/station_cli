@@ -66,7 +66,7 @@ program
   .addOption(
     new Option(
       "--no-retry",
-      "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads (the station firmware still retries the pogo link internally)"
+      "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads, and the station's own pogo-link retries (S1TTXX-firmware 3.2.0+; restored when the command ends)"
     ).helpGroup("Testing options (not for production):")
   )
   .hook("preAction", (thisCommand) => {
@@ -212,6 +212,7 @@ const MODEL_DEPENDENT_COMMANDS: Record<string, typeof STATION_MODELS> = {
   "fw-status": S1TT_MODELS,
   "fw-plan": S1TT_MODELS,
   "fw-apply": S1TT_MODELS,
+  "pb-link-attempts": S1TT_MODELS,
 };
 for (const command of program.commands) {
   const models = MODEL_DEPENDENT_COMMANDS[command.name()];
@@ -237,7 +238,7 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     "pb-firmware-update", "pb-enter-boot", "pb-fwu-hello", "pb-fwu-exit",
     "ports", "config",
   ],
-  [TESTING]: ["pb-firmware", "pb-link-stats", "convert"],
+  [TESTING]: ["pb-firmware", "pb-link-stats", "pb-link-attempts", "convert"],
   [EXPERIMENTAL]: ["s0ttxx-query", "s0ttxx-unlock"],
 };
 for (const [heading, names] of Object.entries(COMMAND_GROUPS)) {
@@ -265,6 +266,7 @@ program.addHelpText(
     "  station-cli status -i 3 --raw              every TX/RX frame of the exchange",
     "  station-cli slots --no-retry --raw         each powerbank asked once, failures not retried",
     "  station-cli pb-link-stats -b 0 --reset     link attempts/retries/timeouts per slot",
+    "  station-cli pb-link-attempts -b 0 --set 1  station retries off until --reset or reboot",
   ].join("\n")
 );
 

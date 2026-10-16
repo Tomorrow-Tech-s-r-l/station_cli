@@ -27,6 +27,11 @@ export function hex(data: Buffer): string {
   return data.toString("hex").match(/.{2}/g)?.join(" ") ?? "";
 }
 
+/** A testing-mode notice on stderr, printed whatever --raw says. */
+export function testNotice(message: string): void {
+  process.stderr.write(`[TEST] ${message}\n`);
+}
+
 /** One --raw trace line on stderr: `[RAW +12ms] TX ...`. */
 export function rawTrace(label: string, detail: string): void {
   if (!raw) return;
