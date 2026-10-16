@@ -1,6 +1,6 @@
 # Station CLI
 
-Cross-platform CLI for managing station boards and powerbanks (S1TTXX and S0RUXX protocols).
+Cross-platform CLI for managing station boards and powerbanks (S1TTXX and S0TTXX protocols).
 
 ## Quick start
 
@@ -14,7 +14,9 @@ station-cli ports           # list serial ports and the one auto-detect picks
 station-cli slots -p COM3   # use a specific port (or set STATION_CLI_PORT)
 ```
 
-Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0RUXX), follow the wiki.
+The model is `S1TT30` (default), `S1TT6`, `S0TT6`, `S0TT12` or `S0TT18`; `station-cli --help` lists them and `station-cli <command> --help` shows the ranges for the selected one. On Windows run `station-cli-windows-x64.exe ports` to find the station's COM port, then pass it with `-p`.
+
+Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0TTXX), the serial port options and Windows usage, follow the wiki.
 
 ## Headless firmware updates
 
@@ -224,7 +226,7 @@ change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
 The full documentation lives in the wiki—use it as the source of truth:
 - [Home](../station_cli.wiki/Home.md) — overview and quick links
 - [Getting Started](../station_cli.wiki/Getting-Started.md) — installation, models, first commands, logging
-- [Protocols](../station_cli.wiki/Protocols.md) — S1TTXX binary framing, S0RUXX ASCII framing
+- [Protocols](../station_cli.wiki/Protocols.md) — S1TTXX binary framing, S0TTXX ASCII framing
 - [Commands](../station_cli.wiki/Commands.md) — complete CLI reference
 - [Tests](../station_cli.wiki/Tests.md) — integration scripts and harnesses
 - [Troubleshooting and Debugging](../station_cli.wiki/Troubleshooting-and-Debugging.md)
