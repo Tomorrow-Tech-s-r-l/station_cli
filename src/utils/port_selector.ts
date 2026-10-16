@@ -39,18 +39,43 @@ function isGenericStationPort(path: string): boolean {
 }
 
 /**
+ * Windows lists every COM port, including ones that can never be the
+ * station: the motherboard UART (COM1, pnpId "ACPI\PNP0501\...") and
+ * Bluetooth serial links (pnpId "BTHENUM\..."). Their identity is known, so
+ * they are ruled out instead of being picked just because they come first.
+ */
+export function isNonUsbComPort(p: PortCandidate): boolean {
+  const pnpId = (p.pnpId ?? "").toUpperCase();
+  return pnpId.startsWith("ACPI\\") || pnpId.includes("BTHENUM");
+}
+
+/**
  * Picks the station port from an enumeration: the real interfacer bus (an
- * FTDI / USB-RS485 adapter) first, exactly as before; the hardware emulator
- * only when no real bus is attached, so plugging the emulator into a real
- * station can never hijack it.
+ * FTDI / USB-RS485 adapter) first; among several candidates one that reports
+ * a USB vendor id wins, so a stray built-in or Bluetooth COM port on Windows
+ * cannot shadow the adapter. The hardware emulator is used only when no real
+ * bus is attached, so plugging the emulator into a real station can never
+ * hijack it.
  */
 export function pickPort(ports: PortCandidate[]): string | undefined {
-  const real = ports.find((p) => isGenericStationPort(p.path));
-  if (real) return real.path;
+  const real = ports.filter((p) => isGenericStationPort(p.path) && !isNonUsbComPort(p));
+  const best = real.find((p) => p.vendorId !== undefined && p.vendorId !== "") ?? real[0];
+  if (best) return best.path;
   return ports.find(isStationEmulator)?.path;
 }
 
+let portOverride: string | undefined;
+
+/** Port given on the command line (-p/--port); wins over STATION_CLI_PORT. */
+export function setPortOverride(port: string | undefined): void {
+  portOverride = port;
+}
+
 export async function selectPort(): Promise<string> {
+  if (portOverride && portOverride.length > 0) {
+    return portOverride;
+  }
+
   // Test/emulator seam: when STATION_CLI_PORT is set, use it verbatim and skip
   // USB enumeration. This lets the unmodified CLI open a virtual serial port
   // (e.g. a socat PTY bridged to the station_emulator) so every layer below —
@@ -64,7 +89,11 @@ export async function selectPort(): Promise<string> {
   const ports: PortCandidate[] = await SerialPort.list();
   const port = pickPort(ports);
   if (!port) {
-    throw new Error("No compatible serial port found");
+    const seen = ports.map((p) => p.path).join(", ") || "none";
+    throw new Error(
+      `No compatible serial port found (available: ${seen}). ` +
+        `Run "station-cli ports" and pass the station port with --port, e.g. --port COM3`
+    );
   }
   return port;
 }

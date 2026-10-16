@@ -1,6 +1,6 @@
 # Station CLI
 
-Cross-platform CLI for managing station boards and powerbanks (S1TTXX and S0RUXX protocols).
+Cross-platform CLI for managing station boards and powerbanks (S1TTXX and S0TTXX protocols).
 
 ## Quick start
 
@@ -9,9 +9,56 @@ Download the latest release binary, connect the station over USB, and run:
 ```bash
 station-cli slots           # default model S1TT30
 station-cli S1TT6 slots     # single-board model
+station-cli slots -m S1TT6  # same, as a flag (--model also works)
+station-cli ports           # list serial ports and the one auto-detect picks
+station-cli slots -p COM3   # use a specific port (or set STATION_CLI_PORT)
 ```
 
-Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0RUXX), follow the wiki.
+The model is `S1TT30` (default), `S1TT6`, `S0TT6`, `S0TT12` or `S0TT18`; `station-cli --help` lists them and `station-cli <command> --help` shows the ranges for the selected one. On Windows run `station-cli-windows-x64.exe ports` to find the station's COM port, then pass it with `-p`.
+
+Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0TTXX), the serial port options and Windows usage, follow the wiki.
+
+## Testing and debugging
+
+Not for production — the kiosk app never uses these. `station-cli --help` lists
+commands in three groups: *Production commands* (what the kiosk app runs, plus
+`ports` and `config`), *Testing commands* and *Experimental commands (S0TTXX)*;
+the testing modes are under *Testing options*.
+Traces go to stderr; stdout stays the one JSON result.
+
+```bash
+station-cli status -i 3 --raw            # every TX/RX frame, hex + timing + status
+station-cli slots --no-retry --raw       # ask each powerbank once, no CLI retries
+station-cli pb-link-stats -b 0 --reset   # station-side link attempts/retries/timeouts
+```
+
+- `--raw` prints, per exchange, the request (command, board, slot), the bytes
+  sent (payload and full frame with SOF/CRC), the raw frame received with its
+  latency, and the decoded reply (status and data bytes).
+- With a **trace build of the station firmware** (S1TTXX-firmware built with
+  `CONFIG_AMPERRY_TRACE_WIRE`, the CI `trace-binaries` artifact), `--raw` also
+  prints `STATION` lines after every powerbank request: what the station itself
+  sent and received on the pogo link, for every exchange of the request (STATUS
+  on an older pack is two: `PB_CMD_INFO_EXT`, rejected, then `PB_CMD_INFO`) and
+  every attempt, and why an attempt failed
+  (nothing received, line noise, or bytes rejected). One station reply carries
+  at most 50 bytes, so the CLI reads this log in 40-byte pages and joins them;
+  each trace says how many bytes and pages were read and flags a log that could
+  not be read completely. The station keeps at most 192 bytes per request (its
+  RAM is nearly full): the request is shown once, and reply bytes or attempts
+  that did not fit are marked as such. Release
+  firmware prints a one-line "trace not available" notice instead.
+- `--no-retry` turns off the CLI's retries (the 150/400 ms re-sends after a
+  powerbank timeout and the second status read in `slots`) and, on
+  S1TTXX-firmware 3.2.0+, the station's own pogo-link retries too: it lowers
+  them to 1 attempt on each board the command talks to and restores them when
+  the command ends (the station also restores them on every boot). On older
+  firmware only the CLI retries are off, and a `[TEST]` line says so.
+- `pb-link-attempts -b <n> [--set 1|2|3] [--reset]` reads or sets the station's
+  retries by hand (testing command, S1TTXX-firmware 3.2.0+).
+- Testing commands: `pb-firmware`, `pb-link-stats`, `pb-link-attempts`, `convert`.
+- Experimental: the S0TTXX commands (`s0ttxx-query`, `s0ttxx-unlock`) and the
+  `S0TT6`/`S0TT12`/`S0TT18` models.
 
 ## Headless firmware updates
 
@@ -221,7 +268,7 @@ change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
 The full documentation lives in the wiki—use it as the source of truth:
 - [Home](../station_cli.wiki/Home.md) — overview and quick links
 - [Getting Started](../station_cli.wiki/Getting-Started.md) — installation, models, first commands, logging
-- [Protocols](../station_cli.wiki/Protocols.md) — S1TTXX binary framing, S0RUXX ASCII framing
+- [Protocols](../station_cli.wiki/Protocols.md) — S1TTXX binary framing, S0TTXX ASCII framing
 - [Commands](../station_cli.wiki/Commands.md) — complete CLI reference
 - [Tests](../station_cli.wiki/Tests.md) — integration scripts and harnesses
 - [Troubleshooting and Debugging](../station_cli.wiki/Troubleshooting-and-Debugging.md)

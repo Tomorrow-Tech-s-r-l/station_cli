@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
+import { Command, Help, Option } from "commander";
 import packageJson from "../package.json";
 import { logger } from "./utils/logger";
 import {
@@ -17,28 +17,36 @@ import {
   setModel,
   getModel,
   isS0TTModel,
-  type StationModel,
   getSlotIndexMinimum,
   getSlotIndexMaximum,
 } from "./utils/model";
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 import { convertFrame } from "./S1TTXX/cli/commands/convert";
 import { registerConfigCommands } from "./config/cli";
+import { takeFlag } from "./utils/argv";
+import { setPortOverride, pickPort } from "./utils/port_selector";
+import { setRawMode, setNoRetryMode } from "./utils/test_modes";
+import { SerialPort } from "serialport";
+import {
+  extractModelFromArgv,
+  addModelOption,
+  programModelHelp,
+  STATION_MODELS,
+  S1TT_MODELS,
+} from "./utils/model_cli";
 
-// Parse optional positional mode token before any command.
-// Accepted: S1TT30 (default), S1TT6, S0TT6, S0TT12, S0TT18
-(() => {
-  const token = process.argv[2];
-  const allowed: StationModel[] = ["S1TT30", "S1TT6", "S0TT6", "S0TT12", "S0TT18"];
-  if (allowed.includes(token as StationModel)) {
-    setModel(token as StationModel);
-    // Remove the token so Commander sees the command next
-    process.argv.splice(2, 1);
-  } else {
-    // Default for backward compatibility
-    setModel("S1TT30");
-  }
-})();
+// Resolve the station model (first-argument token or -m/--model) before any
+// command is registered: option help and validators depend on its ranges.
+// The serial port (-p/--port) is resolved the same way so every command that
+// talks to the station honours it, not only the S0TTXX ones.
+try {
+  setModel(extractModelFromArgv(process.argv));
+  const ports = takeFlag(process.argv, "-p", "--port", "a serial port (e.g. COM3, /dev/ttyUSB0)");
+  setPortOverride(ports[ports.length - 1]);
+} catch (error) {
+  console.error(`error: ${error instanceof Error ? error.message : error}`);
+  process.exit(1);
+}
 
 const program = new Command();
 
@@ -46,9 +54,25 @@ program
   .name(packageJson.name)
   .description(packageJson.description)
   .version(packageJson.version)
+  .usage("[model] [options] <command>")
+  .addHelpText("after", programModelHelp())
   .option("--log", "Enable logging to file (creates timestamp-cli-logs.log)")
+  .addOption(
+    new Option(
+      "--raw",
+      "Print every frame sent to / received from the station (hex, timing, decoded status) on stderr; with a trace build of the station firmware also the station's own pogo-link frames for each powerbank exchange (read in 40-byte pages and joined)"
+    ).helpGroup("Testing options (not for production):")
+  )
+  .addOption(
+    new Option(
+      "--no-retry",
+      "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads, and the station's own pogo-link retries (S1TTXX-firmware 3.2.0+; restored when the command ends)"
+    ).helpGroup("Testing options (not for production):")
+  )
   .hook("preAction", (thisCommand) => {
     const options = thisCommand.opts();
+    setRawMode(options.raw === true);
+    setNoRetryMode(options.retry === false);
     if (options.log) {
       logger.enableFileLogging();
       logger.log(`Logging enabled. Log file: ${logger.getLogFilePath()}`);
@@ -93,7 +117,6 @@ interface RoutedOptions {
 program
   .command("slots")
   .description("Get slots information")
-  .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
   .action(async (options: RoutedOptions) => {
     if (isS0TTModel(getModel())) {
       await runS0TTXXSlots(options.port);
@@ -111,7 +134,6 @@ program
     `Slot index (${getSlotIndexMinimum()}-${getSlotIndexMaximum()})`,
     cliInputValidatorIndex
   )
-  .option("-p, --port <port>", "Serial port (S0TTXX only; default: auto-detect)")
   .action(async (options: RoutedOptions) => {
     const index = parseInt(options.index as string);
     if (isS0TTModel(getModel())) {
@@ -119,6 +141,31 @@ program
     } else {
       await runS1TTXXUnlock(index);
     }
+  });
+
+// Ports command: what auto-detect sees, to find the station's COM port.
+program
+  .command("ports")
+  .description("List serial ports and show which one auto-detect would use")
+  .action(async () => {
+    const ports = await SerialPort.list();
+    const picked = pickPort(ports);
+    logger.log(
+      JSON.stringify(
+        {
+          autoDetected: picked ?? null,
+          ports: ports.map((p) => ({
+            path: p.path,
+            manufacturer: p.manufacturer ?? null,
+            vendorId: p.vendorId ?? null,
+            productId: p.productId ?? null,
+            pnpId: p.pnpId ?? null,
+          })),
+        },
+        null,
+        2
+      )
+    );
   });
 
 // Convert command (available globally, works with S1TTXX protocol)
@@ -134,5 +181,93 @@ program
     const hex = hexParts.join(" ");
     convertFrame(hex);
   });
+
+// Every station command takes -p/--port (consumed before parsing, above).
+const PORT_OPTION_FLAGS = "-p, --port <port>";
+const PORT_OPTION_HELP =
+  'Serial port, e.g. COM3 or /dev/ttyUSB0 (default: STATION_CLI_PORT, else auto-detect; see "station-cli ports")';
+for (const command of program.commands) {
+  if (["slots", "unlock"].includes(command.name())) command.option(PORT_OPTION_FLAGS, PORT_OPTION_HELP);
+}
+
+// Model-dependent commands: document the model choice in their help.
+const MODEL_DEPENDENT_COMMANDS: Record<string, typeof STATION_MODELS> = {
+  slots: STATION_MODELS,
+  unlock: STATION_MODELS,
+  status: S1TT_MODELS,
+  charge: S1TT_MODELS,
+  "initialize-powerbank": S1TT_MODELS,
+  firmware: S1TT_MODELS,
+  "pb-firmware": S1TT_MODELS,
+  "pb-link-stats": S1TT_MODELS,
+  stats: S1TT_MODELS,
+  "pb-enter-boot": S1TT_MODELS,
+  "pb-fwu-hello": S1TT_MODELS,
+  "pb-firmware-update": S1TT_MODELS,
+  "pb-fwu-exit": S1TT_MODELS,
+  "fwu-enter": S1TT_MODELS,
+  "fwu-hello": S1TT_MODELS,
+  "fwu-exit": S1TT_MODELS,
+  "firmware-update": S1TT_MODELS,
+  "fw-status": S1TT_MODELS,
+  "fw-plan": S1TT_MODELS,
+  "fw-apply": S1TT_MODELS,
+  "pb-link-attempts": S1TT_MODELS,
+};
+for (const command of program.commands) {
+  const models = MODEL_DEPENDENT_COMMANDS[command.name()];
+  if (models) {
+    addModelOption(command, models, getModel());
+    if (!command.options.some((o) => o.long === "--port")) {
+      command.option(PORT_OPTION_FLAGS, PORT_OPTION_HELP);
+    }
+  }
+}
+
+// Help groups. Production = what the kiosk app (amperry_kiosk_local) runs,
+// plus the setup utilities; Testing = debugging aids, never used in the
+// field; Experimental = the S0TTXX gateway commands.
+const PRODUCTION = "Production commands:";
+const TESTING = "Testing commands (not for production):";
+const EXPERIMENTAL = "Experimental commands (S0TTXX):";
+const COMMAND_GROUPS: Record<string, string[]> = {
+  [PRODUCTION]: [
+    "slots", "unlock", "status", "charge", "initialize-powerbank", "firmware", "stats",
+    "fw-status", "fw-plan", "fw-apply",
+    "firmware-update", "fwu-enter", "fwu-hello", "fwu-exit",
+    "pb-firmware-update", "pb-enter-boot", "pb-fwu-hello", "pb-fwu-exit",
+    "ports", "config",
+  ],
+  [TESTING]: ["pb-firmware", "pb-link-stats", "pb-link-attempts", "convert"],
+  [EXPERIMENTAL]: ["s0ttxx-query", "s0ttxx-unlock"],
+};
+for (const [heading, names] of Object.entries(COMMAND_GROUPS)) {
+  for (const name of names) {
+    program.commands.find((c) => c.name() === name)?.helpGroup(heading);
+  }
+}
+// Commander lists groups in the order their commands were registered, which
+// is not this order: sort the listing into Production, Testing, Experimental.
+const groupOrder = [PRODUCTION, TESTING, EXPERIMENTAL];
+const rank = (c: Command) => {
+  const g = groupOrder.indexOf(c.helpGroup());
+  const i = COMMAND_GROUPS[c.helpGroup()]?.indexOf(c.name()) ?? -1;
+  return (g < 0 ? groupOrder.length : g) * 1000 + (i < 0 ? 999 : i); // help last
+};
+program.configureHelp({
+  visibleCommands: (cmd) => new Help().visibleCommands(cmd).sort((a, b) => rank(a) - rank(b)),
+});
+program.commandsGroup(PRODUCTION).helpCommand(true);
+program.addHelpText(
+  "after",
+  [
+    "",
+    "Testing (not for production; stdout stays one JSON result, traces go to stderr):",
+    "  station-cli status -i 3 --raw              every TX/RX frame of the exchange",
+    "  station-cli slots --no-retry --raw         each powerbank asked once, failures not retried",
+    "  station-cli pb-link-stats -b 0 --reset     link attempts/retries/timeouts per slot",
+    "  station-cli pb-link-attempts -b 0 --set 1  station retries off until --reset or reboot",
+  ].join("\n")
+);
 
 program.parse();
