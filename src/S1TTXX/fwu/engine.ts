@@ -11,8 +11,8 @@ import { JsonlLog } from "../../utils/jsonl_log";
 import { Secret } from "../../config/secret";
 import { CompatSourceConfig, DEFAULT_COMPAT_SOURCE, FirmwareSourceConfig } from "../../config/schema";
 import { buildInfo, bundledCompatibilityFile } from "../../utils/build_info";
-import { ComponentId, parseSemVer } from "../../compat/semver";
-import { CompatibilityDoc, InstalledComponent, interpretInstalled } from "../../compat/compatibility";
+import { ComponentId, ReleaseChannel, parseSemVer } from "../../compat/semver";
+import { CompatibilityDoc, InstalledComponent, interpretInstalled, stationChannel } from "../../compat/compatibility";
 import { CompatLoad, loadCompatibility } from "../../compat/source";
 
 import {
@@ -152,6 +152,8 @@ export interface EngineReport {
     error: string | null;
     /** This CLI's own release tag, when the build recorded it. */
     cliTag: string | null;
+    /** Whose floors were read: the channel of a station on this update channel. */
+    channel: ReleaseChannel;
   } | null;
   plan: UpdatePlan;
   results: ApplyItemResult[];
@@ -325,6 +327,7 @@ export async function runEngine(
         generatedAt: compat.generatedAt,
         error: compat.error,
         cliTag: buildInfo().tag,
+        channel: stationChannel(opts.channel),
       }
     : null;
 

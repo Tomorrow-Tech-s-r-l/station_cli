@@ -15,7 +15,10 @@ name: Firmware contract
 # main branches, for S1TTXX × P1TT2C. Every leg's result goes into
 # `compat-evidence/v1` (artifact `compat-evidence`), from which release-compat
 # computes the floors in compatibility.json and in this CLI's metadata.json.
-# A branch build on any side never moves a floor.
+# A branch build on any side never moves a floor, and only runs on main /
+# development (build.yml's call, the nightly, a dispatch on those refs) upload
+# `compat-evidence` or report to release-compat: anywhere else the same file
+# is `compat-evidence-branch`, which nothing ingests.
 #
 # The run goes red when a leg could not run, or when this CLI fails a core
 # check against the newest production S1TTXX and P1TT2C releases tested —
@@ -32,7 +35,7 @@ name: Firmware contract
 #   - nightly, so a firmware change that breaks this CLI is reported on a day
 #     nothing is pushed here;
 #   - on request (cli_tag: a published release of this CLI, whose evidence is
-#     then sent to release-compat).
+#     then sent to release-compat when dispatched on main or development).
 #
 # Without COMPAT_TOKEN / vars.COMPAT_REF it falls back to the legacy legs
 # (development, main, newest release, newest dev release) with the P1TT2C
@@ -471,16 +474,22 @@ jobs:
       # tag point at another commit), so it is uploaded as
       # compat-evidence-unpublished and the release job re-uploads it as
       # compat-evidence once published — as S1TTXX-firmware's release does.
+      # Any other ref (a feature branch push, a dispatch from one — whose
+      # harness and scripts are that branch's) uploads compat-evidence-branch:
+      # it gates this run only.
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ (inputs.cli_artifact != '' && inputs.cli_tag != '') && 'compat-evidence-unpublished' || 'compat-evidence' }}
+          name: ${{ (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development') && 'compat-evidence-branch' || ((inputs.cli_artifact != '' && inputs.cli_tag != '') && 'compat-evidence-unpublished' || 'compat-evidence') }}
           path: evidence/evidence.json
           retention-days: 30
 
-      # A published CLI release was tested: hand the evidence to release-compat.
-      # (build.yml does this for a new release, once it is published.)
+      # A published CLI release was tested: hand the evidence to release-compat
+      # — from main / development only, as above. (build.yml does this for a
+      # new release, once it is published.)
       - name: Report the evidence to release-compat
-        if: github.event_name == 'workflow_dispatch' && inputs.cli_tag != '' && needs.targets.outputs.compat == 'true'
+        if: >-
+          github.event_name == 'workflow_dispatch' && inputs.cli_tag != '' && needs.targets.outputs.compat == 'true' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         env:
           GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
         run: |

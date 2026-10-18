@@ -13,6 +13,8 @@ const {
   parseCompatibility,
   checkInstall,
   interpretInstalled,
+  channelFloor,
+  stationChannel,
 } = require("../../dist/compat/compatibility");
 
 const FIXTURES = path.join(__dirname, "..", "fixtures");
@@ -115,6 +117,10 @@ test("validation: any structural error rejects the whole file", () => {
     [(d) => (d.components.S1TTXX.releases["v3.0.3"].requires.P1TT2C.min = "3.0"), /min/],
     [(d) => (d.components.P1TT2C.releases["v3.0.2"].channel = "beta"), /channel/],
     [(d) => (d.components.P1TT2C.releases["v3.0.2"].version = "latest"), /version/],
+    [(d) => (d.components.S1TTXX.releases["v3.0.3"].requires.P1TT2C.channels = []), /channels/],
+    [(d) => (d.components.S1TTXX.releases["v3.0.3"].requires.P1TT2C.channels = { production: floor("3.0.2") }), /channels\.development/],
+    [(d) => (d.components.S1TTXX.releases["v3.0.3"].requires.P1TT2C.channels = { production: { ...floor("3.0.2"), min: "3" }, development: floor("3.0.2") }), /channels\.production\.min/],
+    [(d) => (d.components.S1TTXX.releases["v3.0.3"].requires.P1TT2C.channels = { production: floor("3.0.2"), development: { min: null, min_tag: null } }), /channels\.development\.no_compatible/],
   ];
   for (const [mutate, pattern] of cases) {
     const d = doc();
@@ -125,6 +131,11 @@ test("validation: any structural error rejects the whole file", () => {
   }
   assert.equal(parseCompatibility("{not json").doc, null);
 });
+
+// A per-channel floor (release-compat's `floor` def).
+function floor(min, extra = {}) {
+  return { min, min_tag: min ? `v${min}` : null, no_compatible: min === null, tested: [], failed: [], ...extra };
+}
 
 // --- what is installed -----------------------------------------------------------
 
@@ -229,4 +240,52 @@ test("components without an edge do not constrain each other", () => {
   const d = doc();
   const kiosk = { component: "kiosk", label: "kiosk", interpretations: [{ tag: "v0.0.1", version: v("0.0.1") }] };
   assert.equal(checkInstall(d, "S1TTXX", "v3.0.3", [cli(d, "dev-v0.5.0"), kiosk]).installable, true);
+});
+
+// --- floors per installing channel --------------------------------------------
+
+test("channels: stable stations read production floors, beta ones development floors", () => {
+  assert.equal(stationChannel("stable"), "production");
+  assert.equal(stationChannel("beta"), "development");
+  const req = { ...floor(null), evidence: [], channels: { production: floor("3.0.2"), development: floor(null) } };
+  assert.equal(channelFloor(req, "production").min, "3.0.2");
+  assert.equal(channelFloor(req, "development").min, null);
+  assert.equal(channelFloor(req, null), req, "no channel: the top level");
+  const legacy = { ...floor("3.0.0"), evidence: [] };
+  assert.equal(channelFloor(legacy, "production"), legacy, "no channels block: the top level");
+  assert.equal(channelFloor(undefined, "production"), undefined);
+});
+
+test("channels: rule 2 and rule 3 use the installing station's channel", () => {
+  const d = doc();
+  // dev-v3.2.0's pack floor: none over both channels (the dev pack fails),
+  // v3.0.2 over production packs.
+  const board = d.components.S1TTXX.releases["dev-v3.2.0"].requires.P1TT2C;
+  board.channels = { production: floor("3.0.2", { tested: ["v3.0.2"] }), development: floor(null, { reason: "newest_failed" }) };
+  const installed = [cli(d, "dev-v0.5.0"), pack(d, "3.0.2")];
+  assert.equal(checkInstall(d, "S1TTXX", "dev-v3.2.0", installed, { channel: "production" }).installable, true);
+  const dev = checkInstall(d, "S1TTXX", "dev-v3.2.0", installed, { channel: "development" });
+  assert.equal(dev.installable, false);
+  assert.equal(dev.channel, "development");
+  assert.match(dev.reasons.join(), /no compatible P1TT2C release for a development station \(newest tested failed\)/);
+  assert.equal(checkInstall(d, "S1TTXX", "dev-v3.2.0", installed).installable, false, "no channel: the top level");
+
+  // Rule 3: the installed board's own pack floor, per channel.
+  const onBoard = [cli(d, "dev-v0.5.0"), interpretInstalled(d, "S1TTXX", "3.2.0-dev", "interface board 0")];
+  assert.equal(checkInstall(d, "P1TT2C", "v3.0.2", onBoard, { channel: "production" }).installable, true);
+  assert.match(
+    checkInstall(d, "P1TT2C", "v3.0.2", onBoard, { channel: "development" }).reasons.join(),
+    /S1TTXX dev-v3\.2\.0\) has no compatible P1TT2C release for a development station/
+  );
+});
+
+test("channels: a channel nothing was tested on blocks that channel only", () => {
+  const d = doc();
+  const req = d.components.station_cli.releases["dev-v0.5.0"].requires.S1TTXX;
+  req.channels = { production: floor(null, { reason: "untested" }), development: floor(req.min) };
+  const boardOn = [interpretInstalled(d, "S1TTXX", "3.0.3", "interface board 0", { tag: "v3.0.3" })];
+  const r = checkInstall(d, "station_cli", "dev-v0.5.0", boardOn, { channel: "production" });
+  assert.equal(r.installable, false);
+  assert.match(r.reasons.join(), /none of that channel was tested/);
+  assert.equal(checkInstall(d, "station_cli", "dev-v0.5.0", boardOn, { channel: "development" }).installable, true);
 });

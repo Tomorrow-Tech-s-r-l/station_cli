@@ -1,7 +1,7 @@
 {
   "format": "compatibility/v1",
   "sequence": 1,
-  "generated_at": "2026-10-18T17:52:52Z",
+  "generated_at": "2026-10-18T18:47:12Z",
   "edges": [
     [
       "S1TTXX",
@@ -56,12 +56,43 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -86,12 +117,30 @@
                 "production": {
                   "min": "0.3.1",
                   "min_tag": "v0.3.1",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1"
+                  ],
+                  "failed": [
+                    "v0.2.4"
+                  ],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "0.4.0-dev",
-                  "min_tag": "dev-v0.4.0",
-                  "no_compatible": false
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [
+                    "v0.2.4"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -129,12 +178,43 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -159,12 +239,30 @@
                 "production": {
                   "min": "0.3.1",
                   "min_tag": "v0.3.1",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1"
+                  ],
+                  "failed": [
+                    "v0.2.4"
+                  ],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "0.4.0-dev",
-                  "min_tag": "dev-v0.4.0",
-                  "no_compatible": false
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [
+                    "v0.2.4"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -200,12 +298,41 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.1.0-dev",
-                  "min_tag": "dev-v3.1.0",
-                  "no_compatible": false
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -236,12 +363,31 @@
                 "production": {
                   "min": "2.0.0",
                   "min_tag": "v2.0.0",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.1.0-dev",
-                  "min_tag": "dev-v3.1.0",
-                  "no_compatible": false
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -272,12 +418,31 @@
                 "production": {
                   "min": "2.0.0",
                   "min_tag": "v2.0.0",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.1.0-dev",
-                  "min_tag": "dev-v3.1.0",
-                  "no_compatible": false
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -308,12 +473,31 @@
                 "production": {
                   "min": "2.0.0",
                   "min_tag": "v2.0.0",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.1.0-dev",
-                  "min_tag": "dev-v3.1.0",
-                  "no_compatible": false
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -353,12 +537,38 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "failed": [
+                    "v3.0.3"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -386,12 +596,34 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1"
+                  ],
+                  "failed": [
+                    "v0.3.1"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -422,12 +654,31 @@
                 "production": {
                   "min": "2.0.0",
                   "min_tag": "v2.0.0",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.2.0-dev",
-                  "min_tag": "dev-v3.2.0",
-                  "no_compatible": false
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             },
@@ -450,12 +701,26 @@
                 "production": {
                   "min": "0.2.4",
                   "min_tag": "v0.2.4",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "0.4.0-dev",
-                  "min_tag": "dev-v0.4.0",
-                  "no_compatible": false
+                  "min": "0.2.4",
+                  "min_tag": "v0.2.4",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -491,12 +756,40 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -532,12 +825,40 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -573,12 +894,40 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -614,12 +963,40 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": []
                 }
               }
             }
@@ -651,12 +1028,23 @@
                 "production": {
                   "min": "3.0.3",
                   "min_tag": "v3.0.3",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.2.0-dev",
-                  "min_tag": "dev-v3.2.0",
-                  "no_compatible": false
+                  "min": "3.0.3",
+                  "min_tag": "v3.0.3",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             },
@@ -680,12 +1068,26 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -706,12 +1108,23 @@
                 "production": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "1.4.0-dev.23",
-                  "min_tag": "v1.4.0-dev.23",
-                  "no_compatible": false
+                  "min": "1.3.17",
+                  "min_tag": "v1.3.17",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -738,12 +1151,23 @@
                 "production": {
                   "min": "3.0.3",
                   "min_tag": "v3.0.3",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.2.0-dev",
-                  "min_tag": "dev-v3.2.0",
-                  "no_compatible": false
+                  "min": "3.0.3",
+                  "min_tag": "v3.0.3",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             },
@@ -767,12 +1191,26 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -793,12 +1231,23 @@
                 "production": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "1.4.0-dev.23",
-                  "min_tag": "v1.4.0-dev.23",
-                  "no_compatible": false
+                  "min": "1.3.17",
+                  "min_tag": "v1.3.17",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -825,12 +1274,23 @@
                 "production": {
                   "min": "3.0.3",
                   "min_tag": "v3.0.3",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.2.0-dev",
-                  "min_tag": "dev-v3.2.0",
-                  "no_compatible": false
+                  "min": "3.0.3",
+                  "min_tag": "v3.0.3",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             },
@@ -854,12 +1314,26 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -880,12 +1354,23 @@
                 "production": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "1.4.0-dev.23",
-                  "min_tag": "v1.4.0-dev.23",
-                  "no_compatible": false
+                  "min": "1.3.17",
+                  "min_tag": "v1.3.17",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -916,12 +1401,30 @@
                 "production": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.3"
+                  ],
+                  "failed": [
+                    "v3.0.3"
+                  ],
+                  "unknown": []
                 },
                 "development": {
                   "min": null,
                   "min_tag": null,
-                  "no_compatible": true
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": []
                 }
               }
             },
@@ -942,12 +1445,23 @@
                 "production": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "3.1.0-dev",
-                  "min_tag": "dev-v3.1.0",
-                  "no_compatible": false
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             },
@@ -968,12 +1482,23 @@
                 "production": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "1.4.0-dev.23",
-                  "min_tag": "v1.4.0-dev.23",
-                  "no_compatible": false
+                  "min": "1.3.17",
+                  "min_tag": "v1.3.17",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -1007,12 +1532,26 @@
                 "production": {
                   "min": "0.2.4",
                   "min_tag": "v0.2.4",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "0.4.0-dev",
-                  "min_tag": "dev-v0.4.0",
-                  "no_compatible": false
+                  "min": "0.2.4",
+                  "min_tag": "v0.2.4",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }
@@ -1041,12 +1580,26 @@
                 "production": {
                   "min": "0.2.4",
                   "min_tag": "v0.2.4",
-                  "no_compatible": false
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 },
                 "development": {
-                  "min": "0.4.0-dev",
-                  "min_tag": "dev-v0.4.0",
-                  "no_compatible": false
+                  "min": "0.2.4",
+                  "min_tag": "v0.2.4",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [],
+                  "unknown": []
                 }
               }
             }

@@ -128,7 +128,7 @@ export function parseKinds(spec: string | undefined): TargetKind[] {
 /** Accepts the channel aliases the kiosk and installers use. */
 export function normaliseChannel(spec: string): "stable" | "beta" {
   const value = spec.trim().toLowerCase();
-  if (value === "stable" || value === "release" || value === "prod") return "stable";
+  if (value === "stable" || value === "release" || value === "prod" || value === "production") return "stable";
   if (value === "beta" || value === "dev" || value === "development") return "beta";
   throw new UsageError(`Unknown channel "${spec}" (expected stable or beta)`);
 }

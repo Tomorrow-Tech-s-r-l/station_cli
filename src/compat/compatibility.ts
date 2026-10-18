@@ -21,17 +21,38 @@ import {
 
 export const COMPAT_FORMAT = "compatibility/v1";
 
-/** Which floor a release of one component has towards one other component. */
-export interface CompatRequirement {
+/** A floor over one set of tested releases of the other component. */
+export interface CompatFloor {
   /** Lowest compatible version of the other component; null when none is. */
   min: string | null;
   min_tag: string | null;
-  /** True when the newest tested release of the other component failed. */
+  /** True when the newest tested release of the other component failed (or none was tested). */
   no_compatible: boolean;
+  /** Why there is no floor, when there is none (e.g. `untested`). */
+  reason?: string;
   tested: string[];
   failed: string[];
-  evidence: string[];
+  unknown?: string[];
 }
+
+/**
+ * Which floor a release of one component has towards one other component.
+ * The top level is the floor over every tested release of the other
+ * component; `channels` splits it by the channel of the INSTALLING station
+ * (see channelFloor).
+ */
+export interface CompatRequirement extends CompatFloor {
+  evidence: string[];
+  /**
+   * production: the floor over production releases of the other component
+   * only — a production station installs nothing else, so a failing dev
+   * release does not hold it back. development: over both channels (the
+   * same as the top level). Absent in files written before the split.
+   */
+  channels?: Record<ReleaseChannel, CompatFloor>;
+}
+
+export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ["production", "development"];
 
 export interface CompatRelease {
   version: string;
@@ -116,21 +137,36 @@ export function validateCompatibility(doc: unknown): { doc: CompatibilityDoc | n
             err(qat, "must be an object");
             continue;
           }
-          if (req.min !== null && !parseSemVer(req.min as string)) {
-            err(`${qat}.min`, "must be a semantic version or null");
+          validateFloor(qat, req, err);
+          if (req.evidence !== undefined && !isStringArray(req.evidence)) err(`${qat}.evidence`, "must be a list of strings");
+          if (req.channels === undefined) continue;
+          if (!isObject(req.channels)) {
+            err(`${qat}.channels`, "must be an object");
+            continue;
           }
-          if (req.min_tag !== undefined && req.min_tag !== null && typeof req.min_tag !== "string") {
-            err(`${qat}.min_tag`, "must be a string or null");
-          }
-          if (typeof req.no_compatible !== "boolean") err(`${qat}.no_compatible`, "must be a boolean");
-          for (const k of ["tested", "failed", "evidence"]) {
-            if (req[k] !== undefined && !isStringArray(req[k])) err(`${qat}.${k}`, "must be a list of strings");
+          for (const ch of RELEASE_CHANNELS) {
+            const floor = req.channels[ch];
+            if (!isObject(floor)) err(`${qat}.channels.${ch}`, "must be an object");
+            else validateFloor(`${qat}.channels.${ch}`, floor, err);
           }
         }
       }
     }
   }
   return errors.length ? { doc: null, errors } : { doc: doc as unknown as CompatibilityDoc, errors };
+}
+
+function validateFloor(at: string, floor: Record<string, unknown>, err: (p: string, m: string) => void): void {
+  if (floor.min !== null && !parseSemVer(floor.min as string)) {
+    err(`${at}.min`, "must be a semantic version or null");
+  }
+  if (floor.min_tag !== undefined && floor.min_tag !== null && typeof floor.min_tag !== "string") {
+    err(`${at}.min_tag`, "must be a string or null");
+  }
+  if (typeof floor.no_compatible !== "boolean") err(`${at}.no_compatible`, "must be a boolean");
+  for (const k of ["tested", "failed", "unknown"]) {
+    if (floor[k] !== undefined && !isStringArray(floor[k])) err(`${at}.${k}`, "must be a list of strings");
+  }
 }
 
 /** Parses and validates file contents. Never throws. */
@@ -211,24 +247,60 @@ export function interpretInstalled(
 }
 
 // ---------------------------------------------------------------------------
+// Channels
+// ---------------------------------------------------------------------------
+
+/**
+ * The release channel of a station on this CLI's update channel: `stable`
+ * installs production releases only, `beta` both.
+ */
+export function stationChannel(channel: "stable" | "beta"): ReleaseChannel {
+  return channel === "stable" ? "production" : "development";
+}
+
+/**
+ * The floor a station of `channel` uses (release-compat's `channelFloor`):
+ * `requires[Y].channels[channel]`; with no channel, or a file without
+ * `channels`, the top level (= the development floor).
+ */
+export function channelFloor(
+  req: CompatRequirement | undefined,
+  channel: ReleaseChannel | null | undefined
+): CompatFloor | undefined {
+  if (!req) return req;
+  return (channel && req.channels?.[channel]) || req;
+}
+
+// ---------------------------------------------------------------------------
 // The consumer rule
 // ---------------------------------------------------------------------------
 
 export interface InstallVerdict {
   installable: boolean;
+  /** The installing station's channel whose floors were read; null = the top level. */
+  channel: ReleaseChannel | null;
   /** Why not, one line per broken requirement. Empty when installable. */
   reasons: string[];
   /** Non-blocking observations (an installed build the file does not list). */
   notes: string[];
 }
 
+/** release-compat's `reason` for a floor with no compatible version. */
+const NO_FLOOR_WHY: Record<string, string> = {
+  newest_failed: "newest tested failed",
+  newest_unknown: "newest tested has no result",
+  untested: "none of that channel was tested",
+};
+
 function hasEdge(doc: CompatibilityDoc, a: string, b: string): boolean {
   return doc.edges.some(([x, y]) => x === a && y === b);
 }
 
 /**
- * "May I install `component@tag` next to what is installed?" — identical in
- * every consumer (release-compat's `compat check`, the kiosk, the installer):
+ * "May I install `component@tag` next to what is installed, on a station of
+ * `channel`?" — identical in every consumer (release-compat's `compat
+ * check`, the kiosk, the installer). Every floor below is the one for the
+ * installing station's channel (channelFloor):
  *
  *  1. The release must be in the file. Untested means not installable.
  *  2. For each installed component it has an edge with, its own floor
@@ -243,21 +315,25 @@ export function checkInstall(
   doc: CompatibilityDoc,
   component: ComponentId,
   tag: string,
-  installed: InstalledComponent[]
+  installed: InstalledComponent[],
+  opts: { channel?: ReleaseChannel | null } = {}
 ): InstallVerdict {
+  const channel = opts.channel ?? null;
   const reasons: string[] = [];
   const notes: string[] = [];
+  const on = channel ? ` for a ${channel} station` : "";
   const rel = doc.components[component]?.releases?.[tag];
   if (!rel) {
     return {
       installable: false,
+      channel,
       reasons: [`${component} ${tag} is not in compatibility.json (untested)`],
       notes,
     };
   }
   const version = classifyTag(component, tag)?.version ?? parseSemVer(rel.version);
   if (!version) {
-    return { installable: false, reasons: [`${component} ${tag} has no usable version`], notes };
+    return { installable: false, channel, reasons: [`${component} ${tag} has no usable version`], notes };
   }
 
   for (const inst of installed) {
@@ -268,12 +344,15 @@ export function checkInstall(
     if (!forward && !reverse) continue;
 
     // --- 2: this release's floor towards Y ---------------------------------
-    const req = rel.requires?.[Y];
+    const req = channelFloor(rel.requires?.[Y], channel);
     if (!req) {
       if (forward) reasons.push(`${component} ${tag} was never tested with ${Y}`);
       else notes.push(`${component} ${tag} lists no floor for ${Y}`);
     } else if (req.no_compatible || req.min === null) {
-      reasons.push(`${component} ${tag} has no compatible ${Y} release (newest tested failed)`);
+      reasons.push(
+        `${component} ${tag} has no compatible ${Y} release${on} ` +
+          `(${NO_FLOOR_WHY[req.reason ?? ""] ?? "newest tested failed"})`
+      );
     } else {
       const min = parseSemVer(req.min);
       for (const i of inst.interpretations) {
@@ -293,10 +372,10 @@ export function checkInstall(
         notes.push(`${inst.label} (${Y} ${formatSemVer(i.version)}) is not in compatibility.json`);
         continue;
       }
-      const back = theirs.requires?.[component];
+      const back = channelFloor(theirs.requires?.[component], channel);
       if (!back) continue;
       if (back.no_compatible || back.min === null) {
-        reasons.push(`${inst.label} (${Y} ${i.tag}) has no compatible ${component} release`);
+        reasons.push(`${inst.label} (${Y} ${i.tag}) has no compatible ${component} release${on}`);
         continue;
       }
       const min = parseSemVer(back.min);
@@ -305,5 +384,5 @@ export function checkInstall(
       }
     }
   }
-  return { installable: reasons.length === 0, reasons: [...new Set(reasons)], notes: [...new Set(notes)] };
+  return { installable: reasons.length === 0, channel, reasons: [...new Set(reasons)], notes: [...new Set(notes)] };
 }

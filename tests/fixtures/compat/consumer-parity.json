@@ -1,6 +1,6 @@
 {
   "format": "compat-parity/v1",
-  "about": "Shared consumer-rule cases. release-compat's checkInstall, station_cli's catalog, the kiosk's CompatibilityData and install.sh's jq rule must all give `installable` for every case. Copy this file verbatim; the source of truth is release-compat/test/fixtures/consumer-parity.json.",
+  "about": "Shared consumer-rule cases. release-compat's checkInstall, station_cli's catalog, the kiosk's CompatibilityData and install.sh's jq rule must all give `installable` for every case. A case's `channel` (production | development) is the channel of the installing station: floors are read from requires[Y].channels[channel]; no `channel`, or a requirement without `channels`, uses the top-level floor. Copy this file verbatim; the source of truth is release-compat/test/fixtures/consumer-parity.json.",
   "docs": {
     "synthetic": {
       "format": "compatibility/v1",
@@ -91,6 +91,68 @@
                   ],
                   "failed": [],
                   "evidence": []
+                }
+              }
+            },
+            "v3.0.5": {
+              "version": "3.0.5",
+              "channel": "production",
+              "requires": {
+                "station_cli": {
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.3.1"
+                  ],
+                  "failed": [],
+                  "evidence": [],
+                  "channels": {
+                    "production": {
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.3.1"
+                      ],
+                      "failed": []
+                    },
+                    "development": {
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.3.1"
+                      ],
+                      "failed": []
+                    }
+                  }
+                },
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "tested": [],
+                  "failed": [],
+                  "evidence": [],
+                  "channels": {
+                    "production": {
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "tested": [],
+                      "failed": []
+                    }
+                  }
                 }
               }
             }
@@ -286,6 +348,40 @@
                   "evidence": []
                 }
               }
+            },
+            "v0.7.0": {
+              "version": "0.7.0",
+              "channel": "production",
+              "requires": {
+                "kiosk": {
+                  "min": "1.4.0-dev.2",
+                  "min_tag": "v1.4.0-dev.2",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.4.0-dev.2"
+                  ],
+                  "failed": [],
+                  "evidence": [],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "tested": [],
+                      "failed": []
+                    },
+                    "development": {
+                      "min": "1.4.0-dev.2",
+                      "min_tag": "v1.4.0-dev.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.4.0-dev.2"
+                      ],
+                      "failed": []
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -352,7 +448,7 @@
     "computed": {
       "format": "compatibility/v1",
       "sequence": 1,
-      "generated_at": "2026-10-18T17:52:52Z",
+      "generated_at": "2026-10-18T18:47:12Z",
       "edges": [
         [
           "S1TTXX",
@@ -407,12 +503,43 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -437,12 +564,30 @@
                     "production": {
                       "min": "0.3.1",
                       "min_tag": "v0.3.1",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "0.4.0-dev",
-                      "min_tag": "dev-v0.4.0",
-                      "no_compatible": false
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -480,12 +625,43 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -510,12 +686,30 @@
                     "production": {
                       "min": "0.3.1",
                       "min_tag": "v0.3.1",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "0.4.0-dev",
-                      "min_tag": "dev-v0.4.0",
-                      "no_compatible": false
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -551,12 +745,41 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.1.0-dev",
-                      "min_tag": "dev-v3.1.0",
-                      "no_compatible": false
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -587,12 +810,31 @@
                     "production": {
                       "min": "2.0.0",
                       "min_tag": "v2.0.0",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.1.0-dev",
-                      "min_tag": "dev-v3.1.0",
-                      "no_compatible": false
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -623,12 +865,31 @@
                     "production": {
                       "min": "2.0.0",
                       "min_tag": "v2.0.0",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.1.0-dev",
-                      "min_tag": "dev-v3.1.0",
-                      "no_compatible": false
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -659,12 +920,31 @@
                     "production": {
                       "min": "2.0.0",
                       "min_tag": "v2.0.0",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.1.0-dev",
-                      "min_tag": "dev-v3.1.0",
-                      "no_compatible": false
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -704,12 +984,38 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.3"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -737,12 +1043,34 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [
+                        "v0.3.1"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -773,12 +1101,31 @@
                     "production": {
                       "min": "2.0.0",
                       "min_tag": "v2.0.0",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.2.0-dev",
-                      "min_tag": "dev-v3.2.0",
-                      "no_compatible": false
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 },
@@ -801,12 +1148,26 @@
                     "production": {
                       "min": "0.2.4",
                       "min_tag": "v0.2.4",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "0.4.0-dev",
-                      "min_tag": "dev-v0.4.0",
-                      "no_compatible": false
+                      "min": "0.2.4",
+                      "min_tag": "v0.2.4",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -842,12 +1203,40 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -883,12 +1272,40 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -924,12 +1341,40 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -965,12 +1410,40 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 }
@@ -1002,12 +1475,23 @@
                     "production": {
                       "min": "3.0.3",
                       "min_tag": "v3.0.3",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.2.0-dev",
-                      "min_tag": "dev-v3.2.0",
-                      "no_compatible": false
+                      "min": "3.0.3",
+                      "min_tag": "v3.0.3",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 },
@@ -1031,12 +1515,26 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -1057,12 +1555,23 @@
                     "production": {
                       "min": "1.3.17",
                       "min_tag": "v1.3.17",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "1.4.0-dev.23",
-                      "min_tag": "v1.4.0-dev.23",
-                      "no_compatible": false
+                      "min": "1.3.17",
+                      "min_tag": "v1.3.17",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -1089,12 +1598,23 @@
                     "production": {
                       "min": "3.0.3",
                       "min_tag": "v3.0.3",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.2.0-dev",
-                      "min_tag": "dev-v3.2.0",
-                      "no_compatible": false
+                      "min": "3.0.3",
+                      "min_tag": "v3.0.3",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 },
@@ -1118,12 +1638,26 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -1144,12 +1678,23 @@
                     "production": {
                       "min": "1.3.17",
                       "min_tag": "v1.3.17",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "1.4.0-dev.23",
-                      "min_tag": "v1.4.0-dev.23",
-                      "no_compatible": false
+                      "min": "1.3.17",
+                      "min_tag": "v1.3.17",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -1176,12 +1721,23 @@
                     "production": {
                       "min": "3.0.3",
                       "min_tag": "v3.0.3",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.2.0-dev",
-                      "min_tag": "dev-v3.2.0",
-                      "no_compatible": false
+                      "min": "3.0.3",
+                      "min_tag": "v3.0.3",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 },
@@ -1205,12 +1761,26 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -1231,12 +1801,23 @@
                     "production": {
                       "min": "1.3.17",
                       "min_tag": "v1.3.17",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "1.4.0-dev.23",
-                      "min_tag": "v1.4.0-dev.23",
-                      "no_compatible": false
+                      "min": "1.3.17",
+                      "min_tag": "v1.3.17",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -1267,12 +1848,30 @@
                     "production": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.3"
+                      ],
+                      "unknown": []
                     },
                     "development": {
                       "min": null,
                       "min_tag": null,
-                      "no_compatible": true
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
                     }
                   }
                 },
@@ -1293,12 +1892,23 @@
                     "production": {
                       "min": "3.0.2",
                       "min_tag": "v3.0.2",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "3.1.0-dev",
-                      "min_tag": "dev-v3.1.0",
-                      "no_compatible": false
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 },
@@ -1319,12 +1929,23 @@
                     "production": {
                       "min": "1.3.17",
                       "min_tag": "v1.3.17",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "1.4.0-dev.23",
-                      "min_tag": "v1.4.0-dev.23",
-                      "no_compatible": false
+                      "min": "1.3.17",
+                      "min_tag": "v1.3.17",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -1358,12 +1979,26 @@
                     "production": {
                       "min": "0.2.4",
                       "min_tag": "v0.2.4",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "0.4.0-dev",
-                      "min_tag": "dev-v0.4.0",
-                      "no_compatible": false
+                      "min": "0.2.4",
+                      "min_tag": "v0.2.4",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -1392,12 +2027,26 @@
                     "production": {
                       "min": "0.2.4",
                       "min_tag": "v0.2.4",
-                      "no_compatible": false
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     },
                     "development": {
-                      "min": "0.4.0-dev",
-                      "min_tag": "dev-v0.4.0",
-                      "no_compatible": false
+                      "min": "0.2.4",
+                      "min_tag": "v0.2.4",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
                     }
                   }
                 }
@@ -1902,6 +2551,196 @@
       "installable": true
     },
     {
+      "doc": "synthetic",
+      "name": "production station: production pack floor met, the failing dev pack does not count",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.5"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "synthetic",
+      "name": "development station: the dev pack failure blocks",
+      "channel": "development",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.5"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "synthetic",
+      "name": "no channel: the top level (= development) blocks",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.5"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "synthetic",
+      "name": "production station: below the production floor",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.5"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "synthetic",
+      "name": "rule 3 per channel: installed board's production pack floor",
+      "channel": "production",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "v3.0.2"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.5"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "synthetic",
+      "name": "rule 3 per channel: installed board's development pack floor",
+      "channel": "development",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "v3.0.2"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.5"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "synthetic",
+      "name": "production floor untested -> not installable on production",
+      "channel": "production",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.7.0"
+      },
+      "installed": [
+        {
+          "component": "kiosk",
+          "tag": "v1.4.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "synthetic",
+      "name": "same release on a development station",
+      "channel": "development",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.7.0"
+      },
+      "installed": [
+        {
+          "component": "kiosk",
+          "tag": "v1.4.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "synthetic",
+      "name": "same release, no channel",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.7.0"
+      },
+      "installed": [
+        {
+          "component": "kiosk",
+          "tag": "v1.4.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "synthetic",
+      "name": "no channels block: production uses the top level",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "dev-v3.2.0"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "synthetic",
+      "name": "no channels block: production uses the top level (met)",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        }
+      ],
+      "installable": true
+    },
+    {
       "doc": "computed",
       "name": "board v3.0.3 with cli v0.3.1",
       "install": {
@@ -2090,6 +2929,201 @@
         {
           "component": "station_cli",
           "version": "0.5.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "production: board v3.0.3 with pack v3.0.2 + cli v0.3.1",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "development: board v3.0.3 with pack v3.0.2 + cli v0.3.1 (dev-v3.1.0 fails)",
+      "channel": "development",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "no channel: board v3.0.3 with pack v3.0.2 + cli v0.3.1",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: board v3.0.3 with cli v0.2.4 still refused",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.4"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: pack v3.0.2 on board v3.0.3",
+      "channel": "production",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "v3.0.2"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        },
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "development: pack v3.0.2 on board v3.0.3",
+      "channel": "development",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "v3.0.2"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        },
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: cli v0.3.1 on board v3.0.3 + pack v3.0.2 + kiosk v1.3.17",
+      "channel": "production",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.3.1"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        },
+        {
+          "component": "kiosk",
+          "tag": "v1.3.17"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "development: cli dev-v0.5.0 on board v3.0.3 + pack v3.0.2",
+      "channel": "development",
+      "install": {
+        "component": "station_cli",
+        "tag": "dev-v0.5.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: pack dev-v3.1.0 has no compatible board on any channel",
+      "channel": "production",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "dev-v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: kiosk v1.3.17 with cli v0.3.1",
+      "channel": "production",
+      "install": {
+        "component": "kiosk",
+        "tag": "v1.3.17"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
         }
       ],
       "installable": true

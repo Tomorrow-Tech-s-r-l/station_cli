@@ -18,18 +18,31 @@ const { installedSet } = require("../../dist/S1TTXX/fwu/engine");
 const FIXTURES = path.join(__dirname, "..", "fixtures");
 const parity = JSON.parse(fs.readFileSync(path.join(FIXTURES, "compat", "consumer-parity.json"), "utf8"));
 
+// A case's `channel` is the installing station's (production | development);
+// without one the rule reads the top-level floors.
 for (const c of parity.cases) {
-  test(`parity [${c.doc}] ${c.name}`, () => {
+  test(`parity [${c.doc}${c.channel ? `, ${c.channel}` : ""}] ${c.name}`, () => {
     const { doc, errors } = parseCompatibility(JSON.stringify(parity.docs[c.doc]));
     assert.deepEqual(errors, []);
     const installed = c.installed.map((i) =>
       interpretInstalled(doc, i.component, i.version ?? "", i.component, { tag: i.tag ?? null })
     );
     assert.ok(installed.every(Boolean), "every installed component is readable");
-    const v = checkInstall(doc, c.install.component, c.install.tag, installed);
+    const v = checkInstall(doc, c.install.component, c.install.tag, installed, { channel: c.channel ?? null });
     assert.equal(v.installable, c.installable, JSON.stringify({ reasons: v.reasons, notes: v.notes }));
+    assert.equal(v.channel, c.channel ?? null);
   });
 }
+
+test("parity: the cases cover production, development and no channel", () => {
+  const channels = new Set(parity.cases.map((c) => c.channel ?? null));
+  assert.deepEqual([...channels].sort(), ["development", "production", null].sort());
+});
+
+test("parity: the computed doc is the computed fixture the catalog tests read", () => {
+  const computed = JSON.parse(fs.readFileSync(path.join(FIXTURES, "compat", "compatibility.computed.json"), "utf8"));
+  assert.deepEqual(parity.docs.computed, computed);
+});
 
 // --- the catalog on the computed file ---------------------------------------
 
@@ -62,6 +75,8 @@ function opts({ channel = "stable", cliVersion, cliTag, interfaces = [], powerba
   };
 }
 
+// channel "stable" (the default here) is a production station, "beta" a
+// development one: the floors are those of that channel.
 test("computed: a station on v3.0.3 + CLI v0.3.1 with no packs read is offered v3.0.3", () => {
   const o = opts({ cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")] });
   const c = selectGithubCandidate("interface", SOURCES.interface, boards, o);
@@ -69,14 +84,26 @@ test("computed: a station on v3.0.3 + CLI v0.3.1 with no packs read is offered v
   assert.deepEqual(c.minCliVersion, [0, 3, 1], "v0.2.4 fails the board contract (empty slot reported present)");
 });
 
-test("computed: with packs docked, no board firmware is offered (dev pack dev-v3.1.0 fails every board)", () => {
+test("computed: stable, packs docked: v3.0.3 is offered (the failing dev pack is not a production release)", () => {
   const o = opts({ cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
-  assert.equal(selectGithubCandidate("interface", SOURCES.interface, boards, o), null);
-  assert.ok(o.warnings.some((w) => /no compatible P1TT2C/.test(w)), o.warnings.join("\n"));
+  const c = selectGithubCandidate("interface", SOURCES.interface, boards, o);
+  assert.equal(c?.tag, "v3.0.3", o.warnings.join("\n"));
+  assert.deepEqual(c.minCliVersion, [0, 3, 1], "the production station_cli floor");
 });
 
-test("computed: no pack firmware is offered on a v3.0.3 board", () => {
+test("computed: beta, packs docked: no board firmware is offered (dev pack dev-v3.1.0 fails every board)", () => {
+  const o = opts({ channel: "beta", cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
+  assert.equal(selectGithubCandidate("interface", SOURCES.interface, boards, o), null);
+  assert.ok(o.warnings.some((w) => /no compatible P1TT2C release for a development station/.test(w)), o.warnings.join("\n"));
+});
+
+test("computed: stable: pack v3.0.2 is offered on a v3.0.3 board", () => {
   const o = opts({ cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
+  assert.equal(selectGithubCandidate("powerbank", SOURCES.powerbank, packs, o)?.tag, "v3.0.2", o.warnings.join("\n"));
+});
+
+test("computed: beta: no pack firmware is offered on a v3.0.3 board", () => {
+  const o = opts({ channel: "beta", cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
   assert.equal(selectGithubCandidate("powerbank", SOURCES.powerbank, packs, o), null, o.warnings.join("\n"));
 });
 

@@ -381,7 +381,7 @@ jobs:
           if [ -n "$COMPAT_TOKEN" ] && [ -n "$COMPAT_REF" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::COMPAT_TOKEN or vars.COMPAT_REF not set — metadata.json gets no computed floors; legacy fields are carried forward from the previous release"
+            echo "::warning::COMPAT_TOKEN or vars.COMPAT_REF not set — metadata.json gets no computed floors; a legacy field is carried only from a previous release that computed it, else the release fails"
             echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -397,13 +397,16 @@ jobs:
       # from this run's contract evidence (fw-contract → artifact
       # compat-evidence-unpublished) through release-compat (`compat floor`),
       # and for what this run did not test (the kiosk) from the published
-      # compatibility.json (`compat metadata`); the legacy
-      # min_kiosk_app_version, which kiosks in the field read, is the X.Y.Z
-      # of the computed kiosk floor, one patch above the newest kiosk tested
-      # when none is compatible, and with no evidence the previous release's
-      # published value, carried forward and listed in
-      # computed.carried_forward. `capabilities` is what the released binary
-      # itself reports.
+      # compatibility.json (`compat metadata`). The legacy
+      # min_kiosk_app_version, which kiosks in the field read, uses the floor
+      # of this release's channel (a production release: the floor over
+      # production kiosks): its X.Y.Z, one patch above the newest kiosk
+      # tested when none is compatible, and with no evidence the value of
+      # the newest earlier release whose metadata.json was itself computed
+      # (schema 2 with a run_url), listed in computed.carried_forward /
+      # carried_from. Nothing computed to carry: the step fails, and so does
+      # the release (release-metadata.js). `capabilities` is what the
+      # released binary itself reports.
       - name: Compute metadata.json
         env:
           GH_TOKEN: ${{ github.token }}
@@ -417,12 +420,21 @@ jobs:
           W="$RUNNER_TEMP/metadata" && rm -rf "$W" && mkdir -p "$W"
           ./station-cli-linux-x64 capabilities --json > "$W/capabilities.json"
 
-          PREV=$(gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' \
-            | node scripts/release-metadata.js previous-tag "$TAG" || true)
-          if [ -n "$PREV" ]; then
-            gh release download "$PREV" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/previous" \
-              || echo "::notice::$PREV has no metadata.json"
-          fi
+          # The newest earlier release with a computed metadata.json (same
+          # channel first); else the newest one with any, which
+          # release-metadata.js then refuses to carry from, saying why.
+          gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' \
+            | node scripts/release-metadata.js previous-tags "$TAG" | head -n 10 > "$W/previous-tags.txt" || true
+          while read -r prev; do
+            rm -rf "$W/candidate"
+            gh release download "$prev" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/candidate" 2>/dev/null || continue
+            if node scripts/release-metadata.js has-provenance "$W/candidate/metadata.json"; then
+              rm -rf "$W/previous" && mv "$W/candidate" "$W/previous"
+              echo "::notice::legacy values may be carried from $prev"
+              break
+            fi
+            [ -d "$W/previous" ] || mv "$W/candidate" "$W/previous"
+          done < "$W/previous-tags.txt"
 
           args=()
           # fw-contract's evidence, uploaded as unpublished until this job
@@ -434,9 +446,11 @@ jobs:
             else
               echo "::warning::compat floor failed — metadata.json carries no computed floors"
             fi
+            prev_args=()
+            [ -f "$W/previous/metadata.json" ] && prev_args=(--previous "$W/previous/metadata.json")
             if GH_TOKEN="$COMPAT_TOKEN" gh release download current -R Tomorrow-Tech-s-r-l/release-compat -p compatibility.json -D "$W/compat" \
               && node release-compat/bin/compat.mjs metadata --component station_cli --tag "$TAG" \
-                   --compat "$W/compat/compatibility.json" --out "$W/base.json"; then
+                   --compat "$W/compat/compatibility.json" "${prev_args[@]}" --out "$W/base.json"; then
               args+=(--base "$W/base.json")
             else
               echo "::warning::compat metadata failed — metadata.json is completed from the evidence floor alone"
@@ -487,8 +501,11 @@ jobs:
 
       # The release exists now, so the contract evidence of this run can move
       # floors: publish it under the name release-compat ingests, and hand it
-      # over, so compatibility.json is recomputed.
+      # over, so compatibility.json is recomputed. Only from main /
+      # development (the only branches this workflow runs on; guarded anyway,
+      # as release-compat trusts nothing else).
       - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
         with:
           name: compat-evidence
           path: compat-evidence-unpublished/evidence.json
@@ -496,7 +513,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Report the contract evidence to release-compat
-        if: steps.compat.outputs.ok == 'true' && hashFiles('compat-evidence-unpublished/evidence.json') != ''
+        if: steps.compat.outputs.ok == 'true' && hashFiles('compat-evidence-unpublished/evidence.json') != '' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         env:
           GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
         run: |

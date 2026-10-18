@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 
 const { buildMatrix, tagsFrom } = require("../../scripts/contract-targets");
 const { legResult, legResults, verdict, merge } = require("../../scripts/contract-evidence");
-const { buildMetadata, previousTag } = require("../../scripts/release-metadata");
+const { buildMetadata, previousTag, previousTags, hasProvenance, MetadataError } = require("../../scripts/release-metadata");
 
 test("targets: compat targets × packs, branches never get a tag", () => {
   const m = buildMatrix({
@@ -117,33 +117,59 @@ test("evidence: a branch build has no tag, and the file is compat-evidence/v1", 
   assert.equal(e.generated_at, "2026-10-18T10:00:00Z");
 });
 
-test("metadata: the kiosk floor from evidence, else carried forward, never a literal", () => {
+// A previous release's metadata.json that was computed (may be carried from).
+const computedPrevious = (extra = {}) => ({
+  schema: 2,
+  component: "station_cli",
+  tag: "v0.5.0",
+  min_kiosk_app_version: "1.2.0",
+  computed: { run_url: "https://github.com/o/r/actions/runs/7", suite_ref: "s", at: "2026-10-01T00:00:00Z", carried_forward: [] },
+  ...extra,
+});
+
+test("metadata: the kiosk floor from evidence, else carried from a computed value, never a literal", () => {
   const fromEvidence = buildMetadata({
     tag: "dev-v0.6.0",
     version: "0.6.0",
-    floor: { requires: { kiosk: { min: "1.3.14", no_compatible: false }, S1TTXX: { min: "3.0.3", no_compatible: false } } },
-    previous: { min_kiosk_app_version: "1.2.0" },
+    floor: { requires: { kiosk: { min: "1.3.14", no_compatible: false, tested: ["v1.3.14"] }, S1TTXX: { min: "3.0.3", no_compatible: false, tested: ["v3.0.3"] } } },
+    previous: computedPrevious(),
   }).meta;
   assert.equal(fromEvidence.schema, 2);
+  assert.equal(fromEvidence.channel, "development");
   assert.equal(fromEvidence.cli_version, "0.6.0");
   assert.equal(fromEvidence.min_kiosk_app_version, "1.3.14");
   assert.equal(fromEvidence.requires.S1TTXX.min, "3.0.3");
-  assert.equal(fromEvidence.computed.carried_forward, undefined);
+  assert.deepEqual(fromEvidence.computed.carried_forward, [], "always present (release-compat's metadata schema)");
 
-  const carried = buildMetadata({ tag: "v0.6.0", version: "0.6.0", previous: { min_kiosk_app_version: "1.2.0" } }).meta;
+  const carried = buildMetadata({ tag: "v0.6.0", version: "0.6.0", previous: computedPrevious(), runUrl: "https://github.com/o/r/actions/runs/8" }).meta;
   assert.equal(carried.min_kiosk_app_version, "1.2.0");
   assert.deepEqual(carried.computed.carried_forward, ["min_kiosk_app_version"]);
+  assert.deepEqual(carried.computed.carried_from, { min_kiosk_app_version: { tag: "v0.5.0", run_url: "https://github.com/o/r/actions/runs/7" } });
 
-  const none = buildMetadata({ tag: "v0.6.0", version: "0.6.0" });
-  assert.equal(none.meta.min_kiosk_app_version, undefined);
-  assert.match(none.warnings[0], /left out/);
+  // Carried again: the origin is the run that computed it, not the carrier.
+  const again = buildMetadata({ tag: "v0.7.0", version: "0.7.0", previous: { ...carried, tag: "v0.6.0" } }).meta;
+  assert.deepEqual(again.computed.carried_from.min_kiosk_app_version, { tag: "v0.5.0", run_url: "https://github.com/o/r/actions/runs/7" });
+});
+
+test("metadata: no evidence and no computed previous value fails the release", () => {
+  assert.throws(() => buildMetadata({ tag: "v0.6.0", version: "0.6.0" }), (e) => e instanceof MetadataError && /no previous computed value/.test(e.message));
+  // A schema-1 file, or a value with no run behind it, has no provenance.
+  for (const previous of [
+    { min_kiosk_app_version: "1.2.0" },
+    computedPrevious({ computed: { run_url: null, carried_forward: [] } }),
+    computedPrevious({ computed: { run_url: "u", carried_forward: ["min_kiosk_app_version"] } }),
+    computedPrevious({ computed: { run_url: "u", carried_forward: [], uncomputed: ["min_kiosk_app_version"] } }),
+  ]) {
+    assert.throws(() => buildMetadata({ tag: "v0.6.0", version: "0.6.0", previous }), /no computed provenance/);
+  }
+  assert.throws(() => buildMetadata({ tag: "nightly", version: "0.6.0" }), /not a station_cli release tag/);
 });
 
 test("metadata: this run's floor wins over the published file, legacy values are X.Y.Z", () => {
   const base = {
     schema: 2,
     component: "station_cli",
-    tag: "v0.6.0",
+    tag: "dev-v0.6.0",
     requires: {
       S1TTXX: { min: "3.0.1", no_compatible: false, tested: ["v3.0.1"] },
       kiosk: { min: "1.4.0-dev.23", min_tag: "v1.4.0-dev.23", no_compatible: false, tested: ["v1.4.0-dev.23"] },
@@ -151,16 +177,41 @@ test("metadata: this run's floor wins over the published file, legacy values are
     computed: { run_url: null, carried_forward: [], uncomputed: ["min_kiosk_app_version"] },
   };
   const { meta } = buildMetadata({
-    tag: "v0.6.0",
+    tag: "dev-v0.6.0",
     version: "0.6.0",
     base,
-    floor: { requires: { S1TTXX: { min: "3.0.3", no_compatible: false } } },
+    floor: { requires: { S1TTXX: { min: "3.0.3", no_compatible: false, tested: ["v3.0.3"] } } },
   });
   assert.equal(meta.requires.S1TTXX.min, "3.0.3", "the evidence of this run, not the stale published entry");
   assert.equal(meta.requires.kiosk.min_tag, "v1.4.0-dev.23", "what the run did not test comes from the file");
   assert.equal(meta.min_kiosk_app_version, "1.4.0", "legacy kiosks parse X.Y.Z only");
   assert.equal(meta.computed.uncomputed, undefined);
-  assert.equal(meta.computed.carried_forward, undefined);
+  assert.deepEqual(meta.computed.carried_forward, []);
+});
+
+test("metadata: the legacy floor is the one of the release's own channel", () => {
+  // Over both channels the newest kiosk (a dev build) fails; over production
+  // kiosks v1.3.17 is the floor.
+  const kiosk = {
+    min: null, min_tag: null, no_compatible: true, tested: ["v1.3.17", "v1.4.0-dev.23"], failed: ["v1.4.0-dev.23"],
+    channels: {
+      production: { min: "1.3.17", min_tag: "v1.3.17", no_compatible: false, tested: ["v1.3.17"], failed: [] },
+      development: { min: null, min_tag: null, no_compatible: true, tested: ["v1.3.17", "v1.4.0-dev.23"], failed: ["v1.4.0-dev.23"] },
+    },
+  };
+  const prod = buildMetadata({ tag: "v0.6.0", version: "0.6.0", base: { requires: { kiosk } } }).meta;
+  assert.equal(prod.channel, "production");
+  assert.equal(prod.min_kiosk_app_version, "1.3.17");
+  assert.equal(prod.computed.legacy_blocked, undefined);
+  const dev = buildMetadata({ tag: "dev-v0.6.0", version: "0.6.0", base: { requires: { kiosk } } }).meta;
+  assert.equal(dev.min_kiosk_app_version, "1.4.1");
+  assert.deepEqual(dev.computed.legacy_blocked, ["min_kiosk_app_version"]);
+
+  // Nothing of the release's channel was tested: no evidence, so carried.
+  const untested = { ...kiosk, channels: { ...kiosk.channels, production: { min: null, min_tag: null, no_compatible: true, reason: "untested", tested: [], failed: [] } } };
+  const carried = buildMetadata({ tag: "v0.6.0", version: "0.6.0", base: { requires: { kiosk: untested } }, previous: computedPrevious() }).meta;
+  assert.equal(carried.min_kiosk_app_version, "1.2.0");
+  assert.deepEqual(carried.computed.carried_forward, ["min_kiosk_app_version"]);
 });
 
 test("metadata: no compatible kiosk is never read as no floor by an old kiosk", () => {
@@ -168,20 +219,24 @@ test("metadata: no compatible kiosk is never read as no floor by an old kiosk", 
     tag: "v0.6.0",
     version: "0.6.0",
     base: { requires: { kiosk: { min: null, no_compatible: true, tested: ["v1.3.17", "v1.4.0-dev.23"] } } },
-    previous: { min_kiosk_app_version: "1.2.0" },
+    previous: computedPrevious(),
   });
   assert.equal(meta.min_kiosk_app_version, "1.4.1");
   assert.deepEqual(meta.computed.legacy_blocked, ["min_kiosk_app_version"]);
-  assert.equal(meta.computed.carried_forward, undefined);
+  assert.deepEqual(meta.computed.carried_forward, []);
 });
 
-test("metadata: the previous release is found by grammar and precedence", () => {
+test("metadata: the previous releases are found by grammar and precedence", () => {
   const tags = ["dev-v0.5.0", "dev-v0.4.1", "v0.3.1", "dev-v0.3.1", "v0.2.4", "nightly"];
   assert.equal(previousTag(tags, "dev-v0.6.0"), "dev-v0.5.0");
   assert.equal(previousTag(tags, "v0.6.0"), "v0.3.1", "same channel first");
   assert.equal(previousTag(tags, "v0.3.1"), "v0.2.4");
   assert.equal(previousTag(["dev-v0.1.0"], "v0.2.0"), "dev-v0.1.0", "else any lower release");
   assert.equal(previousTag(tags, "v0.0.1"), null);
+  assert.deepEqual(previousTags(tags, "v0.6.0"), ["v0.3.1", "v0.2.4", "dev-v0.5.0", "dev-v0.4.1", "dev-v0.3.1"]);
+  assert.equal(hasProvenance(computedPrevious()), true);
+  assert.equal(hasProvenance({ min_kiosk_app_version: "1.2.0" }), false);
+  assert.equal(hasProvenance(null), false);
 });
 
 // --- the gate --------------------------------------------------------------

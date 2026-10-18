@@ -508,6 +508,7 @@ test("compatibility data and the installed set reach the catalog, and the report
     { origin: report.compatibility.origin, sequence: report.compatibility.sequence, error: report.compatibility.error },
     { origin: "cache", sequence: 42, error: "offline" }
   );
+  assert.equal(report.compatibility.channel, "production", "a stable station reads the production floors");
 });
 
 test("an injected catalog without a loader, or a dir source, never reads compatibility data", async () => {

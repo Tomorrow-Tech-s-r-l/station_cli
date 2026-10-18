@@ -98,7 +98,9 @@ echo '{"credentials":{"github":{"token":"'"$TOKEN"'"}}}' \
    that ships an application-only `.bin` and that **compatibility.json**
    accepts: the release was tested, its floors are met by this CLI and by the
    firmware installed on the station, and the installed releases' own floors
-   accept it back. A device that reports a bare `X.Y.Z` may run `vX.Y.Z` or
+   accept it back. The floors are those of the station's channel: `stable`
+   reads the production floors, `beta` the development ones (see
+   [Compatibility](#compatibility)). A device that reports a bare `X.Y.Z` may run `vX.Y.Z` or
    `dev-vX.Y.Z`, and both must pass. A powerbank image is offered only when
    the boards it sits in are compatible with it — as they run now and as the
    board release of the same run would leave them; a board image only when
@@ -253,6 +255,18 @@ the firmware images (`<firmware.cacheDir>/compatibility.json`), and falls back
 to the copy bundled into the executable at build time. Floors only gate
 installs: nothing already running is stopped because of them.
 
+**Floors per channel.** Each floor (`requires[Y]`) also comes per channel of
+the station that installs: `channels.production` is computed over the
+production releases of Y only — a production station never installs anything
+else, so a failing development pack does not hold its board back —
+and `channels.development` over both channels (the same as the top level).
+The CLI reads the floors of its update channel (`--channel` / the
+`firmware.channel` config): `stable` = `production`, `beta` = `development`;
+a file without `channels` uses the top level. The JSON's
+`compatibility.channel` says which were read. The rule is release-compat's,
+pinned by its shared parity cases
+(`tests/fixtures/compat/consumer-parity.json`, a verbatim copy).
+
 ```json
 "compat": { "repo": "Tomorrow-Tech-s-r-l/release-compat", "tag": "current", "asset": "compatibility.json" }
 ```
@@ -270,6 +284,12 @@ station-cli capabilities --json   # version, release tag, every command and flag
 The release job publishes the same document in `metadata.json`
 (`capabilities`), next to the computed floors (`requires`, schema 2) and the
 legacy `cli_version` / `min_kiosk_app_version` that kiosks in the field read.
+A legacy reader knows no channels, and a release is only installed by
+stations of its own channel, so `min_kiosk_app_version` is the floor of the
+release's channel (a `vX.Y.Z` release: the production kiosk floor). With no
+kiosk evidence of that channel it is carried only from an earlier release
+that computed it (schema 2 with `computed.run_url`; its origin goes in
+`computed.carried_from`); with nothing computed to carry, the release fails.
 
 ## Logs
 
@@ -309,7 +329,8 @@ protocol, so the real code runs end to end. CI runs the suite on every build.
 | `fwu_cli.test.js` | The built binary, spawned: refusals and the stdout/stderr contract |
 | `fwu_http.test.js`, `fwu_catalog.test.js`, `fwu_wire_validation.test.js`, `check_workflows.test.js` | Downloads, asset rules, host-side guards, the CI guard |
 | `unit/compat.test.js`, `unit/compat_catalog.test.js` (`npm test`) | SemVer precedence and the tag grammar on the real release lists, compatibility.json validation, the consumer rule, firmware candidate selection, network/cache/bundled fallback |
-| `unit/contract_scripts.test.js` (`npm test`) | The CI helpers: contract matrix, evidence verdicts, the release gate, metadata.json floors and carry-forward |
+| `unit/compat_parity.test.js` (`npm test`) | release-compat's shared consumer-rule cases (per installing channel), and the catalog on the compatibility.json computed from real contract runs |
+| `unit/contract_scripts.test.js` (`npm test`) | The CI helpers: contract matrix, evidence verdicts, the release gate, metadata.json floors per channel and carry-forward provenance |
 
 If a golden test fails, the wire protocol changed. Regenerate only when that
 change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
@@ -329,7 +350,10 @@ in the JSON. The legs are S1TTXX × P1TT2C: the releases release-compat's
 becomes a `compat-evidence/v1` result (artifact `compat-evidence`; in a
 release run `compat-evidence-unpublished` until the release job has published
 the tag, then re-uploaded as `compat-evidence`); for a release of this CLI the
-release job sends it to release-compat, which recomputes the floors. A pairing
+release job sends it to release-compat, which recomputes the floors. Only
+runs on `main` / `development` (the release, the nightly, a dispatch on those
+refs) publish or report evidence: elsewhere it is `compat-evidence-branch`,
+which release-compat never reads. A pairing
 of two releases tested next to a branch build is left out of the evidence.
 The run (and so the release) goes red when a leg dies, or when this CLI fails
 a core check against the newest production S1TTXX and P1TT2C releases tested;

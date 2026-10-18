@@ -15,7 +15,7 @@ import { Channel, ReleaseCandidate, TargetKind } from "./types";
 import { Secret } from "../../config/secret";
 import { FirmwareSourceConfig } from "../../config/schema";
 import { ComponentId, classifyTag, compareSemVer, parseSemVer } from "../../compat/semver";
-import { InstalledComponent, checkInstall } from "../../compat/compatibility";
+import { InstalledComponent, channelFloor, checkInstall, stationChannel } from "../../compat/compatibility";
 import { CompatLoad } from "../../compat/source";
 
 /**
@@ -217,6 +217,10 @@ export function selectGithubCandidate(
     return null;
   }
 
+  // The floors of this station's channel: a stable station installs only
+  // production releases, so a failing dev release of another component does
+  // not hold it back; a beta one may install either, and uses both.
+  const channel = stationChannel(opts.channel);
   const rules = assetRules(kind, source);
   const eligible = releases
     .filter((r) => r && r.draft !== true)
@@ -248,7 +252,7 @@ export function selectGithubCandidate(
       skipped.push(`Release ${tag} of ${repo} has no asset matching ${rules.describe} — skipping.`);
       continue;
     }
-    const verdict = checkInstall(doc, component, tag, installed);
+    const verdict = checkInstall(doc, component, tag, installed, { channel });
     if (!verdict.installable) {
       skipped.push(`Release ${tag} of ${repo} is not installable here: ${verdict.reasons.join("; ")} — skipping.`);
       continue;
@@ -264,7 +268,9 @@ export function selectGithubCandidate(
     for (const note of verdict.notes) opts.warnings.push(`compatibility: ${note}`);
 
     const v = entry.classified.version;
-    const cliFloor = parseSemVer(doc.components[component]?.releases[tag]?.requires.station_cli?.min ?? null);
+    const cliFloor = parseSemVer(
+      channelFloor(doc.components[component]?.releases[tag]?.requires.station_cli, channel)?.min ?? null
+    );
     return {
       kind,
       tag,
