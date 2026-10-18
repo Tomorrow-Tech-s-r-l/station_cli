@@ -11,7 +11,7 @@ import { JsonlLog } from "../../utils/jsonl_log";
 import { Secret } from "../../config/secret";
 import { CompatSourceConfig, DEFAULT_COMPAT_SOURCE, FirmwareSourceConfig } from "../../config/schema";
 import { buildInfo, bundledCompatibilityFile } from "../../utils/build_info";
-import { ComponentId, ReleaseChannel, parseSemVer } from "../../compat/semver";
+import { ComponentId, parseSemVer } from "../../compat/semver";
 import { CompatibilityDoc, InstalledComponent, interpretInstalled } from "../../compat/compatibility";
 import { CompatLoad, loadCompatibility } from "../../compat/source";
 
@@ -275,17 +275,21 @@ export async function runEngine(
         inventory.interfaces.length || !opts.gates.kinds.includes("powerbank")
           ? inventory.interfaces
           : await readBoardsOfPacks(service, inventory.powerbanks);
-      catalogOpts.installed = installedSet(compat.doc, opts, boardVersions, inventory.powerbanks);
-      if (opts.filter.skipPowerbanks) {
-        catalogWarnings.push(
-          "powerbanks were not read this run, so interface releases were checked against this CLI only, not against the docked packs"
-        );
-      }
+      // And board images against every pack docked in them: a run limited
+      // to interfaces, or to some slots, has not read all of those.
+      const packVersions =
+        opts.gates.kinds.includes("interface") && (opts.filter.skipPowerbanks || !!opts.filter.slots?.length)
+          ? await readDockedPacks(service, opts.filter, catalogWarnings)
+          : inventory.powerbanks;
+      catalogOpts.installed = installedSet(compat.doc, opts, boardVersions, packVersions);
     }
   }
 
   if (opts.online) {
-    for (const kind of opts.gates.kinds) {
+    // Interface first: a pack image must also suit the board release this
+    // run may flash under it, not only the one the board runs now.
+    const order = [...opts.gates.kinds].sort((a, b) => (a === "interface" ? -1 : b === "interface" ? 1 : 0));
+    for (const kind of order) {
       if (!opts.sources[kind]) {
         warn(
           `no firmware source configured for ${kind} devices — set firmware.sources.${kind} ` +
@@ -294,7 +298,20 @@ export async function runEngine(
         candidates[kind] = null;
         continue;
       }
-      candidates[kind] = await (opts.catalog ?? githubCatalog).resolve(kind, catalogOpts);
+      const board = candidates.interface;
+      const kindOpts =
+        kind === "powerbank" && compat?.doc && board?.compat && catalogOpts.installed
+          ? {
+              ...catalogOpts,
+              installed: [
+                ...catalogOpts.installed,
+                ...[interpretInstalled(compat.doc, COMPONENT_OF.interface, formatVersion(board.version), `interface boards once on ${board.tag}`, { tag: board.tag })].filter(
+                  (i): i is InstalledComponent => i !== null
+                ),
+              ],
+            }
+          : catalogOpts;
+      candidates[kind] = await (opts.catalog ?? githubCatalog).resolve(kind, kindOpts);
     }
   } else {
     warn("offline mode — no releases were resolved, so nothing can be planned");
@@ -508,11 +525,23 @@ async function readBoardsOfPacks(service: SerialService, packs: InstalledTarget[
   return out;
 }
 
+/** Every pack docked in the selected boards, whatever the slot filter (interface runs). */
+async function readDockedPacks(
+  service: SerialService,
+  filter: EngineOptions["filter"],
+  warnings: string[]
+): Promise<InstalledTarget[]> {
+  const inv = await collectInventory(service, { boards: filter.boards, skipInterfaces: true });
+  for (const w of inv.warnings) warnings.push(w);
+  return inv.powerbanks;
+}
+
 /**
  * What is installed, in the terms of compatibility.json: this CLI (by its
  * release tag when the build recorded one), and every distinct firmware
- * version on the boards and the docked packs. On the stable channel a device
- * reporting a bare `X.Y.Z` is taken to run the production build of it.
+ * version on the boards and the docked packs. A device reporting a bare
+ * `X.Y.Z` may run either build of it, whatever the update channel: every
+ * reading is checked (interpretInstalled).
  */
 export function installedSet(
   doc: CompatibilityDoc,
@@ -520,7 +549,6 @@ export function installedSet(
   interfaces: InstalledTarget[],
   powerbanks: InstalledTarget[]
 ): InstalledComponent[] {
-  const hint: ReleaseChannel | null = opts.channel === "stable" ? "production" : null;
   const out: InstalledComponent[] = [];
   const cliTag = opts.cliTag !== undefined ? opts.cliTag : buildInfo().tag;
   const self = interpretInstalled(doc, "station_cli", formatVersion(opts.cliVersion), "this station-cli", {
@@ -542,7 +570,7 @@ export function installedSet(
       byVersion.set(reported, labels);
     }
     for (const [reported, labels] of byVersion) {
-      const inst = interpretInstalled(doc, component, reported, labels.join(", "), { channelHint: hint });
+      const inst = interpretInstalled(doc, component, reported, labels.join(", "));
       if (inst) out.push(inst);
     }
   };

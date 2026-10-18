@@ -13,10 +13,17 @@
  *     prints the release whose metadata.json legacy values carry forward.
  *
  * Nothing here is a floor written by hand. The values come from, in order:
- *   - the contract evidence of this run (`--base` / `--floor`, computed by
- *     release-compat);
- *   - for a legacy field the evidence does not cover, the previous release's
- *     published value, carried forward and listed in
+ *   - the contract evidence of this run (`--floor`, computed by
+ *     release-compat): it wins over `--base` for every component it covers,
+ *     because the published compatibility.json cannot have seen this run yet
+ *     (for a tag that is published again it holds the previous build's);
+ *   - the published compatibility.json (`--base`) for the rest (the kiosk
+ *     floor, from the kiosk's own contract runs);
+ *   - for a legacy field: the floor's X.Y.Z (legacy parsers know no
+ *     pre-release); with no compatible release at all, one patch above the
+ *     newest one tested, listed in `computed.legacy_blocked` (release-compat's
+ *     rule: an old kiosk must not read "no floor"); with no evidence, the
+ *     previous release's published value, carried forward and listed in
  *     `computed.carried_forward`, so older kiosks keep working;
  *   - otherwise the field is left out and a warning says so — never a literal.
  *
@@ -51,6 +58,21 @@ function requiresFrom(floor) {
   return out;
 }
 
+/** `X.Y.Z` of a version or tag (`v1.4.0-dev.23` → `1.4.0`); null when it has none. */
+function core(v) {
+  const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(v ?? ""));
+  return m ? `${Number(m[1])}.${Number(m[2])}.${Number(m[3])}` : null;
+}
+
+/** One patch above the newest X.Y.Z tested (the legacy value of "nothing is compatible"). */
+function abovePatch(tested) {
+  const cores = (tested || []).map(core).filter(Boolean).map((c) => c.split(".").map(Number));
+  if (!cores.length) return null;
+  cores.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  const [x, y, z] = cores.at(-1);
+  return `${x}.${y}.${z + 1}`;
+}
+
 function buildMetadata({ tag, version, base, floor, previous, capabilities, runUrl, suiteRef, now = new Date() }) {
   const warnings = [];
   const meta = { ...(base || {}) };
@@ -58,31 +80,42 @@ function buildMetadata({ tag, version, base, floor, previous, capabilities, runU
   meta.component = "station_cli";
   meta.tag = tag;
   meta.cli_version = version;
-  meta.requires = { ...requiresFrom(floor), ...(meta.requires || {}) };
+  meta.requires = { ...(meta.requires || {}), ...requiresFrom(floor) };
 
   const computed = { ...(meta.computed || {}) };
   if (runUrl && !computed.run_url) computed.run_url = runUrl;
   if (suiteRef && !computed.suite_ref) computed.suite_ref = suiteRef;
   if (!computed.at) computed.at = now.toISOString().replace(/\.\d{3}Z$/, "Z");
   const carried = new Set(computed.carried_forward || []);
+  const blocked = new Set(computed.legacy_blocked || []);
+  const uncomputed = new Set(computed.uncomputed || []);
 
   for (const [field, component] of Object.entries(LEGACY)) {
     const req = meta.requires[component];
-    if (req && !req.no_compatible && typeof req.min === "string") {
-      meta[field] = req.min;
-      carried.delete(field);
-    } else if (typeof meta[field] === "string") {
-      // `compat metadata` already decided it
+    carried.delete(field);
+    blocked.delete(field);
+    uncomputed.delete(field);
+    if (req && !req.no_compatible && core(req.min)) {
+      meta[field] = core(req.min);
+    } else if (req && abovePatch(req.tested)) {
+      meta[field] = abovePatch(req.tested);
+      blocked.add(field);
     } else if (previous && typeof previous[field] === "string") {
       meta[field] = previous[field];
       carried.add(field);
     } else {
       delete meta[field];
+      uncomputed.add(field);
       warnings.push(`${field}: no evidence and no previous release value — left out`);
     }
   }
-  if (carried.size) computed.carried_forward = [...carried].sort();
-  else delete computed.carried_forward;
+  const list = (key, set) => {
+    if (set.size) computed[key] = [...set].sort();
+    else delete computed[key];
+  };
+  list("carried_forward", carried);
+  list("legacy_blocked", blocked);
+  list("uncomputed", uncomputed);
   meta.computed = computed;
   if (capabilities) meta.capabilities = capabilities;
   return { meta, warnings };

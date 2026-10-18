@@ -135,15 +135,18 @@ test("installed: a bare X.Y.Z can be the release or its dev build", () => {
     interpretInstalled(d, "S1TTXX", "3.2.0", "board 0").interpretations.map((i) => i.tag),
     ["dev-v3.2.0"]
   );
-  // Both builds listed: both interpretations, unless the channel says which.
+  // Both builds listed: both interpretations — the update channel does not
+  // say which build a device runs (release-compat's readings).
   d.components.S1TTXX.releases["v3.2.0"] = { version: "3.2.0", channel: "production", requires: {} };
   assert.deepEqual(
     interpretInstalled(d, "S1TTXX", "3.2.0", "board 0").interpretations.map((i) => i.tag).sort(),
     ["dev-v3.2.0", "v3.2.0"]
   );
+  // Only the `-dev` pre-release is a build of the bare version.
+  d.components.S1TTXX.releases["v3.2.0-rc"] = { version: "3.2.0-rc.1", channel: "development", requires: {} };
   assert.deepEqual(
-    interpretInstalled(d, "S1TTXX", "3.2.0", "board 0", { channelHint: "production" }).interpretations.map((i) => i.tag),
-    ["v3.2.0"]
+    interpretInstalled(d, "S1TTXX", "3.2.0", "board 0").interpretations.map((i) => i.tag).sort(),
+    ["dev-v3.2.0", "v3.2.0"]
   );
   // A version the file does not list counts as itself.
   const unknown = interpretInstalled(d, "S1TTXX", "9.9.9", "board 0");
@@ -157,8 +160,8 @@ test("installed: a bare X.Y.Z can be the release or its dev build", () => {
 // --- the consumer rule -------------------------------------------------------------
 
 const cli = (d, tag) => interpretInstalled(d, "station_cli", tag.replace(/^(dev-)?v/, ""), "this station-cli", { tag });
-const board = (d, version, hint = null) => interpretInstalled(d, "S1TTXX", version, "interface board 0", { channelHint: hint });
-const pack = (d, version, hint = null) => interpretInstalled(d, "P1TT2C", version, "powerbank slot 1", { channelHint: hint });
+const board = (d, version) => interpretInstalled(d, "S1TTXX", version, "interface board 0");
+const pack = (d, version) => interpretInstalled(d, "P1TT2C", version, "powerbank slot 1");
 
 test("rule 1: a release the file does not list is not installable", () => {
   const d = doc();
@@ -204,7 +207,7 @@ test("rule 2: SemVer pre-release floors (a dev board below a release floor)", ()
 test("rule 3: the installed release's own floor towards the candidate", () => {
   const d = doc();
   // v3.0.1 accepts pack 3.0.2 (forward), but pack v3.0.2 needs a board >= 3.0.3.
-  const r = checkInstall(d, "S1TTXX", "v3.0.1", [cli(d, "dev-v0.5.0"), pack(d, "3.0.2", "production")]);
+  const r = checkInstall(d, "S1TTXX", "v3.0.1", [cli(d, "dev-v0.5.0"), pack(d, "3.0.2")]);
   assert.equal(r.installable, false);
   assert.match(r.reasons.join(), /powerbank slot 1 \(P1TT2C v3\.0\.2\) needs S1TTXX >= 3\.0\.3; v3\.0\.1 is older/);
   // The installed CLI's own floor: v0.3.1 accepts S1TTXX >= 3.0.1.
@@ -215,13 +218,11 @@ test("rule 2: every interpretation of an ambiguous device must pass", () => {
   const d = doc();
   d.components.S1TTXX.releases["v3.2.0"] = { version: "3.2.0", channel: "production", requires: {} };
   // P1TT2C v3.0.2 needs S1TTXX >= 3.0.3; "3.2.0" passes as both builds — but
-  // the dev build refuses all packs, so on the beta channel it is refused…
-  assert.equal(checkInstall(d, "P1TT2C", "v3.0.2", [cli(d, "dev-v0.5.0"), board(d, "3.2.0")]).installable, false);
-  // …while on the stable channel the board runs the production build.
-  assert.equal(
-    checkInstall(d, "P1TT2C", "v3.0.2", [cli(d, "dev-v0.5.0"), board(d, "3.2.0", "production")]).installable,
-    true
-  );
+  // the dev build refuses all packs, and a board reporting 3.2.0 may be
+  // running it (on either update channel), so the pack is refused.
+  const r = checkInstall(d, "P1TT2C", "v3.0.2", [cli(d, "dev-v0.5.0"), board(d, "3.2.0")]);
+  assert.equal(r.installable, false);
+  assert.match(r.reasons.join(), /S1TTXX dev-v3\.2\.0\) has no compatible P1TT2C/);
 });
 
 test("components without an edge do not constrain each other", () => {

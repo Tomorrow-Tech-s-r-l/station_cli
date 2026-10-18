@@ -15,7 +15,14 @@ name: Firmware contract
 # main branches, for S1TTXX × P1TT2C. Every leg's result goes into
 # `compat-evidence/v1` (artifact `compat-evidence`), from which release-compat
 # computes the floors in compatibility.json and in this CLI's metadata.json.
-# A branch on either side gates CI but never moves a floor.
+# A branch build on any side never moves a floor.
+#
+# The run goes red when a leg could not run, or when this CLI fails a core
+# check against the newest production S1TTXX and P1TT2C releases tested —
+# what stations run. Any other failing pair (an old or a development
+# release) is a fact for the floors, not a broken build: it is in the table
+# and in the evidence, and release-compat keeps stations from installing
+# the pair.
 #
 # When:
 #   - every push to a feature branch (this CLI built from source);
@@ -28,8 +35,8 @@ name: Firmware contract
 #     then sent to release-compat).
 #
 # Without COMPAT_TOKEN / vars.COMPAT_REF it falls back to the legacy legs
-# (development, main, newest release, newest dev release) and the harness's
-# own pack, and reports no evidence.
+# (development, main, newest release, newest dev release) with the P1TT2C
+# development branch docked, and reports no evidence.
 #
 # Push, schedule and dispatch only (never pull_request): it runs on
 # self-hosted runners, see CONTRIBUTING.md.
@@ -139,10 +146,15 @@ jobs:
         run: |
           set -euo pipefail
           args=()
-          if [ "$COMPAT" = "true" ] && [ -z "$FW_REFS" ]; then
-            node release-compat/bin/compat.mjs targets --component S1TTXX --newest "$NEWEST" > "$RUNNER_TEMP/fw-targets.json"
+          # Explicit fw_refs replace the firmware axis only: the packs are
+          # still the releases compat targets names.
+          if [ "$COMPAT" = "true" ]; then
             node release-compat/bin/compat.mjs targets --component P1TT2C --newest 1 > "$RUNNER_TEMP/pack-targets.json"
-            args+=(--fw-targets "$RUNNER_TEMP/fw-targets.json" --pack-targets "$RUNNER_TEMP/pack-targets.json")
+            args+=(--pack-targets "$RUNNER_TEMP/pack-targets.json")
+            if [ -z "$FW_REFS" ]; then
+              node release-compat/bin/compat.mjs targets --component S1TTXX --newest "$NEWEST" > "$RUNNER_TEMP/fw-targets.json"
+              args+=(--fw-targets "$RUNNER_TEMP/fw-targets.json")
+            fi
           fi
           matrix=$(node cli/scripts/contract-targets.js "${args[@]}" --fw-refs "$FW_REFS")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
@@ -341,8 +353,11 @@ jobs:
             CLI=cli
             CLI_LABEL="${GITHUB_REF_NAME} ${GITHUB_SHA:0:7}"
           fi
+          # A failing pair is a verdict (the evidence), not a broken leg: the
+          # report job's gate decides what turns the run red.
           sh harness/tests/cli_contract/run.sh "$CLI" --label "$CLI_LABEL" --fw-label "$FW_LABEL × pack $PACK_LABEL" \
-            --report "$REPORTS/leg.json" --summary "$GITHUB_STEP_SUMMARY"
+            --report "$REPORTS/leg.json" --summary "$GITHUB_STEP_SUMMARY" \
+            || [ -f "$REPORTS/leg.json" ]
 
       # A leg that died before the checks ran still shows up in the table.
       - name: Mark a leg without a report
@@ -353,20 +368,28 @@ jobs:
 
       # This leg as one compat-evidence result: ok (with its checks),
       # missing (died before reporting) or skipped (not tested).
+      # A branch side whose commit was never read (the leg died first) is
+      # named by the branch. The CLI's commit is this run's only when this
+      # run built it: a dispatched cli_tag is a release made from another
+      # commit, identified by its tag and the executable's sha256.
       - name: Evidence
         if: always() && steps.token.outputs.ok == 'true'
         env:
           SKIP: ${{ steps.fw.outputs.skip || steps.sim.outputs.skip }}
           FW_TAG: ${{ steps.fw.outputs.tag }}
           FW_SHA: ${{ steps.pack.outputs.fw_sha }}
+          FW_REF: ${{ matrix.fw_ref }}
           CLI_TAG: ${{ inputs.cli_tag }}
+          CLI_ARTIFACT: ${{ inputs.cli_artifact }}
           PACK_TAG: ${{ steps.pack.outputs.used == 'true' && matrix.pack_tag || '' }}
           PACK_SHA: ${{ steps.pack.outputs.ref }}
         run: |
           skipped=()
           [ -n "$SKIP" ] && skipped=(--skipped "$SKIP")
+          cli_ref="$GITHUB_SHA"
+          [ -n "$CLI_TAG" ] && [ -z "$CLI_ARTIFACT" ] && cli_ref=""
           node cli/scripts/contract-evidence.js leg --out "$REPORTS/result.json" --report "$REPORTS/leg.json" "${skipped[@]}" \
-            --fw-tag "$FW_TAG" --fw-ref "$FW_SHA" --cli-tag "$CLI_TAG" --cli-ref "$GITHUB_SHA" \
+            --fw-tag "$FW_TAG" --fw-ref "${FW_SHA:-$FW_REF}" --cli-tag "$CLI_TAG" --cli-ref "$cli_ref" \
             --cli-file "$OUT/bin/station-cli-linux-x64" --pack-tag "$PACK_TAG" --pack-ref "$PACK_SHA"
 
       - uses: actions/upload-artifact@v4
@@ -440,10 +463,17 @@ jobs:
             --suite cli_contract --suite-repo "$GITHUB_REPOSITORY" --suite-ref "$GITHUB_SHA" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-      # Named as release-compat downloads it (`gh run download -n compat-evidence`).
+      # Named as release-compat downloads it (`gh run download -n compat-evidence`;
+      # its nightly sweep ingests every such artifact of main / development).
+      # A build.yml run labels the CLI with the tag it is about to be
+      # released as: until the release job has published that tag from this
+      # commit the label is not true (the release may never happen, or the
+      # tag point at another commit), so it is uploaded as
+      # compat-evidence-unpublished and the release job re-uploads it as
+      # compat-evidence once published — as S1TTXX-firmware's release does.
       - uses: actions/upload-artifact@v4
         with:
-          name: compat-evidence
+          name: ${{ (inputs.cli_artifact != '' && inputs.cli_tag != '') && 'compat-evidence-unpublished' || 'compat-evidence' }}
           path: evidence/evidence.json
           retention-days: 30
 
@@ -459,9 +489,19 @@ jobs:
             && echo "::notice::evidence of run $GITHUB_RUN_ID sent to $COMPAT_REPO" \
             || echo "::warning::could not notify $COMPAT_REPO (COMPAT_TOKEN needs contents:write there); re-run this job to send the evidence"
 
-      # The run goes red when any pair failed, whichever way the legs ended.
+      # Red when a leg died, when nothing ran, or when this CLI fails against
+      # the newest production firmware and pack tested; any other failing
+      # pair is a fact for the floors (contract-evidence.js gate).
       - name: Result
-        if: needs.contract.result != 'success'
+        env:
+          TARGETS: ${{ needs.targets.result }}
         run: |
-          echo "::error::firmware contract: at least one pair failed (table above)"
-          exit 1
+          if [ "$TARGETS" != "success" ]; then
+            echo "::error::firmware contract: the target matrix could not be built"
+            exit 1
+          fi
+          node cli/scripts/contract-evidence.js gate --dir reports --out gate.txt
+          if [ -s gate.txt ]; then
+            while read -r line; do echo "::error::firmware contract: $line"; done < gate.txt
+            exit 1
+          fi

@@ -98,8 +98,12 @@ echo '{"credentials":{"github":{"token":"'"$TOKEN"'"}}}' \
    that ships an application-only `.bin` and that **compatibility.json**
    accepts: the release was tested, its floors are met by this CLI and by the
    firmware installed on the station, and the installed releases' own floors
-   accept it back. A powerbank image is offered only when the boards it sits
-   in are compatible with it. No compatibility data — not published, not
+   accept it back. A device that reports a bare `X.Y.Z` may run `vX.Y.Z` or
+   `dev-vX.Y.Z`, and both must pass. A powerbank image is offered only when
+   the boards it sits in are compatible with it — as they run now and as the
+   board release of the same run would leave them; a board image only when
+   every pack docked in the boards is (a run limited to interfaces or to some
+   slots still reads them). No compatibility data — not published, not
    cached, not bundled — means nothing is offered (fail closed); the JSON's
    `compatibility` field says which copy was used, and `warnings` why each
    newer release was skipped. See [Compatibility](#compatibility).
@@ -305,7 +309,7 @@ protocol, so the real code runs end to end. CI runs the suite on every build.
 | `fwu_cli.test.js` | The built binary, spawned: refusals and the stdout/stderr contract |
 | `fwu_http.test.js`, `fwu_catalog.test.js`, `fwu_wire_validation.test.js`, `check_workflows.test.js` | Downloads, asset rules, host-side guards, the CI guard |
 | `unit/compat.test.js`, `unit/compat_catalog.test.js` (`npm test`) | SemVer precedence and the tag grammar on the real release lists, compatibility.json validation, the consumer rule, firmware candidate selection, network/cache/bundled fallback |
-| `unit/contract_scripts.test.js` (`npm test`) | The CI helpers: contract matrix, evidence verdicts, metadata.json carry-forward |
+| `unit/contract_scripts.test.js` (`npm test`) | The CI helpers: contract matrix, evidence verdicts, the release gate, metadata.json floors and carry-forward |
 
 If a golden test fails, the wire protocol changed. Regenerate only when that
 change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
@@ -322,10 +326,16 @@ uses (`slots`, `status`, `charge`, `initialize-powerbank` with read-back,
 testing modes (`--raw`, `--no-retry`, `pb-link-attempts`), down to the values
 in the JSON. The legs are S1TTXX × P1TT2C: the releases release-compat's
 `compat targets` names, plus the `development` / `main` branches. Every leg
-becomes a `compat-evidence/v1` result (artifact `compat-evidence`); for a
-release of this CLI the release job sends it to release-compat, which
-recomputes the floors. Without `COMPAT_TOKEN` and `vars.COMPAT_REF` it runs the
-legacy legs (`development`, `main`, newest release and dev release) and
+becomes a `compat-evidence/v1` result (artifact `compat-evidence`; in a
+release run `compat-evidence-unpublished` until the release job has published
+the tag, then re-uploaded as `compat-evidence`); for a release of this CLI the
+release job sends it to release-compat, which recomputes the floors. A pairing
+of two releases tested next to a branch build is left out of the evidence.
+The run (and so the release) goes red when a leg dies, or when this CLI fails
+a core check against the newest production S1TTXX and P1TT2C releases tested;
+any other failing pair is a fact for the floors. Without `COMPAT_TOKEN` and
+`vars.COMPAT_REF` it runs the legacy legs (`development`, `main`, newest
+release and dev release) with the P1TT2C `development` branch docked, and
 reports no evidence.
 
 | When | CLI under test |

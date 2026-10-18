@@ -170,13 +170,15 @@ export interface InstalledComponent {
 }
 
 /**
- * Maps a reported version onto the releases the file knows.
+ * Maps a reported version onto the releases the file knows (the readings of
+ * release-compat's lib/check.mjs, pinned by the shared parity cases).
  *
  * - An exact tag (this CLI knows its own) is used as is.
  * - A version with a pre-release (`3.2.0-dev`) matches that release only.
- * - A bare `X.Y.Z` matches every release with that core. `channelHint`
- *   narrows it: a station on the stable channel runs production builds, so
- *   only the production release is meant when one exists.
+ * - A bare `X.Y.Z` is both `vX.Y.Z` and `dev-vX.Y.Z`: a dev build reports
+ *   the bare version too, and nothing the device reports tells them apart —
+ *   not the update channel either (a station switched from beta to stable
+ *   still runs its dev build until the next flash). Every reading must pass.
  * - A version the file does not list still counts, as itself, without a tag.
  */
 export function interpretInstalled(
@@ -184,7 +186,7 @@ export function interpretInstalled(
   component: ComponentId,
   reported: string,
   label: string,
-  opts: { tag?: string | null; channelHint?: ReleaseChannel | null } = {}
+  opts: { tag?: string | null } = {}
 ): InstalledComponent | null {
   const releases = doc.components[component]?.releases ?? {};
   if (opts.tag) {
@@ -195,21 +197,16 @@ export function interpretInstalled(
   const version = parseSemVer(reported);
   if (!version) return null;
 
-  const matching: Array<Interpretation & { channel: ReleaseChannel }> = [];
+  const interpretations: Interpretation[] = [];
   for (const [tag, rel] of Object.entries(releases)) {
     const v = parseSemVer(rel.version);
     if (!v) continue;
-    const same = version.prerelease.length ? compareSemVer(v, version) === 0 : sameCore(v, version);
-    if (same) matching.push({ tag, version: v, channel: rel.channel });
+    const same = version.prerelease.length
+      ? compareSemVer(v, version) === 0
+      : sameCore(v, version) && (v.prerelease.length === 0 || (v.prerelease.length === 1 && v.prerelease[0] === "dev"));
+    if (same) interpretations.push({ tag, version: v });
   }
-  let picked = matching;
-  if (opts.channelHint && !version.prerelease.length) {
-    const onChannel = matching.filter((m) => m.channel === opts.channelHint);
-    if (onChannel.length) picked = onChannel;
-  }
-  const interpretations: Interpretation[] = picked.length
-    ? picked.map((m) => ({ tag: m.tag, version: m.version }))
-    : [{ tag: null, version }];
+  if (!interpretations.length) interpretations.push({ tag: null, version });
   return { component, label, interpretations };
 }
 

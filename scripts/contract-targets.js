@@ -19,7 +19,10 @@
  * the newest per channel, plus whatever the floors depend on), not a version
  * written here. Without release-compat (no COMPAT_TOKEN) the legacy
  * selectors `release` / `dev-release` are passed through, resolved per leg
- * by the harness's release.js, and the pack axis is the harness's own.
+ * by the harness's release.js, and the packs are the P1TT2C branches only
+ * (the harness needs a pack tree: it has no pack of its own any more).
+ * Explicit `--fw-refs` replace the firmware axis only; the pack axis is
+ * still the targets when they are given.
  *
  * Dependency-free on purpose: it runs before `npm ci`.
  */
@@ -77,10 +80,8 @@ function buildMatrix(opts) {
   } else {
     fw = [...opts.fwBranches, "release", "dev-release"].map(entry);
   }
-  // No pack axis without release-compat: the harness uses its own pack.
-  const packs = opts.packTargets
-    ? [...opts.packBranches, ...opts.packTargets].map(entry)
-    : [{ label: "harness", ref: "", tag: null }];
+  // Without release-compat, the pack branches alone (never a floor).
+  const packs = [...opts.packBranches, ...(opts.packTargets || [])].map(entry);
 
   const seen = new Set();
   const include = [];
