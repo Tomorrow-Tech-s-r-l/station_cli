@@ -3,6 +3,8 @@
 // Run with `npm test`.
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const { buildMatrix, tagsFrom } = require("../../scripts/contract-targets");
 const { legResult, legResults, verdict, merge } = require("../../scripts/contract-evidence");
@@ -149,6 +151,42 @@ test("metadata: the kiosk floor from evidence, else carried from a computed valu
   // Carried again: the origin is the run that computed it, not the carrier.
   const again = buildMetadata({ tag: "v0.7.0", version: "0.7.0", previous: { ...carried, tag: "v0.6.0" } }).meta;
   assert.deepEqual(again.computed.carried_from.min_kiosk_app_version, { tag: "v0.5.0", run_url: "https://github.com/o/r/actions/runs/7" });
+});
+
+test("metadata: the kiosk floor `compat metadata --carry-compat` carried into --base is kept", () => {
+  // What release-compat's `compat metadata --carry-compat` wrote for
+  // dev-v0.5.1 from the real computed compatibility.json (sequence 2), with
+  // only schema-1 metadata.json behind it.
+  const base = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "compat", "metadata-carried-dev-v0.5.1.json"), "utf8"));
+  const origin = { source: "compatibility.json", sequence: 2, tag: "dev-v0.5.0", evidence: ["https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"] };
+  const schema1 = { cli_version: "0.5.0", min_kiosk_app_version: "1.2.0" };
+  assert.throws(() => buildMetadata({ tag: "dev-v0.5.1", version: "0.5.1", previous: schema1 }), MetadataError, "without the carry source the release fails");
+
+  const { meta, warnings } = buildMetadata({
+    tag: "dev-v0.5.1",
+    version: "0.5.1",
+    base,
+    floor: { requires: { S1TTXX: { min: "3.0.3", no_compatible: false, tested: ["v3.0.3"] } } },
+    previous: schema1,
+  });
+  assert.equal(meta.min_kiosk_app_version, "1.3.17");
+  assert.deepEqual(meta.computed.carried_forward, ["min_kiosk_app_version"]);
+  assert.deepEqual(meta.computed.carried_from, { min_kiosk_app_version: origin });
+  assert.equal(meta.requires.S1TTXX.min, "3.0.3");
+  assert.match(warnings[0], /carried forward from dev-v0\.5\.0 \(compatibility\.json sequence 2/);
+
+  // The next release may carry it on through this metadata.json; the origin stays the entry.
+  const next = buildMetadata({ tag: "dev-v0.5.2", version: "0.5.2", previous: meta }).meta;
+  assert.equal(next.min_kiosk_app_version, "1.3.17");
+  assert.deepEqual(next.computed.carried_from, { min_kiosk_app_version: origin });
+  // An entry that names no evidence is no provenance.
+  const bare = { ...meta, computed: { ...meta.computed, carried_from: { min_kiosk_app_version: { ...origin, evidence: [] } } } };
+  assert.throws(() => buildMetadata({ tag: "dev-v0.5.2", version: "0.5.2", base: bare, previous: bare }), /no computed provenance/);
+  // Evidence of this run wins over the carried value.
+  const own = buildMetadata({ tag: "dev-v0.5.1", version: "0.5.1", base, floor: { requires: { kiosk: { min: "1.4.0", no_compatible: false, tested: ["v1.4.0"] } } } }).meta;
+  assert.equal(own.min_kiosk_app_version, "1.4.0");
+  assert.deepEqual(own.computed.carried_forward, []);
+  assert.equal(own.computed.carried_from, undefined);
 });
 
 test("metadata: no evidence and no computed previous value fails the release", () => {

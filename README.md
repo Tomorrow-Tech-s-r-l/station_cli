@@ -287,9 +287,15 @@ legacy `cli_version` / `min_kiosk_app_version` that kiosks in the field read.
 A legacy reader knows no channels, and a release is only installed by
 stations of its own channel, so `min_kiosk_app_version` is the floor of the
 release's channel (a `vX.Y.Z` release: the production kiosk floor). With no
-kiosk evidence of that channel it is carried only from an earlier release
-that computed it (schema 2 with `computed.run_url`; its origin goes in
-`computed.carried_from`); with nothing computed to carry, the release fails.
+kiosk evidence of that channel it is carried only from something computed
+(its origin goes in `computed.carried_from`): first the published
+compatibility.json — the floor of that channel of the newest earlier release
+in it that has one backed by evidence (`{source: "compatibility.json",
+sequence, tag, evidence}`); else an earlier release whose metadata.json
+computed it (schema 2 with `computed.run_url`). With nothing computed to
+carry, the release fails. The kiosk's nightly `kiosk_cli_contract` targets the
+newest CLI tags of both channels, so the next compatibility.json has evidence
+for the new tag.
 
 ## Logs
 

@@ -401,12 +401,19 @@ jobs:
       # min_kiosk_app_version, which kiosks in the field read, uses the floor
       # of this release's channel (a production release: the floor over
       # production kiosks): its X.Y.Z, one patch above the newest kiosk
-      # tested when none is compatible, and with no evidence the value of
+      # tested when none is compatible, and with no evidence a value carried
+      # from something computed, listed in computed.carried_forward /
+      # carried_from: first the published compatibility.json (`compat fetch`,
+      # passed as `--carry-compat`: the floor of this channel of the newest
+      # earlier station_cli release in it backed by evidence — so the first
+      # release after schema-1 metadata.json still computes its floor), then
       # the newest earlier release whose metadata.json was itself computed
-      # (schema 2 with a run_url), listed in computed.carried_forward /
-      # carried_from. Nothing computed to carry: the step fails, and so does
-      # the release (release-metadata.js). `capabilities` is what the
-      # released binary itself reports.
+      # (schema 2 with a run_url). The kiosk's nightly kiosk_cli_contract
+      # targets the newest CLI tags of both channels, so the next
+      # compatibility.json computes this tag's kiosk floor from evidence.
+      # Nothing computed to carry: the step fails, and so does the release
+      # (release-metadata.js). `capabilities` is what the released binary
+      # itself reports.
       - name: Compute metadata.json
         env:
           GH_TOKEN: ${{ github.token }}
@@ -440,20 +447,29 @@ jobs:
           # fw-contract's evidence, uploaded as unpublished until this job
           # has published the tag (see firmware_contract.yml).
           EVIDENCE=compat-evidence-unpublished/evidence.json
-          if [ "$COMPAT" = "true" ] && [ -f "$EVIDENCE" ]; then
-            if node release-compat/bin/compat.mjs floor --evidence "$EVIDENCE" --component station_cli --tag "$TAG" > "$W/floor.json"; then
-              args+=(--floor "$W/floor.json")
-            else
-              echo "::warning::compat floor failed — metadata.json carries no computed floors"
+          if [ "$COMPAT" = "true" ]; then
+            ev_args=()
+            if [ -f "$EVIDENCE" ]; then
+              ev_args=(--evidence "$EVIDENCE")
+              if node release-compat/bin/compat.mjs floor --evidence "$EVIDENCE" --component station_cli --tag "$TAG" > "$W/floor.json"; then
+                args+=(--floor "$W/floor.json")
+              else
+                echo "::warning::compat floor failed — metadata.json carries no computed floors"
+              fi
             fi
             prev_args=()
             [ -f "$W/previous/metadata.json" ] && prev_args=(--previous "$W/previous/metadata.json")
-            if GH_TOKEN="$COMPAT_TOKEN" gh release download current -R Tomorrow-Tech-s-r-l/release-compat -p compatibility.json -D "$W/compat" \
+            # The published compatibility.json (COMPAT_TOKEN): the floors of
+            # what this run did not test, and the carry source of a legacy
+            # field with no evidence for this tag.
+            mkdir -p "$W/compat"
+            if node release-compat/bin/compat.mjs fetch --out "$W/compat/compatibility.json" \
               && node release-compat/bin/compat.mjs metadata --component station_cli --tag "$TAG" \
-                   --compat "$W/compat/compatibility.json" "${prev_args[@]}" --out "$W/base.json"; then
+                   --compat "$W/compat/compatibility.json" --carry-compat "$W/compat/compatibility.json" \
+                   "${ev_args[@]}" "${prev_args[@]}" --out "$W/base.json"; then
               args+=(--base "$W/base.json")
             else
-              echo "::warning::compat metadata failed — metadata.json is completed from the evidence floor alone"
+              echo "::warning::compat fetch/metadata failed — metadata.json is completed from the evidence floor alone"
             fi
           fi
           [ -f "$W/previous/metadata.json" ] && args+=(--previous "$W/previous/metadata.json")

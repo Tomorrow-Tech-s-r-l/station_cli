@@ -27,11 +27,17 @@
  *     kiosks. Its X.Y.Z (legacy parsers know no pre-release); with no
  *     compatible release at all, one patch above the newest one tested,
  *     listed in `computed.legacy_blocked` (an old kiosk must not read "no
- *     floor"); with no evidence of that channel, the previous release's
- *     value, but only when that value was itself COMPUTED (schema 2 with a
- *     `computed.run_url`; a value it carried names its origin in
- *     `computed.carried_from`), listed in `computed.carried_forward` with its
- *     origin in `computed.carried_from`;
+ *     floor"); with no evidence of that channel, a value carried from
+ *     something COMPUTED, listed in `computed.carried_forward` with its
+ *     origin in `computed.carried_from`:
+ *       1. what `compat metadata` carried into `--base` (it was given the
+ *          published compatibility.json as `--carry-compat`: the floor of
+ *          this channel of the newest earlier release in that file backed by
+ *          evidence — origin {source: "compatibility.json", sequence, tag,
+ *          evidence}; else a computed previous metadata.json);
+ *       2. else the previous release's value, when that value was itself
+ *          computed (schema 2 with a `computed.run_url`; a value it carried
+ *          names its origin in `computed.carried_from`);
  *   - otherwise the script fails (exit 2) and so does the release — never a
  *     literal, never a value without provenance.
  * These are release-compat's legacy rules (lib/metadata.mjs).
@@ -99,9 +105,35 @@ function channelFloor(req, channel) {
 }
 
 /**
- * Where the previous release's legacy `field` was computed, {tag, run_url},
- * or null when it has no provenance and may not be carried (release-compat's
- * computedSource).
+ * True when a `computed.carried_from` entry names what computed the value:
+ * a run ({run_url}) or a compatibility.json entry with its evidence runs.
+ */
+function isProvenance(from) {
+  if (!from || typeof from !== "object") return false;
+  if (typeof from.run_url === "string" && from.run_url) return true;
+  return from.source === "compatibility.json" && Array.isArray(from.evidence) && from.evidence.some((e) => typeof e === "string" && e);
+}
+
+/** What `compat metadata` carried into `--base` for `field`, {value, source}, or null. */
+function baseCarried(base, field) {
+  const c = base && base.computed;
+  if (!c || !(c.carried_forward || []).includes(field) || typeof base[field] !== "string") return null;
+  const from = c.carried_from && c.carried_from[field];
+  return isProvenance(from) ? { value: base[field], source: copySource(from) } : null;
+}
+
+function copySource(from) {
+  return from.run_url ? { tag: from.tag ?? null, run_url: from.run_url } : { ...from, evidence: [...from.evidence] };
+}
+
+function describeSource(s) {
+  return s.run_url ? `computed by ${s.run_url}` : `compatibility.json sequence ${s.sequence}, computed by ${s.evidence.join(", ")}`;
+}
+
+/**
+ * Where the previous release's legacy `field` was computed, {tag, run_url}
+ * (or the compatibility.json entry it was carried from), or null when it has
+ * no provenance and may not be carried (release-compat's computedSource).
  */
 function computedSource(previous, field) {
   const c = previous && previous.computed;
@@ -111,7 +143,7 @@ function computedSource(previous, field) {
   if ((c.uncomputed || []).includes(field)) return null;
   if ((c.carried_forward || []).includes(field)) {
     const from = c.carried_from && c.carried_from[field];
-    return from && from.run_url ? { tag: from.tag ?? null, run_url: from.run_url } : null;
+    return isProvenance(from) ? copySource(from) : null;
   }
   return { tag: previous.tag ?? null, run_url: c.run_url };
 }
@@ -123,6 +155,7 @@ function buildMetadata({ tag, version, base, floor, previous, capabilities, runU
   if (!channel) throw new MetadataError(`"${tag}" is not a station_cli release tag (vX.Y.Z or dev-vX.Y.Z)`);
   const warnings = [];
   const meta = { ...(base || {}) };
+  const carriedByBase = Object.fromEntries(Object.keys(LEGACY).map((f) => [f, baseCarried(base, f)]));
   meta.schema = 2;
   meta.component = "station_cli";
   meta.tag = tag;
@@ -152,18 +185,19 @@ function buildMetadata({ tag, version, base, floor, previous, capabilities, runU
       meta[field] = abovePatch(req.tested);
       blocked.add(field);
     } else {
-      const source = computedSource(previous, field);
+      const fromBase = carriedByBase[field];
+      const source = fromBase ? fromBase.source : computedSource(previous, field);
       if (!source) {
         throw new MetadataError(
-          `${field}: no ${channel} ${component} evidence for ${tag}, and ` +
+          `${field}: no ${channel} ${component} evidence for ${tag}, nothing computed carried from the published compatibility.json, and ` +
             (previous ? "the previous release's value has no computed provenance" : "no previous computed value") +
             ` — run the ${component} contract with this release, then publish again`
         );
       }
-      meta[field] = previous[field];
+      meta[field] = fromBase ? fromBase.value : previous[field];
       carried.add(field);
       carriedFrom[field] = source;
-      warnings.push(`${field} carried forward from ${source.tag ?? "the previous release"} (computed by ${source.run_url})`);
+      warnings.push(`${field} carried forward from ${source.tag ?? "the previous release"} (${describeSource(source)})`);
     }
   }
   computed.carried_forward = [...carried].sort();
@@ -208,7 +242,7 @@ function hasProvenance(meta) {
   return !!meta && meta.schema === 2 && !!meta.computed && typeof meta.computed.run_url === "string" && !!meta.computed.run_url;
 }
 
-module.exports = { buildMetadata, requiresFrom, previousTag, previousTags, computedSource, hasProvenance, channelFloor, MetadataError };
+module.exports = { buildMetadata, requiresFrom, previousTag, previousTags, computedSource, hasProvenance, isProvenance, channelFloor, MetadataError };
 
 if (require.main === module && process.argv[2] === "previous-tags") {
   // node scripts/release-metadata.js previous-tags <tag> < tags (one per line)

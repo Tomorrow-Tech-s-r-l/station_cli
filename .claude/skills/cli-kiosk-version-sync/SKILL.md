@@ -14,7 +14,7 @@ together is **computed**, not declared:
 |---|---|
 | CLI version / release tag | `package.json` → `version` (CI tags `vX.Y.Z` on main, `dev-vX.Y.Z` on development) |
 | Every floor between kiosk, station_cli, S1TTXX, P1TT2C | `compatibility.json`, published by release-compat (release `current`), computed from `compat-evidence/v1` of the contract suites |
-| This release's `metadata.json` (`requires`, legacy `cli_version` / `min_kiosk_app_version`, `capabilities`) | the release job in `build.yml`, from this run's evidence via `compat floor` / `compat metadata` — a legacy field the evidence does not cover is carried forward and listed in `computed.carried_forward` |
+| This release's `metadata.json` (`requires`, legacy `cli_version` / `min_kiosk_app_version`, `capabilities`) | the release job in `build.yml`, from this run's evidence via `compat floor` / `compat metadata` — a legacy field the evidence does not cover is carried forward (from the published compatibility.json's newest earlier release with an evidence-backed floor, else from a computed earlier metadata.json) and listed in `computed.carried_forward` |
 | What a binary supports | `station-cli capabilities --json` (generated from the command tree) |
 
 There is no `minKioskAppVersion` in package.json, no `minCliVersion` constant
