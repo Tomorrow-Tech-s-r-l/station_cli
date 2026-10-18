@@ -9,7 +9,11 @@ import { mapSlotToBoard } from "../utils/slot_mapping";
 import { debug } from "../../utils/debug";
 import { JsonlLog } from "../../utils/jsonl_log";
 import { Secret } from "../../config/secret";
-import { FirmwareSourceConfig } from "../../config/schema";
+import { CompatSourceConfig, DEFAULT_COMPAT_SOURCE, FirmwareSourceConfig } from "../../config/schema";
+import { buildInfo, bundledCompatibilityFile } from "../../utils/build_info";
+import { ComponentId, ReleaseChannel, parseSemVer } from "../../compat/semver";
+import { CompatibilityDoc, InstalledComponent, interpretInstalled } from "../../compat/compatibility";
+import { CompatLoad, loadCompatibility } from "../../compat/source";
 
 import {
   ApplyItemResult,
@@ -23,7 +27,7 @@ import {
   UpdatePlan,
 } from "./types";
 import { formatVersion, parseVersion, toHeaderWord, Version } from "./version";
-import { CatalogOptions, ensureImage, resolveCandidate } from "./catalog";
+import { COMPONENT_OF, CatalogOptions, ensureImage, resolveCandidate } from "./catalog";
 import {
   collectInventory,
   Inventory,
@@ -72,6 +76,15 @@ export interface EngineOptions {
   online: boolean;
   sources: Partial<Record<TargetKind, FirmwareSourceConfig>>;
   token: Secret | null;
+  /** Where compatibility.json is published. Default: release-compat's `current`. */
+  compat?: CompatSourceConfig;
+  /** Last good compatibility.json. Default: `<cacheDir>/compatibility.json`. */
+  compatCacheFile?: string;
+  /**
+   * Loads compatibility.json. Defaults to `loadCompatibility` (published file,
+   * then cache, then the bundled copy); tests inject a fixture.
+   */
+  compatLoader?: () => Promise<CompatLoad>;
   cacheDir: string;
   cacheKeepPerKind: number;
   stateFile: string;
@@ -126,6 +139,20 @@ export interface EngineReport {
     powerbanks: Inventory["powerbanks"];
   };
   available: Partial<Record<TargetKind, { tag: string; version: string; asset: string } | null>>;
+  /**
+   * The compatibility data this run decided with (null when no GitHub source
+   * needed it). `origin: "none"` means it could not be read and nothing was
+   * offered from GitHub.
+   */
+  compatibility: {
+    origin: CompatLoad["origin"];
+    location: string | null;
+    sequence: number | null;
+    generatedAt: string | null;
+    error: string | null;
+    /** This CLI's own release tag, when the build recorded it. */
+    cliTag: string | null;
+  } | null;
   plan: UpdatePlan;
   results: ApplyItemResult[];
   summary: {
@@ -227,6 +254,36 @@ export async function runEngine(
 
   for (const kind of opts.gates.kinds) sourceConfigured[kind] = !!opts.sources[kind];
 
+  // --- Compatibility data -------------------------------------------------
+  //
+  // Read once per run, only when a GitHub source needs it: a `dir` source
+  // never consults it, and fw-status is offline by definition. An injected
+  // catalog (tests) brings its own release selection, and gets compatibility
+  // data only when a loader is injected with it.
+  let compat: CompatLoad | null = null;
+  const needsCompat =
+    opts.online &&
+    (!opts.catalog || !!opts.compatLoader) &&
+    opts.gates.kinds.some((k) => opts.sources[k] && opts.sources[k]!.provider !== "dir");
+  if (needsCompat) {
+    compat = await (opts.compatLoader ?? (() => defaultCompatLoad(opts, catalogWarnings)))();
+    catalogOpts.compat = compat;
+    if (compat.doc) {
+      // Pack images are judged against the boards they sit in; a run limited
+      // to powerbanks has not read those yet.
+      const boardVersions =
+        inventory.interfaces.length || !opts.gates.kinds.includes("powerbank")
+          ? inventory.interfaces
+          : await readBoardsOfPacks(service, inventory.powerbanks);
+      catalogOpts.installed = installedSet(compat.doc, opts, boardVersions, inventory.powerbanks);
+      if (opts.filter.skipPowerbanks) {
+        catalogWarnings.push(
+          "powerbanks were not read this run, so interface releases were checked against this CLI only, not against the docked packs"
+        );
+      }
+    }
+  }
+
   if (opts.online) {
     for (const kind of opts.gates.kinds) {
       if (!opts.sources[kind]) {
@@ -243,6 +300,16 @@ export async function runEngine(
     warn("offline mode — no releases were resolved, so nothing can be planned");
   }
   for (const w of catalogWarnings) warn(w);
+  const compatSummary = compat
+    ? {
+        origin: compat.origin,
+        location: compat.location,
+        sequence: compat.sequence,
+        generatedAt: compat.generatedAt,
+        error: compat.error,
+        cliTag: buildInfo().tag,
+      }
+    : null;
 
   // --- Plan ---------------------------------------------------------------
   const plan = buildPlan({
@@ -277,6 +344,7 @@ export async function runEngine(
       interface: describeCandidate(candidates.interface ?? null),
       powerbank: describeCandidate(candidates.powerbank ?? null),
     },
+    compatibility: compatSummary,
     plan,
     results: [],
     summary: { attempted: 0, succeeded: 0, failed: 0, updatesPending: plannedCount + deferredByCap > 0 },
@@ -372,6 +440,13 @@ export async function runEngine(
 
     state.inFlight = null;
     report.results.push(result);
+    if (result.bootloaderProtocol?.mismatch) {
+      warn(
+        `${item.label}: bootloader speaks FWU protocol ${result.bootloaderProtocol.reported}, ` +
+          `this station-cli speaks ${result.bootloaderProtocol.host}`,
+        { device: targetKey(item.target) }
+      );
+    }
     report.summary.attempted += 1;
     if (result.success) {
       report.summary.succeeded += 1;
@@ -407,6 +482,73 @@ export async function runEngine(
     durationMs: Date.now() - startedAt,
   });
   return report;
+}
+
+function defaultCompatLoad(opts: EngineOptions, warnings: string[]): Promise<CompatLoad> {
+  return loadCompatibility({
+    source: opts.compat ?? DEFAULT_COMPAT_SOURCE,
+    token: opts.token,
+    cacheFile: opts.compatCacheFile ?? path.join(opts.cacheDir, "compatibility.json"),
+    bundledFile: bundledCompatibilityFile(),
+    warnings,
+  });
+}
+
+/** Board versions for the boards the docked packs sit in (powerbank-only runs). */
+async function readBoardsOfPacks(service: SerialService, packs: InstalledTarget[]): Promise<InstalledTarget[]> {
+  const boards = [...new Set(packs.filter((p) => p.slot?.present).map((p) => p.boardAddress))].sort((a, b) => a - b);
+  const out: InstalledTarget[] = [];
+  for (const b of boards) {
+    try {
+      out.push(await readInterfaceVersion(service, b));
+    } catch {
+      // unreadable: the pack check fails closed on the missing board version
+    }
+  }
+  return out;
+}
+
+/**
+ * What is installed, in the terms of compatibility.json: this CLI (by its
+ * release tag when the build recorded one), and every distinct firmware
+ * version on the boards and the docked packs. On the stable channel a device
+ * reporting a bare `X.Y.Z` is taken to run the production build of it.
+ */
+export function installedSet(
+  doc: CompatibilityDoc,
+  opts: Pick<EngineOptions, "cliVersion" | "channel"> & { cliTag?: string | null },
+  interfaces: InstalledTarget[],
+  powerbanks: InstalledTarget[]
+): InstalledComponent[] {
+  const hint: ReleaseChannel | null = opts.channel === "stable" ? "production" : null;
+  const out: InstalledComponent[] = [];
+  const cliTag = opts.cliTag !== undefined ? opts.cliTag : buildInfo().tag;
+  const self = interpretInstalled(doc, "station_cli", formatVersion(opts.cliVersion), "this station-cli", {
+    tag: cliTag,
+  });
+  if (self) out.push(self);
+
+  const group = (component: ComponentId, devices: InstalledTarget[]) => {
+    const byVersion = new Map<string, string[]>();
+    for (const d of devices) {
+      if (!d.reachable || d.inBootloader) continue;
+      // The raw string when it is a full version (it may carry `-dev`),
+      // else the parsed X.Y.Z.
+      const raw = d.versionRaw?.trim() ?? "";
+      const reported = parseSemVer(raw) ? raw : d.version ? formatVersion(d.version) : "";
+      if (!reported) continue;
+      const labels = byVersion.get(reported) ?? [];
+      labels.push(targetLabel(d));
+      byVersion.set(reported, labels);
+    }
+    for (const [reported, labels] of byVersion) {
+      const inst = interpretInstalled(doc, component, reported, labels.join(", "), { channelHint: hint });
+      if (inst) out.push(inst);
+    }
+  };
+  group(COMPONENT_OF.interface, interfaces);
+  group(COMPONENT_OF.powerbank, powerbanks);
+  return out;
 }
 
 function describeCandidate(
@@ -536,6 +678,14 @@ async function applyOne(
       };
       if (attempt < attempts) await sleep(settle);
       continue;
+    }
+
+    if (flash.blInfo) {
+      result.bootloaderProtocol = {
+        reported: `${flash.blInfo.blVersionMajor}.${flash.blInfo.blVersionMinor}`,
+        host: flash.blInfo.hostProtocol,
+        mismatch: flash.blInfo.protocolMismatch,
+      };
     }
 
     if (!flash.success) {

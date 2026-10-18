@@ -49,13 +49,15 @@ station-cli pb-link-stats -b 0 --reset   # station-side link attempts/retries/ti
   that did not fit are marked as such. Release
   firmware prints a one-line "trace not available" notice instead.
 - `--no-retry` turns off the CLI's retries (the 150/400 ms re-sends after a
-  powerbank timeout and the second status read in `slots`) and, on
-  S1TTXX-firmware 3.2.0+, the station's own pogo-link retries too: it lowers
+  powerbank timeout and the second status read in `slots`) and, when the
+  station firmware has host opcode 0x54 (probed, not assumed from a version),
+  the station's own pogo-link retries too: it lowers
   them to 1 attempt on each board the command talks to and restores them when
   the command ends (the station also restores them on every boot). On older
   firmware only the CLI retries are off, and a `[TEST]` line says so.
 - `pb-link-attempts -b <n> [--set 1|2|3] [--reset]` reads or sets the station's
-  retries by hand (testing command, S1TTXX-firmware 3.2.0+).
+  retries by hand (testing command; a station firmware without host opcode
+  0x54 answers that it does not support it).
 - Testing commands: `pb-firmware`, `pb-link-stats`, `pb-link-attempts`, `convert`.
 - Experimental: the S0TTXX commands (`s0ttxx-query`, `s0ttxx-unlock`) and the
   `S0TT6`/`S0TT12`/`S0TT18` models.
@@ -90,9 +92,17 @@ echo '{"credentials":{"github":{"token":"'"$TOKEN"'"}}}' \
    answers (an earlier flash was interrupted) is found by a harmless `HELLO`
    probe and planned for **recovery**.
 2. **Catalog** — lists the GitHub Releases of the repository configured for
-   each device class, filters by channel, and picks the newest release that
-   ships an application-only `.bin` and whose `metadata.json` does not demand a
-   newer CLI.
+   each device class, classifies them by tag (`vX.Y.Z` production,
+   `dev-vX.Y.Z` development; `stable` takes production only), and walks them
+   newest first in SemVer order (`dev-v3.2.0` < `v3.2.0`). It offers the first
+   that ships an application-only `.bin` and that **compatibility.json**
+   accepts: the release was tested, its floors are met by this CLI and by the
+   firmware installed on the station, and the installed releases' own floors
+   accept it back. A powerbank image is offered only when the boards it sits
+   in are compatible with it. No compatibility data — not published, not
+   cached, not bundled — means nothing is offered (fail closed); the JSON's
+   `compatibility` field says which copy was used, and `warnings` why each
+   newer release was skipped. See [Compatibility](#compatibility).
 3. **Plan** — a pure function (`src/S1TTXX/fwu/policy.ts`) that gives *every*
    device a verdict. A device not updated always carries a stable
    `skipReason` token, never silence.
@@ -191,8 +201,10 @@ One JSON document, assembled from layers — later wins:
 repository, for testing a firmware build before it is published — on a bench
 station or the station emulator (its firmware OTA e2e serves releases this
 way). It is laid out like a set of Releases, one folder per tag, and goes
-through the same path as GitHub: the channel filter, the `metadata.json` CLI
-floor, the merged/bootloader refusal, the cache and read-back verification.
+through the same path as GitHub — the channel filter, the merged/bootloader
+refusal, the cache and read-back verification — except compatibility: such a
+build was never published, so it cannot be in compatibility.json, and the
+folder's own `metadata.json` `min_cli_version` is the only floor applied.
 
 ```json
 "sources": {
@@ -221,6 +233,39 @@ holds a credential and is readable by other users is flagged (`chmod 600`).
 station-cli config check     # effective config, which layer set each key, what is missing
 station-cli config schema    # JSON Schema, for editors and callers
 ```
+
+## Compatibility
+
+Which firmware, station-cli and kiosk versions work together is not written
+anywhere by hand. Contract suites run the real code of each pair against real
+releases (`firmware_contract.yml` here, `cli_contract.yml` / `pogo_contract.yml`
+in the firmware repositories, `kiosk_cli_contract.yml` in the kiosk), and
+release-compat turns their evidence into `compatibility.json` — the floors of
+every release towards every other component — published as asset
+`compatibility.json` of its release `current`.
+
+The CLI reads it with the GitHub credential, keeps the last good copy next to
+the firmware images (`<firmware.cacheDir>/compatibility.json`), and falls back
+to the copy bundled into the executable at build time. Floors only gate
+installs: nothing already running is stopped because of them.
+
+```json
+"compat": { "repo": "Tomorrow-Tech-s-r-l/release-compat", "tag": "current", "asset": "compatibility.json" }
+```
+
+(the default; `STATION_CLI_COMPAT_REPO` / `_TAG` / `_ASSET` override it).
+
+**Capabilities.** Callers probe what a binary can do instead of comparing
+version numbers:
+
+```bash
+station-cli capabilities --json   # version, release tag, every command and flag,
+                                  # FWU protocol and wire-log versions spoken
+```
+
+The release job publishes the same document in `metadata.json`
+(`capabilities`), next to the computed floors (`requires`, schema 2) and the
+legacy `cli_version` / `min_kiosk_app_version` that kiosks in the field read.
 
 ## Logs
 
@@ -259,6 +304,8 @@ protocol, so the real code runs end to end. CI runs the suite on every build.
 | `fwu_lock.test.js` | The firmware lock, including stale-lock recovery |
 | `fwu_cli.test.js` | The built binary, spawned: refusals and the stdout/stderr contract |
 | `fwu_http.test.js`, `fwu_catalog.test.js`, `fwu_wire_validation.test.js`, `check_workflows.test.js` | Downloads, asset rules, host-side guards, the CI guard |
+| `unit/compat.test.js`, `unit/compat_catalog.test.js` (`npm test`) | SemVer precedence and the tag grammar on the real release lists, compatibility.json validation, the consumer rule, firmware candidate selection, network/cache/bundled fallback |
+| `unit/contract_scripts.test.js` (`npm test`) | The CI helpers: contract matrix, evidence verdicts, metadata.json carry-forward |
 
 If a golden test fails, the wire protocol changed. Regenerate only when that
 change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
@@ -268,12 +315,18 @@ change is intended: `UPDATE_GOLDEN=1 npm run test:unit`.
 `.github/workflows/firmware_contract.yml` runs this CLI against the S1TTXX
 station firmware's own protocol code (a simulated station built from
 `host_protocol.c` / `protocol_utils.c` / `pb_protocol.c`, harness in
-S1TTXX-firmware `tests/cli_contract`). It checks every command the kiosk app
+S1TTXX-firmware `tests/cli_contract`), with powerbanks built from a P1TT2C
+tree docked in it. It checks every command the kiosk app
 uses (`slots`, `status`, `charge`, `initialize-powerbank` with read-back,
 `unlock`, `firmware`, `stats`), plus `pb-firmware`, `pb-link-stats` and the
 testing modes (`--raw`, `--no-retry`, `pb-link-attempts`), down to the values
-in the JSON. One leg per firmware: `development`, `main`, the newest release
-and the newest dev release.
+in the JSON. The legs are S1TTXX × P1TT2C: the releases release-compat's
+`compat targets` names, plus the `development` / `main` branches. Every leg
+becomes a `compat-evidence/v1` result (artifact `compat-evidence`); for a
+release of this CLI the release job sends it to release-compat, which
+recomputes the floors. Without `COMPAT_TOKEN` and `vars.COMPAT_REF` it runs the
+legacy legs (`development`, `main`, newest release and dev release) and
+reports no evidence.
 
 | When | CLI under test |
 |---|---|

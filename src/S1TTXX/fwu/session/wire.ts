@@ -16,12 +16,28 @@ import { FwuStep, FwuTarget } from "./target";
  * as thin wrappers over this class, so nothing that imports them changes.
  */
 
-/** Largest DATA chunk either bootloader accepts (FWU_MAX_CHUNK in fwu_iface.h). */
+/**
+ * Largest DATA chunk either bootloader accepts (FWU_MAX_CHUNK in fwu_iface.h,
+ * which owns it). The session also honours the smaller `maxChunk` a
+ * bootloader reports in HELLO, so this is a ceiling, not an assumption.
+ */
 export const FWU_MAX_CHUNK = 32;
 
-/** Bootloader protocol version this host was written against (V-40). */
+/**
+ * Bootloader protocol version this host was written against (V-40).
+ *
+ * Kept here on purpose: FWU_VERSION_MAJOR/MINOR in each bootloader's
+ * fwu_iface.h are the source of truth, and these are this CLI's statement of
+ * which protocol it SPEAKS — published by `station-cli capabilities --json`
+ * (`fwu.protocols`) so the firmware contract can check the two overlap. A
+ * bootloader that answers HELLO with another version is reported in the
+ * command's JSON (`protocolMismatch`), not only on stderr.
+ */
 export const FWU_HOST_EXPECTED_MAJOR = 0;
 export const FWU_HOST_EXPECTED_MINOR = 1;
+
+/** The FWU protocol versions this host implements, as `major.minor`. */
+export const FWU_HOST_PROTOCOLS: readonly string[] = [`${FWU_HOST_EXPECTED_MAJOR}.${FWU_HOST_EXPECTED_MINOR}`];
 
 const HELLO_PAYLOAD_BYTES = 15;
 
@@ -34,6 +50,10 @@ export interface FwuHelloInfo {
   maxChunk: number;
   pageSize: number;
   slotSize: number;
+  /** Protocol version this host expects, `major.minor`. */
+  hostProtocol: string;
+  /** True when the bootloader speaks another FWU protocol version than this host. */
+  protocolMismatch: boolean;
 }
 
 /** Reply to DATA: the offset the bootloader expects next. */
@@ -97,11 +117,10 @@ export class FwuWire extends BaseCommand {
       maxChunk: d.readUInt16LE(7),
       pageSize: d.readUInt16LE(9),
       slotSize: d.readUInt32LE(11),
+      hostProtocol: FWU_HOST_PROTOCOLS[0],
+      protocolMismatch: !FWU_HOST_PROTOCOLS.includes(`${d.readUInt8(0)}.${d.readUInt8(1)}`),
     };
-    if (
-      info.blVersionMajor !== FWU_HOST_EXPECTED_MAJOR ||
-      info.blVersionMinor !== FWU_HOST_EXPECTED_MINOR
-    ) {
+    if (info.protocolMismatch) {
       console.warn(
         this.target.helloVersionWarning(
           info.blVersionMajor,

@@ -18,7 +18,7 @@ import { EngineOptions, EngineReport, runEngine } from "../../fwu/engine";
 import { defaultGates } from "../../fwu/policy";
 import { acquireLock, activeLock, FirmwareLockHeldError, HeldLock } from "../../fwu/lock";
 import { loadConfig, LoadedConfig } from "../../../config/loader";
-import { effectiveLockFile, StationCliConfig } from "../../../config/schema";
+import { compatCacheFile, effectiveLockFile, StationCliConfig } from "../../../config/schema";
 
 /**
  * Headless firmware-update commands.
@@ -263,6 +263,8 @@ async function runOnce(program: Command, opts: FwuOptions, phase: Phase): Promis
     online: phase.online,
     sources: fw.sources,
     token: config.credentials.github.token,
+    compat: config.compat,
+    compatCacheFile: compatCacheFile(fw),
     cacheDir: fw.cacheDir,
     cacheKeepPerKind: fw.cacheKeepPerKind,
     stateFile: fw.stateFile,

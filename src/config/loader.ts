@@ -128,6 +128,15 @@ export function envLayer(env: NodeJS.ProcessEnv): Raw {
   const layer: Raw = {};
   if (Object.keys(firmware).length) layer.firmware = firmware;
 
+  const compat: Raw = {};
+  const compatRepo = pick("STATION_CLI_COMPAT_REPO");
+  const compatTag = pick("STATION_CLI_COMPAT_TAG");
+  const compatAsset = pick("STATION_CLI_COMPAT_ASSET");
+  if (compatRepo) compat.repo = compatRepo;
+  if (compatTag) compat.tag = compatTag;
+  if (compatAsset) compat.asset = compatAsset;
+  if (Object.keys(compat).length) layer.compat = compat;
+
   const jsonl = pick("STATION_CLI_LOG_JSONL");
   if (jsonl) layer.logging = { jsonlFile: jsonl };
 
@@ -292,6 +301,7 @@ export async function loadConfig(opts: LoadOptions = {}): Promise<LoadedConfig> 
       ...(f as unknown as StationCliConfig["firmware"]),
       sources: { ...(isObject(f.sources) ? (f.sources as Raw) : {}) } as StationCliConfig["firmware"]["sources"],
     },
+    compat: { ...(merged.compat as unknown as StationCliConfig["compat"]) },
     logging: { ...(merged.logging as StationCliConfig["logging"]) },
     credentials: { github: { token: secretFrom(gh.token) } },
   };

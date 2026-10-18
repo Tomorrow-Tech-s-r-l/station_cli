@@ -14,10 +14,12 @@ import { Secret } from "./secret";
  *
  * ## What belongs here, and what must never
  * The binary is published. Its built-in defaults therefore contain no
- * deployment knowledge: no organisation, no repository names, no hosts, no
- * credentials. Everything specific to a deployment — where firmware comes from,
- * where state lives, the token that reads private releases — arrives from
- * outside at run time.
+ * deployment knowledge: no hosts, no credentials, no firmware sources.
+ * Everything specific to a deployment — where firmware comes from, where state
+ * lives, the token that reads private releases — arrives from outside at run
+ * time. The one name built in is where compatibility.json is published
+ * (`compat`): it is part of the product's release contract, like the firmware
+ * family names in `catalog.ts`, and is overridable like everything else.
  */
 
 export const CONFIG_VERSION = 1;
@@ -69,6 +71,16 @@ export interface FirmwareConfig {
   sources: Partial<Record<FirmwareKind, FirmwareSourceConfig>>;
 }
 
+/**
+ * Where compatibility.json is published: asset `asset` of the GitHub release
+ * tagged `tag` in `repo`. Read with credentials.github.token.
+ */
+export interface CompatSourceConfig {
+  repo: string;
+  tag: string;
+  asset: string;
+}
+
 export interface LoggingConfig {
   /** Append structured JSONL records here. `null` disables. */
   jsonlFile: string | null;
@@ -81,6 +93,7 @@ export interface CredentialsConfig {
 export interface StationCliConfig {
   version: 1;
   firmware: FirmwareConfig;
+  compat: CompatSourceConfig;
   logging: LoggingConfig;
   credentials: CredentialsConfig;
 }
@@ -120,9 +133,22 @@ export function defaultConfig(): StationCliConfig {
       lockFile: null,
       sources: {},
     },
+    compat: { ...DEFAULT_COMPAT_SOURCE },
     logging: { jsonlFile: null },
     credentials: { github: { token: null } },
   };
+}
+
+/** The published compatibility.json every component reads (release-compat's `current`). */
+export const DEFAULT_COMPAT_SOURCE: Readonly<CompatSourceConfig> = Object.freeze({
+  repo: "Tomorrow-Tech-s-r-l/release-compat",
+  tag: "current",
+  asset: "compatibility.json",
+});
+
+/** The last good compatibility.json, kept next to the firmware images. */
+export function compatCacheFile(firmware: FirmwareConfig): string {
+  return path.join(firmware.cacheDir, "compatibility.json");
 }
 
 /** The lock path actually used: explicit, or next to the state file. */
@@ -141,7 +167,7 @@ export interface ValidationIssue {
 }
 
 const KNOWN_KEYS: Record<string, readonly string[]> = {
-  "": ["$schema", "version", "firmware", "logging", "credentials"],
+  "": ["$schema", "version", "firmware", "compat", "logging", "credentials"],
   firmware: [
     "channel",
     "minBatteryPercent",
@@ -157,6 +183,7 @@ const KNOWN_KEYS: Record<string, readonly string[]> = {
   ],
   "firmware.sources": ["interface", "powerbank"],
   "firmware.sources.*": ["provider", "repo", "path", "assetPattern", "rejectPattern"],
+  compat: ["repo", "tag", "asset"],
   logging: ["jsonlFile"],
   credentials: ["github"],
   "credentials.github": ["token"],
@@ -278,6 +305,20 @@ export function validateRaw(doc: unknown): { errors: ValidationIssue[]; warnings
     }
   }
 
+  if (doc.compat !== undefined) {
+    if (!isObject(doc.compat)) {
+      err("compat", "must be an object");
+    } else {
+      unknown(doc.compat, "compat", KNOWN_KEYS.compat);
+      const r = doc.compat.repo;
+      if (r !== undefined && (typeof r !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(r))) {
+        err("compat.repo", 'must be "owner/name"');
+      }
+      str(doc.compat, "tag", "compat");
+      str(doc.compat, "asset", "compat");
+    }
+  }
+
   if (doc.logging !== undefined) {
     if (!isObject(doc.logging)) {
       err("logging", "must be an object");
@@ -375,6 +416,16 @@ export const CONFIG_JSON_SCHEMA = {
           additionalProperties: false,
           properties: { interface: source, powerbank: source },
         },
+      },
+    },
+    compat: {
+      type: "object",
+      additionalProperties: false,
+      description: "Where compatibility.json is published (a GitHub release asset).",
+      properties: {
+        repo: { type: "string", pattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        tag: { type: "string", minLength: 1 },
+        asset: { type: "string", minLength: 1 },
       },
     },
     logging: {

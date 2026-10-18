@@ -465,3 +465,53 @@ test("devices left over by the per-run cap are still reported as pending", async
   assert.equal(item(report, "interface board 1").skipReason, "MAX_TARGETS_REACHED");
   assert.equal(report.summary.updatesPending, true, "board 1 still needs its update");
 });
+
+// ---------------------------------------------------------------------------
+// compatibility.json: loaded once per run, handed to the catalog with what is
+// installed, and reported in the JSON.
+// ---------------------------------------------------------------------------
+
+test("compatibility data and the installed set reach the catalog, and the report says which copy", async () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "compat", "compatibility.json"), "utf8"));
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  const base = localCatalog({ interface: "3.1.0", powerbank: "3.0.4" });
+  const catalog = {
+    async resolve(kind, opts) {
+      seen[kind] = opts.installed.map((i) => `${i.component}:${i.interpretations.map((x) => x.tag ?? "?").join("|")}`);
+      seen.compat = opts.compat.origin;
+      return base.resolve(kind);
+    },
+    ensure: base.ensure,
+  };
+  let loads = 0;
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({
+      filter: { boards: [0], slots: [] },
+      apply: false,
+      catalog,
+      compatLoader: async () => {
+        loads += 1;
+        return { doc, origin: "cache", location: "/x/compatibility.json", sequence: 42, generatedAt: doc.generated_at, error: "offline" };
+      },
+    })
+  );
+  assert.equal(loads, 1, "read once per run");
+  assert.equal(seen.compat, "cache");
+  assert.deepEqual(seen.interface.slice(1), ["S1TTXX:v3.0.3", "P1TT2C:v3.0.2"]);
+  assert.match(seen.interface[0], /^station_cli:/);
+  assert.deepEqual(
+    { origin: report.compatibility.origin, sequence: report.compatibility.sequence, error: report.compatibility.error },
+    { origin: "cache", sequence: 42, error: "offline" }
+  );
+});
+
+test("an injected catalog without a loader, or a dir source, never reads compatibility data", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] }, apply: false }));
+  assert.equal(report.compatibility, null);
+});

@@ -56,9 +56,9 @@ jobs:
         id: check_branch
         run: |
           if [ "${{ github.ref }}" = "refs/heads/development" ]; then
-            echo "is_development=true" >> $GITHUB_OUTPUT
+            echo "is_development=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is_development=false" >> $GITHUB_OUTPUT
+            echo "is_development=false" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -123,6 +123,22 @@ jobs:
           npm run test:unit
         shell: bash
 
+      # bundle/ is packed into the executable (package.json pkg.assets): the
+      # release tag this build becomes — a version alone cannot tell v0.5.0
+      # from dev-v0.5.0, and compatibility.json may treat them differently —
+      # and the published compatibility.json, the copy the CLI falls back to
+      # when it can neither download nor find a cached one. Downloaded, never
+      # written by hand; without COMPAT_TOKEN the build simply carries none.
+      - name: Bundle build info and compatibility.json
+        env:
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          IS_DEV: ${{ steps.check_branch.outputs.is_development }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$IS_DEV" = "true" ]; then TAG="dev-v$VERSION"; else TAG="v$VERSION"; fi
+          node scripts/bundle.js --tag "$TAG" --commit "$GITHUB_SHA"
+        shell: bash
+
       - name: Build executable
         run: npm run ${{ matrix.build_script }}
         shell: bash
@@ -151,16 +167,18 @@ jobs:
 
       - name: Get version
         id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Get commit message
         id: get_commit_message
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "commit_message<<EOF"
+            echo "$COMMIT_MSG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
 
   # Release gate for the firmware engine: THIS build's fw-status / fw-plan /
@@ -305,6 +323,7 @@ jobs:
     uses: ./.github/workflows/firmware_contract.yml
     with:
       cli_artifact: station-cli-linux-x64
+      cli_tag: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
     secrets: inherit
 
   # Never released past a red gate: every gate below is required.
@@ -349,16 +368,84 @@ jobs:
           # Verify the files exist and are executable
           ls -la station-cli-*
 
-      - name: Generate metadata.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: release-compat available?
+        id: compat
+        env:
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT_REF: ${{ vars.COMPAT_REF }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          MIN_KIOSK=$(node -p "require('./package.json').minKioskAppVersion || '1.0.0'")
-          printf '{\n  "cli_version": "%s",\n  "min_kiosk_app_version": "%s"\n}\n' "$VERSION" "$MIN_KIOSK" > metadata.json
-          echo "Generated metadata.json:"
-          cat metadata.json
+          if [ -n "$COMPAT_TOKEN" ] && [ -n "$COMPAT_REF" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::COMPAT_TOKEN or vars.COMPAT_REF not set — metadata.json gets no computed floors; legacy fields are carried forward from the previous release"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.compat.outputs.ok == 'true'
+        with:
+          repository: Tomorrow-Tech-s-r-l/release-compat
+          ref: ${{ vars.COMPAT_REF }}
+          path: release-compat
+          token: ${{ secrets.COMPAT_TOKEN }}
+
+      # metadata.json, schema 2, computed — never declared. The floors come
+      # from this run's contract evidence (fw-contract → artifact
+      # compat-evidence) through release-compat (`compat floor` and
+      # `compat metadata`); the legacy min_kiosk_app_version, which kiosks in
+      # the field read, is the computed kiosk floor when the evidence has one
+      # and otherwise the previous release's published value, carried forward
+      # and listed in computed.carried_forward. `capabilities` is what the
+      # released binary itself reports.
+      - name: Compute metadata.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT: ${{ steps.compat.outputs.ok }}
+          VERSION: ${{ needs.build.outputs.version }}
+          IS_DEV: ${{ needs.build.outputs.is_development }}
+        run: |
+          set -euo pipefail
+          if [ "$IS_DEV" = "true" ]; then TAG="dev-v$VERSION"; else TAG="v$VERSION"; fi
+          W="$RUNNER_TEMP/metadata" && rm -rf "$W" && mkdir -p "$W"
+          ./station-cli-linux-x64 capabilities --json > "$W/capabilities.json"
+
+          PREV=$(gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' \
+            | node scripts/release-metadata.js previous-tag "$TAG" || true)
+          if [ -n "$PREV" ]; then
+            gh release download "$PREV" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/previous" \
+              || echo "::notice::$PREV has no metadata.json"
+          fi
+
+          args=()
+          EVIDENCE=compat-evidence/evidence.json
+          if [ "$COMPAT" = "true" ] && [ -f "$EVIDENCE" ]; then
+            if node release-compat/bin/compat.mjs floor --evidence "$EVIDENCE" --component station_cli --tag "$TAG" > "$W/floor.json"; then
+              args+=(--floor "$W/floor.json")
+            else
+              echo "::warning::compat floor failed — metadata.json carries no computed floors"
+            fi
+            if GH_TOKEN="$COMPAT_TOKEN" gh release download current -R Tomorrow-Tech-s-r-l/release-compat -p compatibility.json -D "$W/compat" \
+              && node release-compat/bin/compat.mjs metadata --component station_cli --tag "$TAG" \
+                   --compat "$W/compat/compatibility.json" --out "$W/base.json"; then
+              args+=(--base "$W/base.json")
+            else
+              echo "::warning::compat metadata failed — metadata.json is completed from the evidence floor alone"
+            fi
+          fi
+          [ -f "$W/previous/metadata.json" ] && args+=(--previous "$W/previous/metadata.json")
+
+          node scripts/release-metadata.js --tag "$TAG" --version "$VERSION" --out metadata.json \
+            --capabilities "$W/capabilities.json" "${args[@]}" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --suite-ref "$GITHUB_SHA"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        # v2: v1 runs on the retired node16 runtime.
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ needs.build.outputs.is_development == 'true' && format('Development Release v{0}', needs.build.outputs.version) || format('Release v{0}', needs.build.outputs.version) }}
           body: |
@@ -390,8 +477,20 @@ jobs:
             station-cli-linux-x64
             station-cli-macos-arm64
             station-cli-windows-x64.exe
-            metadata.json 
+            metadata.json
           tag_name: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
+
+      # The release exists now, so the contract evidence of this run can move
+      # floors: hand it to release-compat, which recomputes compatibility.json.
+      - name: Report the contract evidence to release-compat
+        if: steps.compat.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+        run: |
+          gh api repos/Tomorrow-Tech-s-r-l/release-compat/dispatches -f event_type=compat-evidence \
+            -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[run_id]=$GITHUB_RUN_ID" \
+            && echo "::notice::evidence of run $GITHUB_RUN_ID sent to release-compat" \
+            || echo "::warning::could not notify release-compat (COMPAT_TOKEN needs contents:write there); dispatch firmware_contract.yml with cli_tag to report it again"
 
       # The other direction: S1TTXX-firmware re-runs its station-cli contract
       # with the executable just published, on its development and main.

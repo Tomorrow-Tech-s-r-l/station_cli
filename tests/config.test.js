@@ -48,10 +48,15 @@ test("built-in defaults carry no deployment knowledge", () => {
   const d = defaultConfig();
   assert.deepEqual(d.firmware.sources, {}, "no firmware repositories are baked in");
   assert.equal(d.credentials.github.token, null);
-  const text = JSON.stringify(d).toLowerCase();
+  // The one name built in is where compatibility.json is published — part of
+  // the release contract every component reads, not a deployment. Everything
+  // else stays generic.
+  const { compat, ...rest } = d;
+  const text = JSON.stringify(rest).toLowerCase();
   for (const word of ["amperry", "tomorrow", "github.com"]) {
     assert.ok(!text.includes(word), `defaults must not mention "${word}"`);
   }
+  assert.deepEqual(compat, { repo: "Tomorrow-Tech-s-r-l/release-compat", tag: "current", asset: "compatibility.json" });
 });
 
 test("defaults are conservative", () => {
@@ -204,6 +209,7 @@ test("the published schema and the validator know the same keys", () => {
   assert.deepEqual(props(s.firmware.properties.sources), [...VALIDATOR_KNOWN_KEYS["firmware.sources"]].sort());
   assert.deepEqual(props(s.firmware.properties.sources.properties.interface), [...VALIDATOR_KNOWN_KEYS["firmware.sources.*"]].sort());
   assert.deepEqual(props(s.logging), [...VALIDATOR_KNOWN_KEYS.logging].sort());
+  assert.deepEqual(props(s.compat), [...VALIDATOR_KNOWN_KEYS.compat].sort());
   assert.deepEqual(props(s.credentials.properties.github), [...VALIDATOR_KNOWN_KEYS["credentials.github"]].sort());
 });
 

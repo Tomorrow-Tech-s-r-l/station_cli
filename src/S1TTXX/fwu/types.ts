@@ -4,11 +4,13 @@
  * The JSON these types serialise to is a cross-repo contract: the kiosk app
  * (amperry-kiosk-local) parses `fw-status`, `fw-plan` and `fw-apply` output to
  * decide what to report to the cloud and when to retry. Fields may be ADDED
- * freely; renaming or removing one is a breaking change that needs a
- * coordinated `minCliVersion` bump on the kiosk side.
+ * freely; renaming or removing one is a breaking change: the kiosk × CLI
+ * contract run (kiosk_cli_contract) fails, and compatibility.json stops
+ * offering the pair.
  */
 
 import { Version } from "./version";
+import type { CompatRequirement } from "../../compat/compatibility";
 
 /** The two updatable device classes in a station. */
 export type TargetKind = "interface" | "powerbank";
@@ -90,6 +92,15 @@ export interface ReleaseCandidate {
   minCliVersion: Version | null;
   /** `sha256:<hex>` digest GitHub reports for the asset, when it reports one. */
   digest: string | null;
+  /**
+   * The compatibility.json entry that made this release installable (GitHub
+   * sources). Absent for a `dir` source, which uses the legacy metadata rule.
+   */
+  compat?: {
+    sequence: number;
+    origin: string;
+    requires: Partial<Record<string, CompatRequirement>>;
+  };
 }
 
 /** Why a target was excluded from the plan. Stable, greppable tokens. */
@@ -171,6 +182,11 @@ export interface ApplyItemResult {
   /** Version read back after the flash; null when the read-back failed. */
   verifiedVersion: string | null;
   error: { stage: string; code?: number; message: string } | null;
+  /**
+   * The FWU protocol the device's bootloader reported in HELLO, against the
+   * one this CLI speaks. Present once a HELLO was answered.
+   */
+  bootloaderProtocol?: { reported: string; host: string; mismatch: boolean };
 }
 
 /** Per-target failure bookkeeping, persisted between runs. */
