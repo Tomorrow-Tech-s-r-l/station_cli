@@ -269,13 +269,14 @@ jobs:
   # unlock, return elsewhere, double rent, config sync, OTA). It runs in
   # station_emulator (release-gate.yml, which downloads the candidate from this
   # run): development → amperry-dev with the development kiosk; main →
-  # amperry-dev, then production, with the stable kiosk. Push-only. Waits on
-  # the X64 runner so the arm64 box stays free to run the gate.
+  # amperry-dev, then production, with the stable kiosk. Push-only. It only
+  # waits, so it runs on a GitHub-hosted runner (free for this public repo)
+  # rather than holding the single self-hosted X64 box for the whole gate.
   # Needs E2E_GATE_TOKEN: a PAT with actions:write + contents:read on
   # Tomorrow-Tech-s-r-l/station_emulator.
   gate:
     needs: build
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
       - name: Run the station emulator release gate
