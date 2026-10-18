@@ -307,8 +307,9 @@ jobs:
       cli_artifact: station-cli-linux-x64
     secrets: inherit
 
+  # Never released past a red gate: every gate below is required.
   release:
-    needs: [build, fwu-e2e, fw-contract]
+    needs: [build, fwu-e2e, fw-contract, gate]
     runs-on: [self-hosted, Linux, X64]
     permissions:
       contents: write
