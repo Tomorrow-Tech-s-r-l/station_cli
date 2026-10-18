@@ -5,7 +5,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { buildMatrix, tagsFrom } = require("../../scripts/contract-targets");
-const { legResult, verdict, merge } = require("../../scripts/contract-evidence");
+const { legResult, legResults, verdict, merge } = require("../../scripts/contract-evidence");
 const { buildMetadata, previousTag } = require("../../scripts/release-metadata");
 
 test("targets: compat targets × packs, branches never get a tag", () => {
@@ -49,6 +49,32 @@ test("evidence: PASS needs every core check to pass", () => {
   assert.equal(verdict(legResult({ ...base, report: null })), "UNKNOWN");
   assert.equal(legResult({ ...base, report: null }).status, "missing");
   assert.equal(legResult({ ...base, report: null, skipped: "cannot build" }).status, "skipped");
+});
+
+test("evidence: one leg is two pairings, split by the edge each check tests", () => {
+  // The shape of a real leg (station-cli v0.3.1 x S1TTXX v3.0.3 x P1TT2C
+  // dev-v3.1.0): the CLI drops the voltage the pack sends in the INFO_EXT
+  // tail. That is the pack's pairing; it must not fail the board's.
+  const base = { fwTag: "v3.0.3", fwRef: "abc", cliTag: "v0.3.1", cliRef: "def", packTag: "dev-v3.1.0", packRef: "123" };
+  const [board, pack] = legResults({
+    ...base,
+    report: report([
+      { name: "slots", tier: "core", edge: "both", result: "pass" },
+      { name: "status empty slot", tier: "core", edge: "board", result: "pass" },
+      { name: "status INFO_EXT tail reaches the JSON", tier: "core", edge: "pack", result: "fail" },
+    ]),
+  });
+  assert.deepEqual([board.a.component, board.b.component, verdict(board)], ["S1TTXX", "station_cli", "PASS"]);
+  assert.deepEqual(board.checks.map((c) => c.name), ["slots", "status empty slot"]);
+  assert.deepEqual([pack.a, pack.context], [
+    { component: "P1TT2C", tag: "dev-v3.1.0", ref: "123", sha256: null },
+    [{ component: "S1TTXX", tag: "v3.0.3", ref: "abc" }],
+  ]);
+  assert.equal(verdict(pack), "FAIL");
+  assert.equal(legResults({ ...base, report: null })[1].status, "missing");
+  // No pack docked: the board pairing only. No edge (an older harness): board.
+  assert.equal(legResults({ ...base, packTag: "", packRef: "", report: report([]) }).length, 1);
+  assert.equal(legResults({ ...base, report: report([{ name: "slots", tier: "core", result: "fail" }]) })[0].checks.length, 1);
 });
 
 test("evidence: a branch build has no tag, and the file is compat-evidence/v1", () => {

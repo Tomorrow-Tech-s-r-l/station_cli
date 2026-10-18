@@ -251,11 +251,21 @@ jobs:
           path: pack
           token: ${{ secrets.RELEASE_TOKEN }}
 
+      # The P1TT2C checkout whose sim/pack_sim builds the pack: release tags
+      # older than sim/ have none (same var as S1TTXX's cli_contract.yml).
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && matrix.pack_ref != ''
+        with:
+          repository: ${{ env.PACK_REPO }}
+          ref: ${{ vars.PACK_HARNESS_REF || 'development' }}
+          path: pack-harness
+          token: ${{ secrets.RELEASE_TOKEN }}
+
       - name: Pack under test
         id: pack
         if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
         run: |
-          if [ -d pack ] && grep -q PACK_SRC harness/tests/cli_contract/*.sh; then
+          if [ -d pack ] && [ -f pack-harness/sim/pack_sim/build.sh ] && grep -q PACK_SRC harness/tests/cli_contract/*.sh; then
             { echo "used=true"; echo "ref=$(git -C pack rev-parse HEAD)"; } >> "$GITHUB_OUTPUT"
           else
             [ -d pack ] && echo "::notice::harness@$HARNESS_REF does not build packs from a P1TT2C tree yet — its own pack is used"
@@ -292,12 +302,15 @@ jobs:
           PACK_USED: ${{ steps.pack.outputs.used }}
           FW_TAG: ${{ steps.fw.outputs.tag }}
         run: |
-          pack_env=()
-          [ "$PACK_USED" = "true" ] && pack_env=(-e PACK_SRC=/w/pack)
+          # pack_sim too, when the harness docks real packs: run.sh needs a
+          # prebuilt one, as the runner has no C toolchain.
           for i in 1 2 3; do
             docker run --rm --user "$(id -u):$(id -g)" \
-              -v "${PWD}:/w:ro" -v "$OUT:/out" -w /w -e FW_SRC=/w/fw "${pack_env[@]}" gcc:13 \
-              sh harness/tests/cli_contract/build_sim.sh /out/station_sim -static && exit 0
+              -v "${PWD}:/w:ro" -v "$OUT:/out" -w /w -e FW_SRC=/w/fw gcc:13 \
+              sh harness/tests/cli_contract/build_sim.sh /out/station_sim -static \
+              && { [ "$PACK_USED" != "true" ] || docker run --rm --user "$(id -u):$(id -g)" \
+                     -v "${PWD}:/w:ro" -v "$OUT:/out" -w /w -e PACK_SRC=/w/pack gcc:13 \
+                     sh pack-harness/sim/pack_sim/build.sh /out/pack_sim -static; } && exit 0
             echo "::warning::station_sim build attempt $i failed, retrying"
             sleep $((i * 15))
           done
@@ -315,6 +328,7 @@ jobs:
           STATION_SIM: ${{ env.OUT }}/station_sim
           FW_SRC: fw
           PACK_SRC: ${{ steps.pack.outputs.used == 'true' && 'pack' || '' }}
+          PACK_SIM: ${{ steps.pack.outputs.used == 'true' && format('{0}/pack_sim', env.OUT) || '' }}
           CLI_ARTIFACT: ${{ inputs.cli_artifact }}
           CLI_TAG: ${{ inputs.cli_tag }}
           FW_LABEL: ${{ steps.fw.outputs.label }}
