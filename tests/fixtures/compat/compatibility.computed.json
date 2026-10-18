@@ -1,7 +1,7 @@
 {
   "format": "compatibility/v1",
-  "sequence": 1,
-  "generated_at": "2026-10-18T18:47:12Z",
+  "sequence": 2,
+  "generated_at": "2026-10-18T19:30:00Z",
   "edges": [
     [
       "S1TTXX",
@@ -111,7 +111,8 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -151,10 +152,9 @@
           "channel": "production",
           "requires": {
             "P1TT2C": {
-              "min": null,
-              "min_tag": null,
-              "no_compatible": true,
-              "reason": "newest_failed",
+              "min": "3.0.2",
+              "min_tag": "v3.0.2",
+              "no_compatible": false,
               "tested": [
                 "v2.0.0",
                 "v2.0.1",
@@ -167,8 +167,7 @@
                 "v2.0.0",
                 "v2.0.1",
                 "v2.0.2",
-                "v3.0.0",
-                "dev-v3.1.0"
+                "v3.0.0"
               ],
               "unknown": [],
               "evidence": [
@@ -195,10 +194,9 @@
                   "unknown": []
                 },
                 "development": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
                   "tested": [
                     "v2.0.0",
                     "v2.0.1",
@@ -211,8 +209,7 @@
                     "v2.0.0",
                     "v2.0.1",
                     "v2.0.2",
-                    "v3.0.0",
-                    "dev-v3.1.0"
+                    "v3.0.0"
                   ],
                   "unknown": []
                 }
@@ -233,7 +230,9 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -526,7 +525,6 @@
                 "dev-v3.2.0"
               ],
               "failed": [
-                "v3.0.3",
                 "dev-v3.2.0"
               ],
               "unknown": [],
@@ -535,10 +533,9 @@
               ],
               "channels": {
                 "production": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
                   "tested": [
                     "v2.0.0",
                     "v2.0.1",
@@ -546,9 +543,7 @@
                     "v3.0.1",
                     "v3.0.3"
                   ],
-                  "failed": [
-                    "v3.0.3"
-                  ],
+                  "failed": [],
                   "unknown": []
                 },
                 "development": {
@@ -565,7 +560,6 @@
                     "dev-v3.2.0"
                   ],
                   "failed": [
-                    "v3.0.3",
                     "dev-v3.2.0"
                   ],
                   "unknown": []
@@ -590,7 +584,9 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -695,7 +691,9 @@
               "failed": [],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1022,7 +1020,9 @@
               "failed": [],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1062,7 +1062,9 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1145,7 +1147,9 @@
               "failed": [],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1185,7 +1189,9 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1268,7 +1274,9 @@
               "failed": [],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1308,7 +1316,9 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1395,7 +1405,9 @@
               ],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
@@ -1439,7 +1451,9 @@
               "failed": [],
               "unknown": [],
               "evidence": [
-                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0"
+                "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
               ],
               "channels": {
                 "production": {
