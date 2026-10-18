@@ -144,8 +144,9 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: executables/${{ matrix.artifact_name }}
           if-no-files-found: error
-          # Transport only: the release job republishes these as Release assets,
-          # which are not charged to the org's storage quota. Artifacts are.
+          # Transport only: the release gate (station_emulator downloads the
+          # linux-arm64 one from this run) and the release job, which republishes
+          # them as Release assets — not charged to the org's storage quota.
           retention-days: 1
 
       - name: Get version
@@ -261,7 +262,38 @@ jobs:
           path: station_emulator/fwu-report/
           retention-days: 14
           if-no-files-found: ignore
-
+          
+  # Release gate for the whole product flow: THIS build's linux-arm64 binary
+  # becomes the station_cli the real kiosk execs, on emulated station hardware,
+  # against the real cloud — the full all-real e2e (rent → return, jammed
+  # unlock, return elsewhere, double rent, config sync, OTA). It runs in
+  # station_emulator (release-gate.yml, which downloads the candidate from this
+  # run): development → amperry-dev with the development kiosk; main →
+  # amperry-dev, then production, with the stable kiosk. Push-only. Waits on
+  # the X64 runner so the arm64 box stays free to run the gate.
+  # Needs E2E_GATE_TOKEN: a PAT with actions:write + contents:read on
+  # Tomorrow-Tech-s-r-l/station_emulator.
+  gate:
+    needs: build
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 150
+    steps:
+      - name: Run the station emulator release gate
+        env:
+          GH_TOKEN: ${{ secrets.E2E_GATE_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+          IS_DEV: ${{ needs.build.outputs.is_development }}
+        run: |
+          set -euo pipefail
+          gh api repos/Tomorrow-Tech-s-r-l/station_emulator/contents/tool/release_gate.sh \
+            -H 'Accept: application/vnd.github.raw' > "$RUNNER_TEMP/release_gate.sh"
+          if [ "$IS_DEV" = "true" ]; then
+            CHANNEL=development CLOUDS=amperry-dev TAG="dev-v$VERSION"
+          else
+            CHANNEL=main CLOUDS=amperry-dev,amperry-app TAG="v$VERSION"
+          fi
+          bash "$RUNNER_TEMP/release_gate.sh" --component=cli --version="$TAG" \
+            --artifact=station-cli-linux-arm64 --channel="$CHANNEL" --clouds="$CLOUDS" --tests=all
   # Release gate for the station commands: the linux-x64 executable this
   # build just made, against the station firmware's protocol code
   # (development, main, the newest release and dev release) — every command
