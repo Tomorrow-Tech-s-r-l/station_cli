@@ -1,25 +1,48 @@
 name: Firmware contract
 
-# The station_cli <-> S1TTXX-firmware command contract, from this side: THIS
-# CLI against the station firmware's protocol code — every command the kiosk
+# The station_cli <-> firmware command contract, from this side: THIS CLI
+# against the station firmware's protocol code, with a powerbank built from
+# the pack firmware docked in the simulated station — every command the kiosk
 # app uses in production, plus the diagnostics and the testing modes, down to
 # the values in the JSON. The harness lives in S1TTXX-firmware
 # (tests/cli_contract: a simulated station built from the firmware's own
 # host_protocol.c / protocol_utils.c / pb_protocol.c); the firmware runs the
 # same harness the other way round (its cli_contract.yml).
 #
-# One matrix leg per firmware:
-#   development, main      the firmware branches (what ships next)
-#   release                newest firmware release (what stations run)
-#   dev-release            newest dev-v* pre-release (beta channel)
+# Which firmware is tested is not written here: every release of S1TTXX and
+# of P1TT2C that release-compatibility-cli lists (`compat resolve`; a dispatch may
+# narrow it to the newest N per channel with `compat targets`), and the legs
+# are those × the development and main branches, for S1TTXX × P1TT2C. Every
+# release, not only the newest: stations still run old firmware, and a floor
+# only stays low over releases that were actually tested (an old tree the
+# harness cannot build is reported as not tested, never as a failure). Every leg's result goes into
+# `compat-evidence/v1` (artifact `compat-evidence`), from which release-compatibility-cli
+# computes the floors in compatibility.json and in this CLI's metadata.json.
+# A branch build on any side never moves a floor, and only runs on main /
+# development (build.yml's call, the nightly, a dispatch on those refs) upload
+# `compat-evidence` or report to release-compatibility-cli: anywhere else the same file
+# is `compat-evidence-branch`, which nothing ingests.
+#
+# The run goes red when a leg could not run, or when this CLI fails a core
+# check against the newest production S1TTXX and P1TT2C releases tested —
+# what stations run. Any other failing pair (an old or a development
+# release) is a fact for the floors, not a broken build: it is in the table
+# and in the evidence, and release-compatibility-cli keeps stations from installing
+# the pair.
 #
 # When:
 #   - every push to a feature branch (this CLI built from source);
 #   - main / development: called from build.yml with the linux-x64 executable
-#     that build just made, and the release waits for it;
+#     that build just made, and the release waits for it (build.yml reports
+#     the evidence once the release exists);
 #   - nightly, so a firmware change that breaks this CLI is reported on a day
 #     nothing is pushed here;
-#   - on request from S1TTXX-firmware right after it publishes a release.
+#   - on request (cli_tag: a published release of this CLI, whose evidence is
+#     then sent to release-compatibility-cli when dispatched on main or development).
+#
+# Without COMPAT_TOKEN / vars.COMPAT_REF it falls back to the legacy legs
+# (development, main, newest release, newest dev release) with the P1TT2C
+# development branch docked, and reports no evidence.
 #
 # Push, schedule and dispatch only (never pull_request): it runs on
 # self-hosted runners, see CONTRIBUTING.md.
@@ -33,11 +56,16 @@ on:
         required: false
         type: string
         default: ''
-      fw_refs:
-        description: "JSON list of firmware refs"
+      cli_tag:
+        description: "Release tag the CLI under test is (or will be) published as; empty for a branch build"
         required: false
         type: string
-        default: '["development", "main", "release", "dev-release"]'
+        default: ''
+      fw_refs:
+        description: "JSON list of firmware refs; empty: the releases compat targets names, plus development and main"
+        required: false
+        type: string
+        default: ''
     outputs:
       report:
         description: "Markdown table of every pair tested"
@@ -45,10 +73,25 @@ on:
   workflow_dispatch:
     inputs:
       fw_refs:
-        description: "JSON list of firmware refs (development, main, release, dev-release, or a tag)"
+        description: "JSON list of firmware refs (development, main, release, dev-release, or a tag); empty: compat targets"
         required: false
         type: string
-        default: '["development", "main", "release", "dev-release"]'
+        default: ''
+      cli_tag:
+        description: "Test this published station_cli release instead of the branch, and report the evidence"
+        required: false
+        type: string
+        default: ''
+      newest:
+        description: "Station firmware releases per channel to test (compat targets --newest); empty: every release"
+        required: false
+        type: string
+        default: ''
+      pack_newest:
+        description: "Pack firmware releases per channel to test (compat targets --newest); empty: every release"
+        required: false
+        type: string
+        default: ''
   schedule:
     - cron: '37 3 * * *'
 
@@ -57,21 +100,95 @@ permissions:
 
 env:
   FW_REPO: Tomorrow-Tech-s-r-l/S1TTXX-firmware
+  PACK_REPO: Tomorrow-Tech-s-r-l/P1TT2C-firmware
+  COMPAT_REPO: Tomorrow-Tech-s-r-l/release-compatibility-cli
   # The harness is versioned with the firmware; development has the newest
-  # checks and builds against any firmware from 3.0.3 on.
+  # checks. An old firmware tree it cannot build is reported as not tested.
   HARNESS_REF: ${{ vars.CONTRACT_HARNESS_REF || 'development' }}
 
 jobs:
+  targets:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      compat: ${{ steps.compat.outputs.ok }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: cli
+          sparse-checkout: scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: release-compatibility-cli available?
+        id: compat
+        env:
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT_REF: ${{ vars.COMPAT_REF }}
+        run: |
+          if [ -n "$COMPAT_TOKEN" ] && [ -n "$COMPAT_REF" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::COMPAT_TOKEN or vars.COMPAT_REF not set — testing the legacy firmware legs, and reporting no compatibility evidence"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Pinned by SHA (vars.COMPAT_REF): the tool that decides what is tested
+      # changes only when this repository says so.
+      - uses: actions/checkout@v4
+        if: steps.compat.outputs.ok == 'true'
+        with:
+          repository: ${{ env.COMPAT_REPO }}
+          ref: ${{ vars.COMPAT_REF }}
+          path: release-compatibility-cli
+          token: ${{ secrets.COMPAT_TOKEN }}
+
+      - name: Matrix
+        id: matrix
+        env:
+          GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT: ${{ steps.compat.outputs.ok }}
+          FW_REFS: ${{ inputs.fw_refs }}
+          NEWEST: ${{ inputs.newest }}
+          PACK_NEWEST: ${{ inputs.pack_newest }}
+        run: |
+          set -euo pipefail
+          # Every release of the component (empty), or the newest N per channel.
+          releases() {
+            if [ -z "$2" ]; then
+              node release-compatibility-cli/bin/compat.mjs resolve --component "$1"
+            else
+              node release-compatibility-cli/bin/compat.mjs targets --component "$1" --newest "$2"
+            fi
+          }
+          args=()
+          # Explicit fw_refs replace the firmware axis only: the packs are
+          # still every P1TT2C release.
+          if [ "$COMPAT" = "true" ]; then
+            releases P1TT2C "$PACK_NEWEST" > "$RUNNER_TEMP/pack-targets.json"
+            args+=(--pack-targets "$RUNNER_TEMP/pack-targets.json")
+            if [ -z "$FW_REFS" ]; then
+              releases S1TTXX "$NEWEST" > "$RUNNER_TEMP/fw-targets.json"
+              args+=(--fw-targets "$RUNNER_TEMP/fw-targets.json")
+            fi
+          fi
+          matrix=$(node cli/scripts/contract-targets.js "${args[@]}" --fw-refs "$FW_REFS")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   contract:
-    name: fw ${{ matrix.fw }}
+    name: fw ${{ matrix.fw }} × pack ${{ matrix.pack }}
+    needs: targets
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        fw: ${{ fromJSON(inputs.fw_refs || '["development", "main", "release", "dev-release"]') }}
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
     env:
-      LEG: station-cli ${{ github.ref_name }} × fw ${{ matrix.fw }}
+      LEG: station-cli ${{ inputs.cli_tag || github.ref_name }} × fw ${{ matrix.fw }} × pack ${{ matrix.pack }}
     steps:
       # (the runner context is not available in a job's env)
       - name: Work folders
@@ -86,7 +203,7 @@ jobs:
           RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           if [ -z "$RELEASE_TOKEN" ]; then
-            echo "::warning::RELEASE_TOKEN is not set — skipping the firmware contract (it needs read access to S1TTXX-firmware)"
+            echo "::warning::RELEASE_TOKEN is not set — skipping the firmware contract (it needs read access to S1TTXX-firmware and P1TT2C-firmware)"
             echo "$LEG: not tested (RELEASE_TOKEN not set)" > "$REPORTS/leg.skipped"
             echo "ok=false" >> "$GITHUB_OUTPUT"
           else
@@ -116,9 +233,11 @@ jobs:
         if: steps.token.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          FW: ${{ matrix.fw }}
+          FW: ${{ matrix.fw_ref }}
+          FW_TAG: ${{ matrix.fw_tag }}
         run: |
           skip=""
+          tag="$FW_TAG"
           # A harness from before release.js cannot test release pairs or
           # other firmware trees: say so instead of failing on it.
           if [ ! -f harness/tests/cli_contract/release.js ]; then
@@ -128,13 +247,18 @@ jobs:
             echo "skip=$skip" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          case "$FW" in
-            main|development) ref="$FW"; label="$FW" ;;
-            *) ref=$(node harness/tests/cli_contract/release.js tag "$FW_REPO" "$FW")
-               label="$FW $ref"
-               [ -n "$ref" ] || skip="no firmware $FW release" ;;
-          esac
-          { echo "ref=$ref"; echo "label=$label"; echo "skip=$skip"; } | tee -a "$GITHUB_OUTPUT"
+          if [ -n "$tag" ]; then
+            ref="$tag"; label="$tag"
+          else
+            case "$FW" in
+              main|development) ref="$FW"; label="$FW" ;;
+              # legacy selectors (no release-compatibility-cli) and tags from fw_refs
+              *) ref=$(node harness/tests/cli_contract/release.js tag "$FW_REPO" "$FW")
+                 tag="$ref"; label="$FW $ref"
+                 [ -n "$ref" ] || skip="no firmware $FW release" ;;
+            esac
+          fi
+          { echo "ref=$ref"; echo "tag=$tag"; echo "label=$label"; echo "skip=$skip"; } | tee -a "$GITHUB_OUTPUT"
           if [ -n "$skip" ]; then
             echo "::notice::$LEG not tested: $skip"
             echo "$LEG: not tested ($skip)" > "$REPORTS/leg.skipped"
@@ -148,52 +272,145 @@ jobs:
           path: fw
           token: ${{ secrets.RELEASE_TOKEN }}
 
+      # The pack the simulated station docks: the P1TT2C tree at this leg's
+      # ref. A harness that cannot build packs from a P1TT2C tree yet ignores
+      # it, and the leg then records no pack context.
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && matrix.pack_ref != ''
+        with:
+          repository: ${{ env.PACK_REPO }}
+          ref: ${{ matrix.pack_ref }}
+          path: pack
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      # The P1TT2C checkout whose sim/pack_sim builds the pack: release tags
+      # older than sim/ have none (same var as S1TTXX's cli_contract.yml).
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && matrix.pack_ref != ''
+        with:
+          repository: ${{ env.PACK_REPO }}
+          ref: ${{ vars.PACK_HARNESS_REF || 'development' }}
+          path: pack-harness
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Pack under test
+        id: pack
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        run: |
+          if [ -d pack ] && [ -f pack-harness/sim/pack_sim/build.sh ] && grep -q PACK_SRC harness/tests/cli_contract/*.sh; then
+            { echo "used=true"; echo "ref=$(git -C pack rev-parse HEAD)"; } >> "$GITHUB_OUTPUT"
+          else
+            [ -d pack ] && echo "::notice::harness@$HARNESS_REF does not build packs from a P1TT2C tree yet — its own pack is used"
+            { echo "used=false"; echo "ref="; } >> "$GITHUB_OUTPUT"
+          fi
+          echo "fw_sha=$(git -C fw rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       # main / development: the executable build.yml just made, the file the
-      # release ships. Elsewhere: this checkout, built by the harness.
+      # release ships. A dispatch with cli_tag: that published release.
+      # Elsewhere: this checkout, built by the harness.
       - uses: actions/download-artifact@v4
         if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && inputs.cli_artifact != ''
         with:
           name: ${{ inputs.cli_artifact }}
           path: ${{ env.OUT }}/bin
 
-      # Compiled in a container, statically and as the runner user, so it
-      # needs no toolchain on the runner and leaves no root-owned files.
-      - name: Build station_sim (firmware protocol code)
-        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+      - name: Download the station_cli release under test
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && inputs.cli_artifact == '' && inputs.cli_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          CLI_TAG: ${{ inputs.cli_tag }}
         run: |
+          mkdir -p "$OUT/bin"
+          node harness/tests/cli_contract/release.js download "$GITHUB_REPOSITORY" "$CLI_TAG" station-cli-linux-x64 "$OUT/bin/station-cli-linux-x64"
+
+      # Compiled in a container, statically and as the runner user, so it
+      # needs no toolchain on the runner and leaves no root-owned files. A
+      # release tree the harness cannot build is "not tested" (UNKNOWN in the
+      # evidence), never a failure of this CLI; a branch that does not build is.
+      - name: Build station_sim (firmware protocol code)
+        id: sim
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        env:
+          PACK_USED: ${{ steps.pack.outputs.used }}
+          FW_TAG: ${{ steps.fw.outputs.tag }}
+        run: |
+          # pack_sim too, when the harness docks real packs: run.sh needs a
+          # prebuilt one, as the runner has no C toolchain.
           for i in 1 2 3; do
             docker run --rm --user "$(id -u):$(id -g)" \
               -v "${PWD}:/w:ro" -v "$OUT:/out" -w /w -e FW_SRC=/w/fw gcc:13 \
-              sh harness/tests/cli_contract/build_sim.sh /out/station_sim -static && exit 0
+              sh harness/tests/cli_contract/build_sim.sh /out/station_sim -static \
+              && { [ "$PACK_USED" != "true" ] || docker run --rm --user "$(id -u):$(id -g)" \
+                     -v "${PWD}:/w:ro" -v "$OUT:/out" -w /w -e PACK_SRC=/w/pack gcc:13 \
+                     sh pack-harness/sim/pack_sim/build.sh /out/pack_sim -static; } && exit 0
             echo "::warning::station_sim build attempt $i failed, retrying"
             sleep $((i * 15))
           done
+          if [ -n "$FW_TAG" ]; then
+            echo "::warning::the harness cannot build $FW_TAG — reported as not tested"
+            echo "$LEG: not tested (harness cannot build $FW_TAG)" > "$REPORTS/leg.skipped"
+            echo "skip=harness@$HARNESS_REF cannot build $FW_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           exit 1
 
       - name: Run this CLI's commands against the firmware
-        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        if: steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && steps.sim.outputs.skip == ''
         env:
           STATION_SIM: ${{ env.OUT }}/station_sim
           FW_SRC: fw
+          PACK_SRC: ${{ steps.pack.outputs.used == 'true' && 'pack' || '' }}
+          PACK_SIM: ${{ steps.pack.outputs.used == 'true' && format('{0}/pack_sim', env.OUT) || '' }}
           CLI_ARTIFACT: ${{ inputs.cli_artifact }}
+          CLI_TAG: ${{ inputs.cli_tag }}
           FW_LABEL: ${{ steps.fw.outputs.label }}
+          PACK_LABEL: ${{ matrix.pack }}
         run: |
-          if [ -n "$CLI_ARTIFACT" ]; then
+          if [ -f "$OUT/bin/station-cli-linux-x64" ]; then
             CLI="$OUT/bin/station-cli-linux-x64"
-            CLI_LABEL="${GITHUB_REF_NAME} ${GITHUB_SHA:0:7}, linux-x64 executable"
+            CLI_LABEL="${CLI_TAG:-${GITHUB_REF_NAME} ${GITHUB_SHA:0:7}}, linux-x64 executable"
           else
             CLI=cli
             CLI_LABEL="${GITHUB_REF_NAME} ${GITHUB_SHA:0:7}"
           fi
-          sh harness/tests/cli_contract/run.sh "$CLI" --label "$CLI_LABEL" --fw-label "$FW_LABEL" \
-            --report "$REPORTS/leg.json" --summary "$GITHUB_STEP_SUMMARY"
+          # A failing pair is a verdict (the evidence), not a broken leg: the
+          # report job's gate decides what turns the run red.
+          sh harness/tests/cli_contract/run.sh "$CLI" --label "$CLI_LABEL" --fw-label "$FW_LABEL × pack $PACK_LABEL" \
+            --report "$REPORTS/leg.json" --summary "$GITHUB_STEP_SUMMARY" \
+            || [ -f "$REPORTS/leg.json" ]
 
       # A leg that died before the checks ran still shows up in the table.
       - name: Mark a leg without a report
-        if: always() && steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == ''
+        if: always() && steps.token.outputs.ok == 'true' && steps.fw.outputs.skip == '' && steps.sim.outputs.skip == ''
         run: |
           mkdir -p "$REPORTS"
           [ -f "$REPORTS/leg.json" ] || echo "$LEG ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" > "$REPORTS/leg.missing"
+
+      # This leg as one compat-evidence result: ok (with its checks),
+      # missing (died before reporting) or skipped (not tested).
+      # A branch side whose commit was never read (the leg died first) is
+      # named by the branch. The CLI's commit is this run's only when this
+      # run built it: a dispatched cli_tag is a release made from another
+      # commit, identified by its tag and the executable's sha256.
+      - name: Evidence
+        if: always() && steps.token.outputs.ok == 'true'
+        env:
+          SKIP: ${{ steps.fw.outputs.skip || steps.sim.outputs.skip }}
+          FW_TAG: ${{ steps.fw.outputs.tag }}
+          FW_SHA: ${{ steps.pack.outputs.fw_sha }}
+          FW_REF: ${{ matrix.fw_ref }}
+          CLI_TAG: ${{ inputs.cli_tag }}
+          CLI_ARTIFACT: ${{ inputs.cli_artifact }}
+          PACK_TAG: ${{ steps.pack.outputs.used == 'true' && matrix.pack_tag || '' }}
+          PACK_SHA: ${{ steps.pack.outputs.ref }}
+        run: |
+          skipped=()
+          [ -n "$SKIP" ] && skipped=(--skipped "$SKIP")
+          cli_ref="$GITHUB_SHA"
+          [ -n "$CLI_TAG" ] && [ -z "$CLI_ARTIFACT" ] && cli_ref=""
+          node cli/scripts/contract-evidence.js leg --out "$REPORTS/result.json" --report "$REPORTS/leg.json" "${skipped[@]}" \
+            --fw-tag "$FW_TAG" --fw-ref "${FW_SHA:-$FW_REF}" --cli-tag "$CLI_TAG" --cli-ref "$cli_ref" \
+            --cli-file "$OUT/bin/station-cli-linux-x64" --pack-tag "$PACK_TAG" --pack-ref "$PACK_SHA"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -204,7 +421,7 @@ jobs:
           if-no-files-found: ignore
 
   report:
-    needs: [contract]
+    needs: [targets, contract]
     if: always()
     runs-on: [self-hosted, Linux, X64]
     outputs:
@@ -219,6 +436,11 @@ jobs:
         env:
           RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: echo "ok=$([ -n "$RELEASE_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          path: cli
+          sparse-checkout: scripts
 
       - uses: actions/checkout@v4
         if: steps.token.outputs.ok == 'true'
@@ -255,9 +477,57 @@ jobs:
           path: report.md
           retention-days: 30
 
-      # The run goes red when any pair failed, whichever way the legs ended.
-      - name: Result
-        if: needs.contract.result != 'success'
+      - name: Evidence file
         run: |
-          echo "::error::firmware contract: at least one pair failed (table above)"
-          exit 1
+          node cli/scripts/contract-evidence.js merge --dir reports --out evidence/evidence.json \
+            --suite cli_contract --suite-repo "$GITHUB_REPOSITORY" --suite-ref "$GITHUB_SHA" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      # Named as release-compatibility-cli downloads it (`gh run download -n compat-evidence`;
+      # its nightly sweep ingests every such artifact of main / development).
+      # A build.yml run labels the CLI with the tag it is about to be
+      # released as: until the release job has published that tag from this
+      # commit the label is not true (the release may never happen, or the
+      # tag point at another commit), so it is uploaded as
+      # compat-evidence-unpublished and the release job re-uploads it as
+      # compat-evidence once published — as S1TTXX-firmware's release does.
+      # Any other ref (a feature branch push, a dispatch from one — whose
+      # harness and scripts are that branch's) uploads compat-evidence-branch:
+      # it gates this run only.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development') && 'compat-evidence-branch' || ((inputs.cli_artifact != '' && inputs.cli_tag != '') && 'compat-evidence-unpublished' || 'compat-evidence') }}
+          path: evidence/evidence.json
+          retention-days: 30
+
+      # A published CLI release was tested: hand the evidence to release-compatibility-cli
+      # — from main / development only, as above. (build.yml does this for a
+      # new release, once it is published.)
+      - name: Report the evidence to release-compatibility-cli
+        if: >-
+          github.event_name == 'workflow_dispatch' && inputs.cli_tag != '' && needs.targets.outputs.compat == 'true' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+        env:
+          GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+        run: |
+          gh api "repos/$COMPAT_REPO/dispatches" -f event_type=compat-evidence \
+            -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[run_id]=$GITHUB_RUN_ID" \
+            && echo "::notice::evidence of run $GITHUB_RUN_ID sent to $COMPAT_REPO" \
+            || echo "::warning::could not notify $COMPAT_REPO (COMPAT_TOKEN needs contents:write there); re-run this job to send the evidence"
+
+      # Red when a leg died, when nothing ran, or when this CLI fails against
+      # the newest production firmware and pack tested; any other failing
+      # pair is a fact for the floors (contract-evidence.js gate).
+      - name: Result
+        env:
+          TARGETS: ${{ needs.targets.result }}
+        run: |
+          if [ "$TARGETS" != "success" ]; then
+            echo "::error::firmware contract: the target matrix could not be built"
+            exit 1
+          fi
+          node cli/scripts/contract-evidence.js gate --dir reports --out gate.txt
+          if [ -s gate.txt ]; then
+            while read -r line; do echo "::error::firmware contract: $line"; done < gate.txt
+            exit 1
+          fi

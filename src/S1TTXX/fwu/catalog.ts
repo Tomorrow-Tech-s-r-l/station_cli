@@ -14,6 +14,9 @@ import {
 import { Channel, ReleaseCandidate, TargetKind } from "./types";
 import { Secret } from "../../config/secret";
 import { FirmwareSourceConfig } from "../../config/schema";
+import { ComponentId, classifyTag, compareSemVer, parseSemVer } from "../../compat/semver";
+import { InstalledComponent, channelFloor, checkInstall, stationChannel } from "../../compat/compatibility";
+import { CompatLoad } from "../../compat/source";
 
 /**
  * Resolves which firmware build each device class *should* be running, from
@@ -23,10 +26,34 @@ import { FirmwareSourceConfig } from "../../config/schema";
  * Where firmware comes from is configuration (`firmware.sources`), never
  * source code: this binary is published and carries no deployment knowledge.
  *
- * The release walk mirrors the kiosk app's own updater: channel-filtered,
- * newest first, a `metadata.json` asset carrying a CLI version floor, and
- * "no metadata" meaning "compatible with everything".
+ * ## Which release may be installed
+ * For a `github` source the answer comes from compatibility.json (see
+ * src/compat): release tags are classified by their grammar (`vX.Y.Z`
+ * production, `dev-vX.Y.Z` development), walked newest first in SemVer order,
+ * and the first one the consumer rule accepts — tested, and compatible both
+ * ways with this CLI and with the firmware installed on the station — wins.
+ * No compatibility data means nothing is installed: the catalog fails closed.
+ *
+ * Releases published before the cutover (`enforced_from`, see
+ * src/compat/compatibility.ts `isLegacy`) are LEGACY: missing evidence never
+ * blocks them. For a pair nobody tested (`untestedLegacy`), the release keeps
+ * the rule it shipped with — towards this CLI, its `metadata.json`
+ * `min_cli_version` (absent meaning no floor); towards the board or the packs,
+ * none, as before compatibility.json. A TESTED failure still blocks it.
+ *
+ * A `dir` source (bench and emulator builds that were never published, so
+ * cannot be in compatibility.json) keeps the legacy rule: the release folder's
+ * own `metadata.json` `min_cli_version`, absent meaning no floor.
  */
+
+/** The compatibility.json component each device class runs. */
+export const COMPONENT_OF: Record<TargetKind, ComponentId> = {
+  interface: "S1TTXX",
+  powerbank: "P1TT2C",
+};
+
+/** Skipped releases listed one by one in the warnings before the rest are summarised. */
+const SKIP_DETAIL_LIMIT = 5;
 
 /**
  * Built-in default for which asset is the application image, per device
@@ -53,6 +80,9 @@ const REJECT_FLOOR = /(merged|bootloader)/i;
 /** Upper bound on an application image, as a sanity check before flashing. */
 const MAX_IMAGE_BYTES = 256 * 1024;
 
+/** Pages of 100 releases read per repository (500 releases). */
+const MAX_RELEASE_PAGES = 5;
+
 /** Wall-clock ceiling on one image download, on top of the socket idle timeout. */
 const DOWNLOAD_DEADLINE_MS = 10 * 60 * 1000;
 
@@ -64,7 +94,7 @@ interface GitHubAsset {
   digest?: string | null;
 }
 
-interface GitHubRelease {
+export interface GitHubRelease {
   tag_name?: string;
   draft?: boolean;
   prerelease?: boolean;
@@ -77,14 +107,31 @@ export interface CatalogOptions {
   sources: Partial<Record<TargetKind, FirmwareSourceConfig>>;
   /** Credential with read access to private firmware repositories. */
   token: Secret | null;
-  /** Version of this CLI, used to honour a release's `min_cli_version`. */
+  /** Version of this CLI, used to honour a `dir` release's `min_cli_version`. */
   cliVersion: Version;
+  /**
+   * compatibility.json as loaded for this run. Required for `github` sources:
+   * absent, null or without a document, nothing is offered from GitHub.
+   */
+  compat?: CompatLoad | null;
+  /**
+   * What is installed — this CLI, the interface boards, the docked packs —
+   * for the consumer rule. Pack images need the board versions in here.
+   */
+  installed?: InstalledComponent[];
   /** Where downloaded images live between runs. */
   cacheDir: string;
   /** Images kept per device class after a download; older ones are pruned. */
   cacheKeepPerKind: number;
   /** Collected non-fatal problems, appended in place. */
   warnings: string[];
+  /**
+   * Reads a GitHub release's legacy CLI floor (`metadata.json`
+   * `min_cli_version`, null when it declares none), for a legacy release
+   * never tested with this CLI. Defaults to downloading that asset; tests
+   * inject it.
+   */
+  legacyMinCli?: (release: GitHubRelease, repo: string, opts: CatalogOptions) => Promise<Version | null>;
 }
 
 /** The accept/reject pair actually applied for a source. */
@@ -112,11 +159,21 @@ export async function resolveCandidate(
   if (source.provider === "dir") return resolveLocalCandidate(kind, source, opts);
 
   const repo = source.repo ?? "";
-  const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
 
-  let releases: GitHubRelease[];
+  // Every page, not only the first: the listing is ordered by creation date,
+  // not by version, so a patch release of an older line can sit on page 2.
+  let releases: GitHubRelease[] = [];
   try {
-    releases = await httpGetJson<GitHubRelease[]>(url, { token: opts.token });
+    for (let page = 1; page <= MAX_RELEASE_PAGES; page++) {
+      const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`;
+      const batch = await httpGetJson<GitHubRelease[]>(url, { token: opts.token });
+      if (!Array.isArray(batch)) {
+        releases = batch as unknown as GitHubRelease[];
+        break;
+      }
+      releases = releases.concat(batch);
+      if (batch.length < 100) break;
+    }
   } catch (e) {
     const hint =
       e instanceof HttpError && (e.statusCode === 401 || e.statusCode === 404)
@@ -133,60 +190,138 @@ export async function resolveCandidate(
     return null;
   }
 
+  return selectGithubCandidate(kind, source, releases, opts);
+}
+
+/**
+ * Picks the release to offer from a GitHub releases listing. Pure apart from
+ * appending to `opts.warnings` and reading a legacy release's metadata.json
+ * (`opts.legacyMinCli`), so the selection is tested from fixtures.
+ */
+export async function selectGithubCandidate(
+  kind: TargetKind,
+  source: FirmwareSourceConfig,
+  releases: GitHubRelease[],
+  opts: CatalogOptions
+): Promise<ReleaseCandidate | null> {
+  const repo = source.repo ?? "";
+  const component = COMPONENT_OF[kind];
+  const doc = opts.compat?.doc ?? null;
+  if (!doc) {
+    opts.warnings.push(
+      `no compatibility data, so no ${kind} firmware is offered from ${repo} ` +
+        `(fail closed: station-cli installs only releases compatibility.json lists as compatible)`
+    );
+    return null;
+  }
+  const listed = doc.components[component]?.repo;
+  if (listed && listed.toLowerCase() !== repo.toLowerCase()) {
+    opts.warnings.push(
+      `compatibility.json describes ${component} releases of ${listed}, but firmware.sources.${kind} ` +
+        `reads ${repo} — no ${kind} firmware is offered`
+    );
+    return null;
+  }
+
+  const installed = opts.installed ?? [];
+  if (kind === "powerbank" && !installed.some((i) => i.component === COMPONENT_OF.interface)) {
+    opts.warnings.push(
+      "no interface board firmware version could be read, and a powerbank image is only offered " +
+        "when every board it may be docked in is compatible with it — no powerbank firmware is offered"
+    );
+    return null;
+  }
+
+  // The floors of this station's channel: a stable station installs only
+  // production releases, so a failing dev release of another component does
+  // not hold it back; a beta one may install either, and uses both.
+  const channel = stationChannel(opts.channel);
   const rules = assetRules(kind, source);
   const eligible = releases
     .filter((r) => r && r.draft !== true)
-    .filter((r) => (opts.channel === "stable" ? r.prerelease !== true : true))
-    .map((r) => {
-      const tag = (r.tag_name ?? "").trim();
-      return { release: r, tag, version: parseVersion(versionStringFromTag(tag)) };
-    })
+    .map((r) => ({ release: r, classified: classifyTag(component, r.tag_name ?? "") }))
     .filter(
-      (e): e is { release: GitHubRelease; tag: string; version: Version } =>
-        e.version !== null && e.tag.length > 0
+      (e): e is { release: GitHubRelease; classified: NonNullable<ReturnType<typeof classifyTag>> } =>
+        e.classified !== null
     )
-    // Newest first, so the first compatible hit is the best one.
-    .sort((a, b) => compareVersions(b.version, a.version));
+    // The channel is read from the tag, never from GitHub's prerelease flag.
+    .filter((e) => (opts.channel === "stable" ? e.classified.channel === "production" : true))
+    // Newest first in SemVer order (dev-v3.2.0 < v3.2.0), so the first
+    // installable hit is the best one.
+    .sort((a, b) => compareSemVer(b.classified.version, a.classified.version));
+
+  const skipped: string[] = [];
+  const flushSkipped = () => {
+    for (const line of skipped.slice(0, SKIP_DETAIL_LIMIT)) opts.warnings.push(line);
+    if (skipped.length > SKIP_DETAIL_LIMIT) {
+      opts.warnings.push(
+        `… and ${skipped.length - SKIP_DETAIL_LIMIT} older ${component} release(s) of ${repo} skipped for the same reasons`
+      );
+    }
+  };
 
   for (const entry of eligible) {
+    const tag = entry.classified.tag;
     const asset = (entry.release.assets ?? []).find((a) => !!a.name && rules.accepts(a.name));
     if (!asset || !asset.name) {
-      opts.warnings.push(
-        `Release ${entry.tag} of ${repo} has no asset matching ${rules.describe} — skipping.`
-      );
+      skipped.push(`Release ${tag} of ${repo} has no asset matching ${rules.describe} — skipping.`);
       continue;
     }
-
-    const minCliVersion = await readMinCliVersion(entry.release, repo, opts);
-    if (minCliVersion && !isAtLeast(opts.cliVersion, minCliVersion)) {
-      opts.warnings.push(
-        `Release ${entry.tag} of ${repo} needs station-cli >= ${formatVersion(minCliVersion)}, ` +
-          `running ${formatVersion(opts.cliVersion)} — skipping.`
-      );
+    const verdict = checkInstall(doc, component, tag, installed, { channel });
+    if (!verdict.installable) {
+      skipped.push(`Release ${tag} of ${repo} is not installable here: ${verdict.reasons.join("; ")} — skipping.`);
       continue;
     }
-
     // Prefer the API asset URL: it works for private repositories with a
     // token, whereas browser_download_url needs the release to be public.
     const assetUrl = asset.url ?? asset.browser_download_url;
     if (!assetUrl) {
-      opts.warnings.push(`Asset ${asset.name} of ${entry.tag} has no download URL — skipping.`);
+      skipped.push(`Asset ${asset.name} of ${tag} has no download URL — skipping.`);
       continue;
     }
+    // A legacy release never tested with this CLI: its own metadata.json
+    // floor decides, as it did before compatibility.json.
+    let minCliVersion: Version | null;
+    if (verdict.untestedLegacy.includes("station_cli")) {
+      minCliVersion = await (opts.legacyMinCli ?? readMinCliVersion)(entry.release, repo, opts);
+      if (minCliVersion && !isAtLeast(opts.cliVersion, minCliVersion)) {
+        skipped.push(
+          `Release ${tag} of ${repo} (legacy, never tested with this station-cli) needs station-cli >= ` +
+            `${formatVersion(minCliVersion)} per its metadata.json, running ${formatVersion(opts.cliVersion)} — skipping.`
+        );
+        continue;
+      }
+    } else {
+      const cliFloor = parseSemVer(
+        channelFloor(doc.components[component]?.releases[tag]?.requires.station_cli, channel)?.min ?? null
+      );
+      minCliVersion = cliFloor ? [cliFloor.major, cliFloor.minor, cliFloor.patch] : null;
+    }
+    flushSkipped();
+    for (const note of verdict.notes) opts.warnings.push(`compatibility: ${note}`);
 
+    const v = entry.classified.version;
     return {
       kind,
-      tag: entry.tag,
-      version: entry.version,
-      prerelease: entry.release.prerelease === true,
+      tag,
+      version: [v.major, v.minor, v.patch],
+      prerelease: entry.classified.channel === "development",
       assetName: asset.name,
       assetUrl,
       assetSizeBytes: asset.size ?? 0,
       minCliVersion,
       digest: asset.digest ?? null,
+      compat: {
+        sequence: doc.sequence,
+        origin: opts.compat?.origin ?? "none",
+        requires: doc.components[component]?.releases[tag]?.requires ?? {},
+        legacy: verdict.legacy,
+        untestedLegacy: verdict.untestedLegacy,
+      },
     };
   }
 
+  flushSkipped();
   return null;
 }
 
@@ -310,8 +445,11 @@ async function readLocalMinCliVersion(
 }
 
 /**
- * Reads `min_cli_version` from the release's `metadata.json` asset. Absent
- * asset or field means "no declared floor".
+ * Reads `min_cli_version` from a GitHub release's `metadata.json` asset: the
+ * legacy CLI floor, still published (computed, and never raised without a
+ * tested failure) for CLIs that predate compatibility.json. Absent asset or
+ * field means "no declared floor"; an unreadable one is warned about and
+ * treated the same, as the catalog always did.
  */
 async function readMinCliVersion(
   release: GitHubRelease,
@@ -319,8 +457,7 @@ async function readMinCliVersion(
   opts: CatalogOptions
 ): Promise<Version | null> {
   const asset = (release.assets ?? []).find((a) => a.name === "metadata.json");
-  if (!asset) return null;
-  const url = asset.url ?? asset.browser_download_url;
+  const url = asset?.url ?? asset?.browser_download_url;
   if (!url) return null;
   try {
     const body = await httpGetBuffer(url, {
@@ -328,8 +465,7 @@ async function readMinCliVersion(
       accept: "application/octet-stream",
       timeoutMs: 15_000,
     });
-    const meta = JSON.parse(body.toString("utf8")) as Record<string, unknown>;
-    const raw = meta.min_cli_version;
+    const raw = (JSON.parse(body.toString("utf8")) as Record<string, unknown>).min_cli_version;
     if (typeof raw !== "string") return null;
     const parsed = parseVersion(raw);
     if (!parsed) {

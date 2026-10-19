@@ -45,7 +45,7 @@ export const CMD_STATS = 0x52;
 // DEV-ONLY (S1TTXX trace builds): read the station's log of the last
 // powerbank exchange on the pogo link, one 40-byte page per request.
 export const CMD_PB_WIRE_TRACE = 0x53;
-// Testing knob (S1TTXX-firmware 3.2.0+, every build): read / lower the station's own pogo-link
+// Testing knob (host opcode 0x54; probed, absent on older station firmware): read / lower the station's own pogo-link
 // attempts per powerbank transaction. [0x54][n]: n=0 reads, n=1..3 sets.
 // Reply payload: [attempts][default_attempts]. RAM only on the station.
 export const CMD_PB_LINK_ATTEMPTS = 0x54;

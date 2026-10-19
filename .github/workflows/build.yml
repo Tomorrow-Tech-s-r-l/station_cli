@@ -56,9 +56,9 @@ jobs:
         id: check_branch
         run: |
           if [ "${{ github.ref }}" = "refs/heads/development" ]; then
-            echo "is_development=true" >> $GITHUB_OUTPUT
+            echo "is_development=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is_development=false" >> $GITHUB_OUTPUT
+            echo "is_development=false" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -123,6 +123,22 @@ jobs:
           npm run test:unit
         shell: bash
 
+      # bundle/ is packed into the executable (package.json pkg.assets): the
+      # release tag this build becomes — a version alone cannot tell v0.5.0
+      # from dev-v0.5.0, and compatibility.json may treat them differently —
+      # and the published compatibility.json, the copy the CLI falls back to
+      # when it can neither download nor find a cached one. Downloaded, never
+      # written by hand; without COMPAT_TOKEN the build simply carries none.
+      - name: Bundle build info and compatibility.json
+        env:
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          IS_DEV: ${{ steps.check_branch.outputs.is_development }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$IS_DEV" = "true" ]; then TAG="dev-v$VERSION"; else TAG="v$VERSION"; fi
+          node scripts/bundle.js --tag "$TAG" --commit "$GITHUB_SHA"
+        shell: bash
+
       - name: Build executable
         run: npm run ${{ matrix.build_script }}
         shell: bash
@@ -151,16 +167,18 @@ jobs:
 
       - name: Get version
         id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Get commit message
         id: get_commit_message
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "commit_message<<EOF"
+            echo "$COMMIT_MSG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
 
   # Release gate for the firmware engine: THIS build's fw-status / fw-plan /
@@ -305,6 +323,7 @@ jobs:
     uses: ./.github/workflows/firmware_contract.yml
     with:
       cli_artifact: station-cli-linux-x64
+      cli_tag: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
     secrets: inherit
 
   # Never released past a red gate: every gate below is required.
@@ -349,16 +368,139 @@ jobs:
           # Verify the files exist and are executable
           ls -la station-cli-*
 
-      - name: Generate metadata.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: release-compatibility-cli available?
+        id: compat
+        env:
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT_REF: ${{ vars.COMPAT_REF }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          MIN_KIOSK=$(node -p "require('./package.json').minKioskAppVersion || '1.0.0'")
-          printf '{\n  "cli_version": "%s",\n  "min_kiosk_app_version": "%s"\n}\n' "$VERSION" "$MIN_KIOSK" > metadata.json
-          echo "Generated metadata.json:"
-          cat metadata.json
+          if [ -n "$COMPAT_TOKEN" ] && [ -n "$COMPAT_REF" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::COMPAT_TOKEN or vars.COMPAT_REF not set — metadata.json gets no computed floors; a legacy field is carried only from a previous release that computed it, else the release fails"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.compat.outputs.ok == 'true'
+        with:
+          repository: Tomorrow-Tech-s-r-l/release-compatibility-cli
+          ref: ${{ vars.COMPAT_REF }}
+          path: release-compatibility-cli
+          token: ${{ secrets.COMPAT_TOKEN }}
+
+      # metadata.json, schema 2, computed — never declared. The floors come
+      # from this run's contract evidence (fw-contract → artifact
+      # compat-evidence-unpublished) through release-compatibility-cli (`compat floor`),
+      # and for what this run did not test (the kiosk) from the published
+      # compatibility.json (`compat metadata`). The legacy
+      # min_kiosk_app_version, which kiosks in the field read, uses the floor
+      # of this release's channel (a production release: the floor over
+      # production kiosks): its X.Y.Z, one patch above the newest kiosk
+      # tested when none is compatible, and with no evidence a value carried
+      # from something computed, listed in computed.carried_forward /
+      # carried_from: first the published compatibility.json (`compat fetch`,
+      # passed as `--carry-compat`: the floor of this channel of the newest
+      # earlier station_cli release in it backed by evidence — so the first
+      # release after schema-1 metadata.json still computes its floor), then
+      # the newest earlier release whose metadata.json was itself computed
+      # (schema 2 with a run_url). The kiosk's nightly kiosk_cli_contract
+      # targets the newest CLI tags of both channels, so the next
+      # compatibility.json computes this tag's kiosk floor from evidence.
+      # Nothing computed to carry: the step fails, and so does the release
+      # (release-metadata.js). Kiosks already in the field read
+      # min_kiosk_app_version, so it never ends up higher than what this tag
+      # (when it is published again) or else the newest earlier release
+      # published (any schema, same channel first) unless a
+      # tested kiosk failure at or above that value proves it: kept otherwise
+      # (computed.legacy_clamped, a notice), raised loudly when proven
+      # (computed.legacy_raised, a warning and a line in the job summary).
+      # `capabilities` is what the released binary itself reports.
+      - name: Compute metadata.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+          COMPAT: ${{ steps.compat.outputs.ok }}
+          VERSION: ${{ needs.build.outputs.version }}
+          IS_DEV: ${{ needs.build.outputs.is_development }}
+        run: |
+          set -euo pipefail
+          if [ "$IS_DEV" = "true" ]; then TAG="dev-v$VERSION"; else TAG="v$VERSION"; fi
+          W="$RUNNER_TEMP/metadata" && rm -rf "$W" && mkdir -p "$W"
+          ./station-cli-linux-x64 capabilities --json > "$W/capabilities.json"
+
+          # The newest earlier release with a computed metadata.json (same
+          # channel first); else the newest one with any, which
+          # release-metadata.js then refuses to carry from, saying why. The
+          # newest one with any metadata.json is also what deployed kiosks
+          # saw last: the value a legacy floor is held to (--published).
+          gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' \
+            | node scripts/release-metadata.js previous-tags "$TAG" | head -n 10 > "$W/previous-tags.txt" || true
+          PUBLISHED_TAG=""
+          # A tag published again (a rebuilt release) was last seen by
+          # deployed kiosks with its own metadata.json: hold to that one.
+          if gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/self" 2>/dev/null; then
+            PUBLISHED_TAG="$TAG"
+            mkdir -p "$W/published" && cp "$W/self/metadata.json" "$W/published/metadata.json"
+          fi
+          while read -r prev; do
+            rm -rf "$W/candidate"
+            gh release download "$prev" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/candidate" 2>/dev/null || continue
+            if [ -z "$PUBLISHED_TAG" ]; then
+              PUBLISHED_TAG="$prev"
+              mkdir -p "$W/published" && cp "$W/candidate/metadata.json" "$W/published/metadata.json"
+            fi
+            if node scripts/release-metadata.js has-provenance "$W/candidate/metadata.json"; then
+              rm -rf "$W/previous" && mv "$W/candidate" "$W/previous"
+              echo "::notice::legacy values may be carried from $prev"
+              break
+            fi
+            [ -d "$W/previous" ] || mv "$W/candidate" "$W/previous"
+          done < "$W/previous-tags.txt"
+
+          args=()
+          # fw-contract's evidence, uploaded as unpublished until this job
+          # has published the tag (see firmware_contract.yml).
+          EVIDENCE=compat-evidence-unpublished/evidence.json
+          if [ "$COMPAT" = "true" ]; then
+            ev_args=()
+            if [ -f "$EVIDENCE" ]; then
+              ev_args=(--evidence "$EVIDENCE")
+              if node release-compatibility-cli/bin/compat.mjs floor --evidence "$EVIDENCE" --component station_cli --tag "$TAG" > "$W/floor.json"; then
+                args+=(--floor "$W/floor.json")
+              else
+                echo "::warning::compat floor failed — metadata.json carries no computed floors"
+              fi
+            fi
+            prev_args=()
+            [ -f "$W/previous/metadata.json" ] && prev_args=(--previous "$W/previous/metadata.json")
+            # The published compatibility.json (COMPAT_TOKEN): the floors of
+            # what this run did not test, and the carry source of a legacy
+            # field with no evidence for this tag.
+            mkdir -p "$W/compat"
+            if node release-compatibility-cli/bin/compat.mjs fetch --out "$W/compat/compatibility.json" \
+              && node release-compatibility-cli/bin/compat.mjs metadata --component station_cli --tag "$TAG" \
+                   --compat "$W/compat/compatibility.json" --carry-compat "$W/compat/compatibility.json" \
+                   "${ev_args[@]}" "${prev_args[@]}" --out "$W/base.json"; then
+              args+=(--base "$W/base.json")
+            else
+              echo "::warning::compat fetch/metadata failed — metadata.json is completed from the evidence floor alone"
+            fi
+          fi
+          [ -f "$W/previous/metadata.json" ] && args+=(--previous "$W/previous/metadata.json")
+          [ -n "$PUBLISHED_TAG" ] && args+=(--published "$W/published/metadata.json" --published-tag "$PUBLISHED_TAG")
+
+          node scripts/release-metadata.js --tag "$TAG" --version "$VERSION" --out metadata.json \
+            --capabilities "$W/capabilities.json" "${args[@]}" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --suite-ref "$GITHUB_SHA"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        # v2: v1 runs on the retired node16 runtime.
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ needs.build.outputs.is_development == 'true' && format('Development Release v{0}', needs.build.outputs.version) || format('Release v{0}', needs.build.outputs.version) }}
           body: |
@@ -390,9 +532,32 @@ jobs:
             station-cli-linux-x64
             station-cli-macos-arm64
             station-cli-windows-x64.exe
-            metadata.json 
+            metadata.json
           tag_name: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
           target_commitish: ${{ github.sha }}
+
+      # The release exists now, so the contract evidence of this run can move
+      # floors: publish it under the name release-compatibility-cli ingests, and hand it
+      # over, so compatibility.json is recomputed. Only from main /
+      # development (the only branches this workflow runs on; guarded anyway,
+      # as release-compatibility-cli trusts nothing else).
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+        with:
+          name: compat-evidence
+          path: compat-evidence-unpublished/evidence.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Report the contract evidence to release-compatibility-cli
+        if: steps.compat.outputs.ok == 'true' && hashFiles('compat-evidence-unpublished/evidence.json') != '' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+        env:
+          GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
+        run: |
+          gh api repos/Tomorrow-Tech-s-r-l/release-compatibility-cli/dispatches -f event_type=compat-evidence \
+            -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[run_id]=$GITHUB_RUN_ID" \
+            && echo "::notice::evidence of run $GITHUB_RUN_ID sent to release-compatibility-cli" \
+            || echo "::warning::could not notify release-compatibility-cli (COMPAT_TOKEN needs contents:write there); dispatch firmware_contract.yml with cli_tag to report it again"
 
       # The other direction: S1TTXX-firmware re-runs its station-cli contract
       # with the executable just published, on its development and main.

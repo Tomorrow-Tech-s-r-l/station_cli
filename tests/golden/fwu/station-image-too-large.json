@@ -13,7 +13,9 @@
       "appVersion": 0,
       "maxChunk": 32,
       "pageSize": 1024,
-      "slotSize": 512
+      "slotSize": 512,
+      "hostProtocol": "0.1",
+      "protocolMismatch": false
     },
     "error": {
       "stage": "FWU_HELLO",

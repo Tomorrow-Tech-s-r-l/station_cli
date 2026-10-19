@@ -4,11 +4,13 @@
  * The JSON these types serialise to is a cross-repo contract: the kiosk app
  * (amperry-kiosk-local) parses `fw-status`, `fw-plan` and `fw-apply` output to
  * decide what to report to the cloud and when to retry. Fields may be ADDED
- * freely; renaming or removing one is a breaking change that needs a
- * coordinated `minCliVersion` bump on the kiosk side.
+ * freely; renaming or removing one is a breaking change: the kiosk × CLI
+ * contract run (kiosk_cli_contract) fails, and compatibility.json stops
+ * offering the pair.
  */
 
 import { Version } from "./version";
+import type { CompatRequirement } from "../../compat/compatibility";
 
 /** The two updatable device classes in a station. */
 export type TargetKind = "interface" | "powerbank";
@@ -86,10 +88,27 @@ export interface ReleaseCandidate {
   /** API URL used to download the asset (works for private repos). */
   assetUrl: string;
   assetSizeBytes: number;
-  /** Minimum station-cli version this firmware requires, when declared. */
+  /**
+   * Minimum station-cli version this firmware requires, when declared: the
+   * computed floor, or for a legacy release never tested with this CLI its
+   * metadata.json `min_cli_version`.
+   */
   minCliVersion: Version | null;
   /** `sha256:<hex>` digest GitHub reports for the asset, when it reports one. */
   digest: string | null;
+  /**
+   * The compatibility.json entry that made this release installable (GitHub
+   * sources). Absent for a `dir` source, which uses the legacy metadata rule.
+   */
+  compat?: {
+    sequence: number;
+    origin: string;
+    requires: Partial<Record<string, CompatRequirement>>;
+    /** Published before the cutover (see compat/compatibility.ts isLegacy). */
+    legacy?: boolean;
+    /** Components left to the release's legacy rule: legacy pairs nobody tested. */
+    untestedLegacy?: string[];
+  };
 }
 
 /** Why a target was excluded from the plan. Stable, greppable tokens. */
@@ -171,6 +190,11 @@ export interface ApplyItemResult {
   /** Version read back after the flash; null when the read-back failed. */
   verifiedVersion: string | null;
   error: { stage: string; code?: number; message: string } | null;
+  /**
+   * The FWU protocol the device's bootloader reported in HELLO, against the
+   * one this CLI speaks. Present once a HELLO was answered.
+   */
+  bootloaderProtocol?: { reported: string; host: string; mismatch: boolean };
 }
 
 /** Per-target failure bookkeeping, persisted between runs. */

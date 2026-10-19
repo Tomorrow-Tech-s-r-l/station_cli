@@ -62,6 +62,7 @@ import { FwuEnterCommand } from "./commands/fwu_enter";
 import { FwuExitCommand } from "./commands/fwu_exit";
 import { PbFirmwareCommand } from "./commands/pb_firmware";
 import { registerFwuCommands, withFirmwareLock } from "./commands/fwu_commands";
+import { resolveImageVersion } from "../fwu/image_version";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
@@ -1228,12 +1229,13 @@ export function registerS1TTXXCommands(program: Command): void {
     });
 
   // Testing: read or lower the station's own powerbank-link attempts
-  // (HOST_CMD_PB_LINK_ATTEMPTS, S1TTXX-firmware 3.2.0+). RAM only on the
+  // (HOST_CMD_PB_LINK_ATTEMPTS, host opcode 0x54; probed at run time, a
+  // firmware without it answers INVALID_CMD). RAM only on the
   // station: a power cycle restores the default.
   program
     .command("pb-link-attempts")
     .description(
-      "Read or set how many times the station tries each powerbank exchange (1 = no retry; S1TTXX-firmware 3.2.0+; RAM only, reboot restores)"
+      "Read or set how many times the station tries each powerbank exchange (1 = no retry; needs station firmware with host opcode 0x54; RAM only, reboot restores)"
     )
     .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .option("--set <n>", "Attempts per powerbank exchange, 1-3 (1 = station retries off)")
@@ -1269,7 +1271,7 @@ export function registerS1TTXXCommands(program: Command): void {
                 error: {
                   code: -1,
                   message:
-                    "Not supported by this station firmware (needs S1TTXX-firmware 3.2.0+)",
+                    "Not supported by this station firmware (it lacks host opcode 0x54, pb-link-attempts)",
                 },
               }
             : {}),
@@ -1505,8 +1507,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--app-version <hex>",
-      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Defaults to 0x00040000. (Not to be confused with the top-level CLI --version flag.)",
-      "0x00040000"
+      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Default: the image's own version, from the metadata.json next to it or its release asset name. (Not to be confused with the top-level CLI --version flag.)"
     )
     .option("--verbose", "Print per-chunk progress", false)
     .option(
@@ -1530,7 +1531,8 @@ export function registerS1TTXXCommands(program: Command): void {
           if (!options.image) {
             throw new Error("--image is required");
           }
-          const version = parseInt(options.appVersion ?? "0x00040000", 16) >>> 0;
+          const imageVersion = resolveImageVersion(options.image, options.appVersion);
+          const version = imageVersion.word;
           const interChunkDelayMs = parseInt(options.interChunkDelay ?? "0", 10);
 
           const port = await selectPort();
@@ -1562,6 +1564,7 @@ export function registerS1TTXXCommands(program: Command): void {
               sizeBytes: r.imageSize,
               crc32: r.imageCrc32,
               version,
+              versionSource: imageVersion.source,
             },
             chunks: r.chunks,
             retries: r.retries,
@@ -1779,8 +1782,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--app-version <hex>",
-      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Defaults to 0x00000000.",
-      "0x00000000"
+      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Default: the image's own version, from the metadata.json next to it or its release asset name."
     )
     .option("--verbose", "Print per-chunk progress", false)
     .option(
@@ -1795,7 +1797,8 @@ export function registerS1TTXXCommands(program: Command): void {
         if (!options.image) {
           throw new Error("--image is required");
         }
-        const version = parseInt(options.appVersion ?? "0x00000000", 16) >>> 0;
+        const imageVersion = resolveImageVersion(options.image, options.appVersion);
+        const version = imageVersion.word;
         const interChunkDelayMs = parseInt(options.interChunkDelay ?? "0", 10);
 
         const port = await selectPort();
@@ -1824,6 +1827,7 @@ export function registerS1TTXXCommands(program: Command): void {
             sizeBytes: r.imageSize,
             crc32: r.imageCrc32,
             version,
+            versionSource: imageVersion.source,
           },
           chunks: r.chunks,
           retries: r.retries,

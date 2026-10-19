@@ -23,6 +23,7 @@ import {
 import { cliInputValidatorIndex } from "./utils/cli_input_validator";
 import { convertFrame } from "./S1TTXX/cli/commands/convert";
 import { registerConfigCommands } from "./config/cli";
+import { registerCapabilitiesCommand } from "./capabilities";
 import { takeFlag } from "./utils/argv";
 import { setPortOverride, pickPort } from "./utils/port_selector";
 import { setRawMode, setNoRetryMode } from "./utils/test_modes";
@@ -66,7 +67,7 @@ program
   .addOption(
     new Option(
       "--no-retry",
-      "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads, and the station's own pogo-link retries (S1TTXX-firmware 3.2.0+; restored when the command ends)"
+      "Ask each powerbank once: turn off the CLI's retries on powerbank timeouts and failed status reads, and the station's own pogo-link retries (when the station firmware has host opcode 0x54; restored when the command ends)"
     ).helpGroup("Testing options (not for production):")
   )
   .hook("preAction", (thisCommand) => {
@@ -106,6 +107,8 @@ registerS1TTXXCommands(program);
 registerS0TTXXCommands(program);
 // Model-independent: inspects the layered configuration (src/config).
 registerConfigCommands(program);
+// What this binary supports, for callers that probe instead of comparing versions.
+registerCapabilitiesCommand(program);
 
 // Unified routed commands
 interface RoutedOptions {
@@ -236,7 +239,7 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     "fw-status", "fw-plan", "fw-apply",
     "firmware-update", "fwu-enter", "fwu-hello", "fwu-exit",
     "pb-firmware-update", "pb-enter-boot", "pb-fwu-hello", "pb-fwu-exit",
-    "ports", "config",
+    "ports", "config", "capabilities",
   ],
   [TESTING]: ["pb-firmware", "pb-link-stats", "pb-link-attempts", "convert"],
   [EXPERIMENTAL]: ["s0ttxx-query", "s0ttxx-unlock"],

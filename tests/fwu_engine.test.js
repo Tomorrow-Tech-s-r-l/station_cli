@@ -465,3 +465,113 @@ test("devices left over by the per-run cap are still reported as pending", async
   assert.equal(item(report, "interface board 1").skipReason, "MAX_TARGETS_REACHED");
   assert.equal(report.summary.updatesPending, true, "board 1 still needs its update");
 });
+
+// ---------------------------------------------------------------------------
+// compatibility.json: loaded once per run, handed to the catalog with what is
+// installed, and reported in the JSON.
+// ---------------------------------------------------------------------------
+
+test("compatibility data and the installed set reach the catalog, and the report says which copy", async () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "compat", "compatibility.json"), "utf8"));
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  const base = localCatalog({ interface: "3.1.0", powerbank: "3.0.4" });
+  const catalog = {
+    async resolve(kind, opts) {
+      seen[kind] = opts.installed.map((i) => `${i.component}:${i.interpretations.map((x) => x.tag ?? "?").join("|")}`);
+      seen.compat = opts.compat.origin;
+      return base.resolve(kind);
+    },
+    ensure: base.ensure,
+  };
+  let loads = 0;
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({
+      filter: { boards: [0], slots: [] },
+      apply: false,
+      catalog,
+      compatLoader: async () => {
+        loads += 1;
+        return { doc, origin: "cache", location: "/x/compatibility.json", sequence: 42, generatedAt: doc.generated_at, error: "offline" };
+      },
+    })
+  );
+  assert.equal(loads, 1, "read once per run");
+  assert.equal(seen.compat, "cache");
+  assert.deepEqual(seen.interface.slice(1), ["S1TTXX:v3.0.3", "P1TT2C:v3.0.2"]);
+  assert.match(seen.interface[0], /^station_cli:/);
+  assert.deepEqual(
+    { origin: report.compatibility.origin, sequence: report.compatibility.sequence, error: report.compatibility.error },
+    { origin: "cache", sequence: 42, error: "offline" }
+  );
+  assert.equal(report.compatibility.channel, "production", "a stable station reads the production floors");
+});
+
+test("an injected catalog without a loader, or a dir source, never reads compatibility data", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] }, apply: false }));
+  assert.equal(report.compatibility, null);
+});
+
+/** A catalog recording the installed set each kind was judged against. */
+function recordingCatalog(seen, versions, withCompat = true) {
+  const base = localCatalog(versions);
+  return {
+    async resolve(kind, opts) {
+      seen[kind] = opts.installed.map((i) => `${i.component}:${i.interpretations.map((x) => x.tag ?? "?").join("|")}`);
+      const c = await base.resolve(kind);
+      return c && withCompat ? { ...c, compat: { sequence: 42, origin: "cache", requires: {} } } : c;
+    },
+    ensure: base.ensure,
+  };
+}
+
+const fixtureCompat = () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "compat", "compatibility.json"), "utf8"));
+  return async () => ({ doc, origin: "cache", location: "/x/compatibility.json", sequence: doc.sequence, generatedAt: doc.generated_at, error: null });
+};
+
+test("an interface-only run still judges board images against every docked pack", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  await runEngine(
+    station,
+    "S1TT30",
+    options({
+      gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0, kinds: ["interface"] }),
+      filter: { boards: [0], slots: [], skipPowerbanks: true },
+      apply: false,
+      catalog: recordingCatalog(seen, { interface: "3.1.0" }),
+      compatLoader: fixtureCompat(),
+    })
+  );
+  assert.ok(seen.interface.includes("P1TT2C:v3.0.2"), `docked pack read: ${seen.interface}`);
+});
+
+test("a pack image is also judged against the board release the same run installs", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  await runEngine(
+    station,
+    "S1TT30",
+    options({
+      // powerbank listed first: the board release is still resolved first
+      gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0, kinds: ["powerbank", "interface"] }),
+      filter: { boards: [0], slots: [] },
+      apply: false,
+      catalog: recordingCatalog(seen, { interface: "3.1.0", powerbank: "3.0.4" }),
+      compatLoader: fixtureCompat(),
+    })
+  );
+  assert.ok(!seen.interface.some((s) => s.startsWith("S1TTXX:v3.1.0")));
+  assert.ok(seen.powerbank.includes("S1TTXX:v3.0.3"), "the board as it runs now");
+  assert.ok(seen.powerbank.includes("S1TTXX:v3.1.0"), "and as this run may leave it");
+});

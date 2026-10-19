@@ -1,0 +1,320 @@
+[
+ {
+  "tagName": "dev-v0.5.0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-16T12:50:00Z"
+ },
+ {
+  "tagName": "dev-v0.4.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-15T16:26:29Z"
+ },
+ {
+  "tagName": "dev-v0.4.0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-02T06:06:36Z"
+ },
+ {
+  "tagName": "dev-v0.3.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-09-22T16:33:11Z"
+ },
+ {
+  "tagName": "v0.3.1",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-09-22T16:29:58Z"
+ },
+ {
+  "tagName": "dev-v0.3.0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-09-15T16:00:11Z"
+ },
+ {
+  "tagName": "v0.2.4",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-18T13:01:14Z"
+ },
+ {
+  "tagName": "dev-v0.2.4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-08-18T13:01:05Z"
+ },
+ {
+  "tagName": "dev-v0.2.3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-07-12T09:20:12Z"
+ },
+ {
+  "tagName": "dev-v0.2.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-25T08:00:37Z"
+ },
+ {
+  "tagName": "v0.2.1",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-05T20:00:00Z"
+ },
+ {
+  "tagName": "dev-v0.2.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-05T19:57:05Z"
+ },
+ {
+  "tagName": "dev-v0.2.0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-29T15:56:16Z"
+ },
+ {
+  "tagName": "v0.1.0",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-05-14T10:43:51Z"
+ },
+ {
+  "tagName": "dev-v0.1.0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-14T08:55:56Z"
+ },
+ {
+  "tagName": "dev-v0.0.29",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-04-15T13:29:48Z"
+ },
+ {
+  "tagName": "dev-v0.0.28",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-04-15T12:52:49Z"
+ },
+ {
+  "tagName": "v0.0.27",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-03-24T14:15:53Z"
+ },
+ {
+  "tagName": "dev-v0.0.27",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-22T20:10:56Z"
+ },
+ {
+  "tagName": "dev-v0.0.26",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-24T11:56:56Z"
+ },
+ {
+  "tagName": "v0.0.25",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-30T14:19:08Z"
+ },
+ {
+  "tagName": "dev-v0.0.25",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-30T14:18:22Z"
+ },
+ {
+  "tagName": "v0.0.22",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T18:26:57Z"
+ },
+ {
+  "tagName": "dev-v0.0.22",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-22T15:46:05Z"
+ },
+ {
+  "tagName": "v0.0.21",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-22T15:45:11Z"
+ },
+ {
+  "tagName": "dev-v0.0.21",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-19T09:41:53Z"
+ },
+ {
+  "tagName": "v0.0.20",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-18T16:02:51Z"
+ },
+ {
+  "tagName": "dev-v0.0.20",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-17T16:59:25Z"
+ },
+ {
+  "tagName": "v0.0.19",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-06T20:07:35Z"
+ },
+ {
+  "tagName": "dev-v0.0.19",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-05T08:49:29Z"
+ },
+ {
+  "tagName": "v0.0.18",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T15:14:22Z"
+ },
+ {
+  "tagName": "dev-v0.0.18",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T11:58:58Z"
+ },
+ {
+  "tagName": "v0.0.17",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T11:12:26Z"
+ },
+ {
+  "tagName": "dev-v0.0.17",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-17T13:24:26Z"
+ },
+ {
+  "tagName": "v0.0.13",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-06-11T08:32:41Z"
+ },
+ {
+  "tagName": "dev-v0.0.16",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-11T08:29:05Z"
+ },
+ {
+  "tagName": "dev-v0.0.15",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-04T17:49:50Z"
+ },
+ {
+  "tagName": "dev-v0.0.14",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-04T17:45:15Z"
+ },
+ {
+  "tagName": "dev-v0.0.13",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-04T17:30:07Z"
+ },
+ {
+  "tagName": "v0.0.12",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-30T10:42:13Z"
+ },
+ {
+  "tagName": "dev-v0.0.12",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-05-30T10:40:39Z"
+ },
+ {
+  "tagName": "v0.0.11",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-30T10:07:47Z"
+ },
+ {
+  "tagName": "dev-v0.0.11",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-05-30T09:57:10Z"
+ },
+ {
+  "tagName": "dev-v0.0.10",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-05-27T06:50:37Z"
+ },
+ {
+  "tagName": "v0.0.10",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T21:21:03Z"
+ },
+ {
+  "tagName": "v0.0.9",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T14:55:01Z"
+ },
+ {
+  "tagName": "v0.0.8",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T14:37:56Z"
+ },
+ {
+  "tagName": "v0.0.6",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T13:28:05Z"
+ },
+ {
+  "tagName": "v0.0.5",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T12:54:55Z"
+ },
+ {
+  "tagName": "v0.0.4",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T12:42:39Z"
+ },
+ {
+  "tagName": "v0.0.3",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T12:24:16Z"
+ },
+ {
+  "tagName": "v0.0.2",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-26T05:34:05Z"
+ },
+ {
+  "tagName": "v0.0.1",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-05-25T20:28:38Z"
+ }
+]

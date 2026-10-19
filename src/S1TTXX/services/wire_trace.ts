@@ -31,7 +31,16 @@ import { hex, rawTrace } from "../../utils/test_modes";
 
 export const WIRE_TRACE_PAGE_LEN = 40;
 export const STATION_LOG_BUDGET = 192;
+/**
+ * The station's pogo-wire log format this parser understands. It mirrors
+ * PB_WIRE_LOG_VERSION in S1TTXX-firmware inc/pb_wire_log.h, which owns the
+ * format; this is the CLI's side of that contract, published by
+ * `station-cli capabilities --json` (`wireLog.versions`) so the firmware
+ * contract can check that the two overlap. A record in another version is
+ * reported as "not understood", never mis-decoded.
+ */
 const LOG_VERSION = 3;
+export const WIRE_LOG_VERSIONS: readonly number[] = [LOG_VERSION];
 const MAX_PAGES = 8; // 192 bytes = 5 pages; a little slack for future builds
 const RX_CUT = 0x80;
 const TX_CUT = 0x01;

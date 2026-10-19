@@ -264,7 +264,7 @@ export class SerialService {
     if (saved === null) {
       testNotice(
         `board ${boardAddress}: this station firmware cannot turn off its own powerbank-link retries ` +
-          `(needs S1TTXX-firmware 3.2.0+); only the CLI retries are off`
+          `(it lacks host opcode 0x54, pb-link-attempts); only the CLI retries are off`
       );
     } else {
       boardsLeftWithoutRetries.add(boardAddress);
