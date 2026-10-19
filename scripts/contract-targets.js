@@ -4,7 +4,8 @@
  * powerbank firmware (P1TT2C) legs for THIS station-cli.
  *
  *   node scripts/contract-targets.js \
- *     [--fw-targets <file>]   output of `compat resolve` (every release) or
+ *     [--fw-targets <file>]   output of `compat targets --for station_cli` (from
+ *                             the floor up), `compat resolve` (every release) or
  *                             `compat targets` (newest N) --component S1TTXX
  *     [--pack-targets <file>] the same for --component P1TT2C
  *     [--fw-branches development,main] [--pack-branches development]
@@ -16,10 +17,10 @@
  * `fw_tag` / `pack_tag` are set only for releases: a branch build is tested
  * (it gates CI) but never produces a compatibility floor.
  *
- * Which releases are tested is release-compatibility-cli's list (`compat resolve`:
- * every release, so a floor only stays low over releases that were tested;
- * or `compat targets` for the newest per channel), not a version written
- * here. Without release-compatibility-cli (no COMPAT_TOKEN) the legacy
+ * Which releases are tested is release-compatibility-cli's list (`compat
+ * targets --for station_cli`: the releases at or above the floor this CLI
+ * already defines, plus the newest, and every release while there is none),
+ * not a version written here. Without release-compatibility-cli (no COMPAT_TOKEN) the legacy
  * selectors `release` / `dev-release` are passed through, resolved per leg
  * by the harness's release.js, and the packs are the P1TT2C branches only
  * (the harness needs a pack tree: it has no pack of its own any more).

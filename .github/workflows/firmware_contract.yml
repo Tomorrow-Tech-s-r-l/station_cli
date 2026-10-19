@@ -9,13 +9,18 @@ name: Firmware contract
 # host_protocol.c / protocol_utils.c / pb_protocol.c); the firmware runs the
 # same harness the other way round (its cli_contract.yml).
 #
-# Which firmware is tested is not written here: every release of S1TTXX and
-# of P1TT2C that release-compatibility-cli lists (`compat resolve`; a dispatch may
-# narrow it to the newest N per channel with `compat targets`), and the legs
-# are those × the development and main branches, for S1TTXX × P1TT2C. Every
-# release, not only the newest: stations still run old firmware, and a floor
-# only stays low over releases that were actually tested (an old tree the
-# harness cannot build is reported as not tested, never as a failure). Every leg's result goes into
+# Which firmware is tested is not written here: the releases of S1TTXX and
+# of P1TT2C that release-compatibility-cli names (`compat targets --for
+# station_cli`), and the legs are those × the development and main branches,
+# for S1TTXX × P1TT2C. Once this CLI has a floor on a channel (in the
+# published compatibility.json, from its newest earlier release), only the
+# releases at or above it are tested, plus the newest: what is below it is
+# skipped (listed in the job summary), so a release is never held back by
+# testing firmware it already dropped. With no floor yet, every release
+# (a dispatch may narrow that to the newest N per channel): stations still
+# run old firmware, and the first floor is computed over what was tested (an
+# old tree the harness cannot build is reported as not tested, never as a
+# failure). Every leg's result goes into
 # `compat-evidence/v1` (artifact `compat-evidence`), from which release-compatibility-cli
 # computes the floors in compatibility.json and in this CLI's metadata.json.
 # A branch build on any side never moves a floor, and only runs on main /
@@ -83,12 +88,12 @@ on:
         type: string
         default: ''
       newest:
-        description: "Station firmware releases per channel to test (compat targets --newest); empty: every release"
+        description: "Station firmware releases per channel to test where this CLI has no floor yet (compat targets --newest); empty: every release"
         required: false
         type: string
         default: ''
       pack_newest:
-        description: "Pack firmware releases per channel to test (compat targets --newest); empty: every release"
+        description: "Pack firmware releases per channel to test where this CLI has no floor yet (compat targets --newest); empty: every release"
         required: false
         type: string
         default: ''
@@ -153,13 +158,26 @@ jobs:
           COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
           COMPAT: ${{ steps.compat.outputs.ok }}
           FW_REFS: ${{ inputs.fw_refs }}
+          CLI_TAG: ${{ inputs.cli_tag }}
           NEWEST: ${{ inputs.newest }}
           PACK_NEWEST: ${{ inputs.pack_newest }}
         run: |
           set -euo pipefail
-          # Every release of the component (empty), or the newest N per channel.
+          # The releases at or above the floor this CLI already defines (per
+          # channel; @CLI_TAG so a release is not its own predecessor), plus
+          # the newest; with no floor, every release (empty) or the newest N.
+          # A vars.COMPAT_REF from before `--for`: every release / newest N.
+          FOR=false
+          if [ "$COMPAT" = "true" ] && grep -qF -- ' --for X' release-compatibility-cli/bin/compat.mjs; then
+            FOR=true
+          elif [ "$COMPAT" = "true" ]; then
+            echo "::notice title=compat targets::vars.COMPAT_REF has no 'compat targets --for': testing without the floors"
+          fi
           releases() {
-            if [ -z "$2" ]; then
+            if [ "$FOR" = "true" ]; then
+              node release-compatibility-cli/bin/compat.mjs targets --component "$1" \
+                --for "station_cli${CLI_TAG:+@$CLI_TAG}" --channel both --newest "${2:-999}" --format tags
+            elif [ -z "$2" ]; then
               node release-compatibility-cli/bin/compat.mjs resolve --component "$1"
             else
               node release-compatibility-cli/bin/compat.mjs targets --component "$1" --newest "$2"
