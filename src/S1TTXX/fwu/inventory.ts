@@ -285,9 +285,7 @@ async function enrichWithPackStatus(
     target.slot.powerLevel = calculatePowerLevel(
       info?.currentCharge,
       info?.totalCharge,
-      info?.cutoffCharge,
-      info?.avgCapacity,
-      info?.status
+      info?.cutoffCharge
     );
     target.slot.charging = info?.status === PB_STATUS_CHARGING;
     target.slot.lowVoltage = isLowVoltage(info?.status, packVoltageMv);

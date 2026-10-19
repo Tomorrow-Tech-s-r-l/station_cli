@@ -131,7 +131,7 @@ class FakeStation {
         p.writeUInt16LE(0, 18); // cutoffCharge
         p.writeUInt16LE(0, 20); // cycles
         p.writeUInt8(1, 22); // status: idle
-        p.writeUInt16LE(0, 23); // avgCapacity
+        p.writeUInt16LE(15800, 23); // packVoltageMv
         return reply(STATUS_OK, p);
       }
       case CMD_PB_FW_VER: {
