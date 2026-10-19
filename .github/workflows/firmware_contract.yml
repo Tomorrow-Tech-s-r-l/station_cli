@@ -1,0 +1,20 @@
+name: Firmware contract
+
+# Registration stub. GitHub only runs a workflow's schedule, and only lets
+# `gh workflow run` find it by name, when the file exists on the default
+# branch (main); the real workflow lives on development. nightly-compat.yml
+# dispatches development's version every night.
+#
+# When development is merged into main, development's version of this file
+# must win: take it whole, discarding this stub.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stub:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - run: echo "::notice::registration stub on main; dispatch firmware_contract.yml with --ref development to run the contract"

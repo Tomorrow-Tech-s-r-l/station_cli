@@ -1,0 +1,27 @@
+name: Nightly compat
+
+# The contract workflows exist only on development, so GitHub never runs
+# their schedule (it reads schedules from the default branch, main): this
+# dispatches them on development every night instead.
+#
+# Delete this file once development is merged into main — the workflows'
+# own schedules take over then.
+on:
+  schedule:
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Dispatch the contract workflows on development
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in firmware_contract.yml; do
+            gh workflow run "$wf" -R "$GITHUB_REPOSITORY" --ref development
+          done
