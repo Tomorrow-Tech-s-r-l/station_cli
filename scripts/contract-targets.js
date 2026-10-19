@@ -4,8 +4,9 @@
  * powerbank firmware (P1TT2C) legs for THIS station-cli.
  *
  *   node scripts/contract-targets.js \
- *     [--fw-targets <file>]   output of `compat targets --component S1TTXX`
- *     [--pack-targets <file>] output of `compat targets --component P1TT2C`
+ *     [--fw-targets <file>]   output of `compat resolve` (every release) or
+ *                             `compat targets` (newest N) --component S1TTXX
+ *     [--pack-targets <file>] the same for --component P1TT2C
  *     [--fw-branches development,main] [--pack-branches development]
  *     [--fw-refs '<json list>']  explicit refs (dispatch input); overrides --fw-targets
  *
@@ -15,9 +16,10 @@
  * `fw_tag` / `pack_tag` are set only for releases: a branch build is tested
  * (it gates CI) but never produces a compatibility floor.
  *
- * Which releases are tested is release-compat's decision (`compat targets`:
- * the newest per channel, plus whatever the floors depend on), not a version
- * written here. Without release-compat (no COMPAT_TOKEN) the legacy
+ * Which releases are tested is release-compat's list (`compat resolve`:
+ * every release, so a floor only stays low over releases that were tested;
+ * or `compat targets` for the newest per channel), not a version written
+ * here. Without release-compat (no COMPAT_TOKEN) the legacy
  * selectors `release` / `dev-release` are passed through, resolved per leg
  * by the harness's release.js, and the packs are the P1TT2C branches only
  * (the harness needs a pack tree: it has no pack of its own any more).
@@ -34,9 +36,10 @@ const fs = require("node:fs");
 const FW_TAG = /^(v|dev-v)\d+\.\d+\.\d+$/;
 
 /**
- * Reads the tags out of a `compat targets` result. Accepts the shapes that
- * command may print: a list of tags, a list of {tag}, or an object holding
- * either under `targets` or per channel.
+ * Reads the tags out of a `compat targets` or `compat resolve` result.
+ * Accepts the shapes those commands may print: a list of tags, a list of
+ * {tag}, or an object holding either under `targets`, `releases` or per
+ * channel.
  */
 function tagsFrom(doc) {
   const out = [];

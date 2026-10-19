@@ -385,8 +385,12 @@ tree docked in it. It checks every command the kiosk app
 uses (`slots`, `status`, `charge`, `initialize-powerbank` with read-back,
 `unlock`, `firmware`, `stats`), plus `pb-firmware`, `pb-link-stats` and the
 testing modes (`--raw`, `--no-retry`, `pb-link-attempts`), down to the values
-in the JSON. The legs are S1TTXX × P1TT2C: the releases release-compat's
-`compat targets` names, plus the `development` / `main` branches. Every leg
+in the JSON. The legs are S1TTXX × P1TT2C: every release release-compat
+lists (`compat resolve`; a dispatch can narrow either axis to the newest N
+per channel with `newest` / `pack_newest`), plus the `development` / `main`
+branches. Old releases too: stations still run them, and floors stay low only
+over releases actually tested; a tree the harness cannot build is reported as
+not tested, never as a failure of this CLI. Every leg
 becomes a `compat-evidence/v1` result (artifact `compat-evidence`; in a
 release run `compat-evidence-unpublished` until the release job has published
 the tag, then re-uploaded as `compat-evidence`); for a release of this CLI the

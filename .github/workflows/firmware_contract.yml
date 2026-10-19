@@ -9,10 +9,13 @@ name: Firmware contract
 # host_protocol.c / protocol_utils.c / pb_protocol.c); the firmware runs the
 # same harness the other way round (its cli_contract.yml).
 #
-# Which firmware is tested is not written here: release-compat's
-# `compat targets` names the releases (newest per channel, plus what the
-# current floors depend on), and the legs are those × the development and
-# main branches, for S1TTXX × P1TT2C. Every leg's result goes into
+# Which firmware is tested is not written here: every release of S1TTXX and
+# of P1TT2C that release-compat lists (`compat resolve`; a dispatch may
+# narrow it to the newest N per channel with `compat targets`), and the legs
+# are those × the development and main branches, for S1TTXX × P1TT2C. Every
+# release, not only the newest: stations still run old firmware, and a floor
+# only stays low over releases that were actually tested (an old tree the
+# harness cannot build is reported as not tested, never as a failure). Every leg's result goes into
 # `compat-evidence/v1` (artifact `compat-evidence`), from which release-compat
 # computes the floors in compatibility.json and in this CLI's metadata.json.
 # A branch build on any side never moves a floor, and only runs on main /
@@ -80,10 +83,15 @@ on:
         type: string
         default: ''
       newest:
-        description: "Station firmware releases per channel to test (compat targets --newest)"
+        description: "Station firmware releases per channel to test (compat targets --newest); empty: every release"
         required: false
         type: string
-        default: '3'
+        default: ''
+      pack_newest:
+        description: "Pack firmware releases per channel to test (compat targets --newest); empty: every release"
+        required: false
+        type: string
+        default: ''
   schedule:
     - cron: '37 3 * * *'
 
@@ -145,17 +153,26 @@ jobs:
           COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
           COMPAT: ${{ steps.compat.outputs.ok }}
           FW_REFS: ${{ inputs.fw_refs }}
-          NEWEST: ${{ inputs.newest || '3' }}
+          NEWEST: ${{ inputs.newest }}
+          PACK_NEWEST: ${{ inputs.pack_newest }}
         run: |
           set -euo pipefail
+          # Every release of the component (empty), or the newest N per channel.
+          releases() {
+            if [ -z "$2" ]; then
+              node release-compat/bin/compat.mjs resolve --component "$1"
+            else
+              node release-compat/bin/compat.mjs targets --component "$1" --newest "$2"
+            fi
+          }
           args=()
           # Explicit fw_refs replace the firmware axis only: the packs are
-          # still the releases compat targets names.
+          # still every P1TT2C release.
           if [ "$COMPAT" = "true" ]; then
-            node release-compat/bin/compat.mjs targets --component P1TT2C --newest 1 > "$RUNNER_TEMP/pack-targets.json"
+            releases P1TT2C "$PACK_NEWEST" > "$RUNNER_TEMP/pack-targets.json"
             args+=(--pack-targets "$RUNNER_TEMP/pack-targets.json")
             if [ -z "$FW_REFS" ]; then
-              node release-compat/bin/compat.mjs targets --component S1TTXX --newest "$NEWEST" > "$RUNNER_TEMP/fw-targets.json"
+              releases S1TTXX "$NEWEST" > "$RUNNER_TEMP/fw-targets.json"
               args+=(--fw-targets "$RUNNER_TEMP/fw-targets.json")
             fi
           fi

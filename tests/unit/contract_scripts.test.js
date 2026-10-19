@@ -43,6 +43,20 @@ test("targets: the shapes `compat targets` may print", () => {
   assert.deepEqual(tagsFrom({ targets: { production: ["v1.0.0"], development: [{ tag: "dev-v1.1.0" }] } }), ["v1.0.0", "dev-v1.1.0"]);
 });
 
+test("targets: `compat resolve` (every release) gives every tag, the oldest included", () => {
+  // The shape `compat resolve --component S1TTXX` prints, from the real list.
+  const real = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "releases", "S1TTXX-firmware.json"), "utf8"));
+  const resolved = {
+    component: "S1TTXX",
+    repo: "Tomorrow-Tech-s-r-l/S1TTXX-firmware",
+    releases: real.map((r) => ({ tag: r.tagName, version: r.tagName.replace(/^(dev-)?v/, ""), channel: r.tagName.startsWith("dev-") ? "development" : "production" })),
+  };
+  assert.deepEqual(tagsFrom(resolved).sort(), real.map((r) => r.tagName).sort());
+  assert.ok(tagsFrom(resolved).includes("v2.0.0"), "boards older than the harness's first buildable tree are listed too");
+  const m = buildMatrix({ fwTargets: tagsFrom(resolved), packTargets: ["v3.0.2", "v2.0.0"], fwBranches: ["development"], packBranches: ["development"] });
+  assert.equal(m.include.length, (real.length + 1) * 3);
+});
+
 const report = (checks) => ({ checks });
 
 test("evidence: PASS needs every core check to pass", () => {
