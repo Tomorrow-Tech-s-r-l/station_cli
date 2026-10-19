@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 
 const { StatusCommand } = require("../../dist/S1TTXX/cli/commands/status");
 const { CMD_STATUS_CODE } = require("../../dist/utils/constants");
+const { calculatePowerLevel } = require("../../dist/S1TTXX/utils/power_level");
 
 /** A stub SerialService answering CMD_STATUS with `payload`. */
 function statusOf(payload) {
@@ -40,4 +41,10 @@ test("a 25-byte reply reports the pack voltage at offset 23", async () => {
   const info = await statusOf(payload(25));
   assert.equal(info.packVoltageMv, 15800);
   assert.equal("avgCapacity" in info, false);
+});
+
+test("the voltage tail never feeds the SoC: a CHARGING pack reads its span", async () => {
+  const info = await statusOf(payload(25));
+  const level = calculatePowerLevel(info.currentCharge, info.totalCharge, info.cutoffCharge);
+  assert.equal(level, 67); // 100 * (13000 - 10625) / (14125 - 10625); was 15 with 15800 as the denominator
 });
