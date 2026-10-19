@@ -19130,6 +19130,38 @@
         }
       ],
       "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: legacy pack dev-v3.1.0 next to a cli read as bare 0.2.4: v0.2.4 passed, but the dev-v0.2.4 reading is held by the pack's floor",
+      "channel": "production",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "dev-v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "version": "0.2.4"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "production: legacy pack dev-v3.1.0 next to cli v0.2.4 (tested PASS)",
+      "channel": "production",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "dev-v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.4"
+        }
+      ],
+      "installable": true
     }
   ]
 }
