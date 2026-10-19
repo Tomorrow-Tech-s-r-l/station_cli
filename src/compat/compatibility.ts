@@ -388,7 +388,8 @@ function hasEdge(doc: CompatibilityDoc, a: string, b: string): boolean {
  *     directions of an edge; CLASSIC tolerates a missing floor on the
  *     reverse side of an edge (step 3 covers that direction) and notes it.
  *  3. Reverse: each installed component's own release must accept this
- *     version (`requires[X].min <= version`).
+ *     version (`requires[X].min <= version`). An installed LEGACY release
+ *     whose floor tested nothing on this channel imposes no constraint.
  */
 export function checkInstall(
   doc: CompatibilityDoc,
@@ -498,6 +499,12 @@ export function checkInstall(
         continue;
       }
       if (!back) continue;
+      // A legacy installed release that tested nothing on this channel
+      // imposes no constraint (G2); this release's own floor covered it.
+      if (!hasEvidence(back) && isLegacy(doc, Y, i.version)) {
+        notes.push(`untested-legacy: ${as} was never tested with ${component} on this channel; no reverse constraint`);
+        continue;
+      }
       if (back.no_compatible || back.min === null) {
         reasons.push(`${as} has no compatible ${component} release${on}`);
         continue;

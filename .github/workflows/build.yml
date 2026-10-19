@@ -413,8 +413,9 @@ jobs:
       # compatibility.json computes this tag's kiosk floor from evidence.
       # Nothing computed to carry: the step fails, and so does the release
       # (release-metadata.js). Kiosks already in the field read
-      # min_kiosk_app_version, so it never ends up higher than what the newest
-      # earlier release published (any schema, same channel first) unless a
+      # min_kiosk_app_version, so it never ends up higher than what this tag
+      # (when it is published again) or else the newest earlier release
+      # published (any schema, same channel first) unless a
       # tested kiosk failure at or above that value proves it: kept otherwise
       # (computed.legacy_clamped, a notice), raised loudly when proven
       # (computed.legacy_raised, a warning and a line in the job summary).
@@ -440,6 +441,12 @@ jobs:
           gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' \
             | node scripts/release-metadata.js previous-tags "$TAG" | head -n 10 > "$W/previous-tags.txt" || true
           PUBLISHED_TAG=""
+          # A tag published again (a rebuilt release) was last seen by
+          # deployed kiosks with its own metadata.json: hold to that one.
+          if gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/self" 2>/dev/null; then
+            PUBLISHED_TAG="$TAG"
+            mkdir -p "$W/published" && cp "$W/self/metadata.json" "$W/published/metadata.json"
+          fi
           while read -r prev; do
             rm -rf "$W/candidate"
             gh release download "$prev" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/candidate" 2>/dev/null || continue
