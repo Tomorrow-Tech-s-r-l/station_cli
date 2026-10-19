@@ -39,7 +39,7 @@ function statusPayload(pack) {
   payload.writeUInt16LE(pack.cutoffCharge, 18);
   payload.writeUInt16LE(pack.cycles, 20);
   payload.writeUInt8(pack.status, 22);
-  payload.writeUInt16LE(pack.avgCapacity, 23);
+  payload.writeUInt16LE(pack.packVoltageMv, 23);
   return payload;
 }
 
@@ -79,7 +79,7 @@ const FULL_PACK = {
   cutoffCharge: DEFAULT_CUTOFF_CHARGE_MAH,
   cycles: 0,
   status: 2,
-  avgCapacity: 3500,
+  packVoltageMv: 15800,
 };
 
 test("an incoherent nameplate is refused with nothing sent", async () => {
