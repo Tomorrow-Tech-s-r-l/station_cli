@@ -91,12 +91,22 @@ test("computed: stable, packs docked: v3.0.3 is offered (the failing dev pack is
   assert.deepEqual(c.minCliVersion, [0, 3, 1], "the production station_cli floor");
 });
 
-test("computed: beta, packs docked: v3.0.3 is offered, dev-v3.2.0 is not (dev pack dev-v3.1.0 fails its tail)", async () => {
+// The development floors of board dev-v3.2.0 (P1TT2C) and CLI v0.3.1 (P1TT2C)
+// have no compatible release (the dev pack dev-v3.1.0 fails), but the pairs
+// on this station were tested and PASSED: a legacy side's floor does not hold
+// back a pair it passed with.
+test("computed: beta, packs docked: dev-v3.2.0 is offered (tested PASS with this CLI and pack v3.0.2)", async () => {
   const o = opts({ channel: "beta", cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
   const c = await selectGithubCandidate("interface", SOURCES.interface, boards, o);
+  assert.equal(c?.tag, "dev-v3.2.0", o.warnings.join("\n"));
+  assert.deepEqual(c.compat.untestedLegacy, []);
+});
+
+test("computed: beta, dev pack dev-v3.1.0 docked: dev-v3.2.0 is not offered (it fails dev-v3.1.0's tail), v3.0.3 is", async () => {
+  const o = opts({ channel: "beta", cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.1.0")] });
+  const c = await selectGithubCandidate("interface", SOURCES.interface, boards, o);
   assert.equal(c?.tag, "v3.0.3", o.warnings.join("\n"));
-  assert.deepEqual(c.minCliVersion, [0, 3, 1], "the development station_cli floor");
-  assert.ok(o.warnings.some((w) => /dev-v3\.2\.0/.test(w) && /no compatible P1TT2C release for a development station/.test(w)), o.warnings.join("\n"));
+  assert.ok(o.warnings.some((w) => /dev-v3\.2\.0/.test(w) && /P1TT2C/.test(w)), o.warnings.join("\n"));
 });
 
 test("computed: stable: pack v3.0.2 is offered on a v3.0.3 board", async () => {
@@ -104,12 +114,13 @@ test("computed: stable: pack v3.0.2 is offered on a v3.0.3 board", async () => {
   assert.equal((await selectGithubCandidate("powerbank", SOURCES.powerbank, packs, o))?.tag, "v3.0.2", o.warnings.join("\n"));
 });
 
-// On beta, the CLI's own floor refuses every pack: CLIs >= v0.3.1 fail
-// dev-v3.1.0's STATUS_EXT tail, so their development floor for P1TT2C is none.
-test("computed: beta: no pack firmware is offered next to CLI v0.3.1", async () => {
+// On beta, the CLI's development floor for P1TT2C has no compatible release
+// (CLIs >= v0.3.1 fail dev-v3.1.0's STATUS_EXT tail), so dev-v3.1.0 is
+// refused; v3.0.2 was tested with it and PASSED, so it is offered.
+test("computed: beta: next to CLI v0.3.1 pack v3.0.2 is offered, dev-v3.1.0 (tested FAIL) is not", async () => {
   const o = opts({ channel: "beta", cliVersion: [0, 3, 1], cliTag: "v0.3.1", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
-  assert.equal(await selectGithubCandidate("powerbank", SOURCES.powerbank, packs, o), null, o.warnings.join("\n"));
-  assert.ok(o.warnings.some((w) => /^Release v3\.0\.2 .*: this station-cli \(station_cli v0\.3\.1\) has no compatible P1TT2C release for a development station/.test(w)), o.warnings.join("\n"));
+  assert.equal((await selectGithubCandidate("powerbank", SOURCES.powerbank, packs, o))?.tag, "v3.0.2", o.warnings.join("\n"));
+  assert.ok(o.warnings.some((w) => /^Release dev-v3\.1\.0 .*not installable here/.test(w)), o.warnings.join("\n"));
 });
 
 // Every release in the computed file is legacy (enforced_from null: nothing

@@ -330,6 +330,22 @@ function hasEvidence(floor: CompatFloor | undefined): boolean {
   return !!floor && (!Array.isArray(floor.tested) || floor.tested.length > 0);
 }
 
+/** The floor tested exactly `tag` and it FAILED. */
+function testedFail(floor: CompatFloor | undefined, tag: string | null | undefined): boolean {
+  return !!tag && Array.isArray(floor?.failed) && floor.failed.includes(tag);
+}
+
+/** The floor tested exactly `tag` and it PASSED (tested, not failed, not unknown). */
+function testedPass(floor: CompatFloor | undefined, tag: string | null | undefined): boolean {
+  return (
+    !!tag &&
+    Array.isArray(floor?.tested) &&
+    floor.tested.includes(tag) &&
+    !(floor.failed ?? []).includes(tag) &&
+    !(floor.unknown ?? []).includes(tag)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The consumer rule
 // ---------------------------------------------------------------------------
@@ -379,6 +395,10 @@ function hasEdge(doc: CompatibilityDoc, a: string, b: string): boolean {
  *     it, gets NO computed constraint (`untestedLegacy`): the candidate's own
  *     legacy rule decides it. Only a TESTED failure blocks a legacy pair. A
  *     legacy candidate the file does not list is such a pair for everything.
+ *     A failure the candidate's floor records for that installed release
+ *     still blocks; a pair tested and PASSED is not held back by a legacy
+ *     side's floor (2 for a legacy candidate, 3 for a legacy installed one),
+ *     even one whose newest tested release failed (`no_compatible`).
  *  1. Otherwise the release must be in the file. Untested means not installable.
  *  2a. Enforced candidate: it needs a computed floor for every edge of its
  *     component, installed or not.
@@ -466,7 +486,10 @@ export function checkInstall(
       const as = `${inst.label} (${Y} ${i.tag ?? formatSemVer(i.version)})`;
 
       // --- 0: a legacy pair without evidence on the edge ------------------
-      if (legacy && (!hasEvidence(req) || (!hasEvidence(back) && isLegacy(doc, Y, i.version)))) {
+      if (
+        legacy &&
+        (!hasEvidence(req) || (!hasEvidence(back) && isLegacy(doc, Y, i.version) && !testedFail(req, i.tag)))
+      ) {
         leaveToLegacy(
           Y,
           !hasEvidence(req) ? `legacy ${tag} was never tested with ${Y}` : `legacy ${as} was never tested with ${component}`
@@ -478,6 +501,8 @@ export function checkInstall(
       if (!req) {
         if (classic && forward) reasons.push(`${component} ${tag} was never tested with ${Y}`);
         else if (classic) notes.push(`${component} ${tag} lists no floor for ${Y}`);
+      } else if (legacy && testedPass(req, i.tag)) {
+        notes.push(`legacy ${component} ${tag} was tested with ${as} and passed`);
       } else if (req.no_compatible || req.min === null) {
         reasons.push(
           `${component} ${tag} has no compatible ${Y} release${on} ` +
@@ -503,6 +528,11 @@ export function checkInstall(
       // imposes no constraint (G2); this release's own floor covered it.
       if (!hasEvidence(back) && isLegacy(doc, Y, i.version)) {
         notes.push(`untested-legacy: ${as} was never tested with ${component} on this channel; no reverse constraint`);
+        continue;
+      }
+      // ...nor does its floor hold back a release it was tested with and passed.
+      if (isLegacy(doc, Y, i.version) && testedPass(back, tag)) {
+        notes.push(`${as} is legacy and was tested with ${component} ${tag} and passed`);
         continue;
       }
       if (back.no_compatible || back.min === null) {

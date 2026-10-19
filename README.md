@@ -286,7 +286,12 @@ firmware release:
   or the packs, none, as before. The JSON's candidate `compat` lists these in
   `untestedLegacy` and `warnings` says `untested-legacy: …`;
 - a pair with evidence follows the full rule, so a **tested failure still
-  blocks** it (CLI v0.2.4 is never offered board v3.0.3);
+  blocks** it (CLI v0.2.4 is never offered board v3.0.3), while a pair that
+  was tested and **passed** is not held back by a legacy side's floor, even
+  one with no compatible release (on beta, CLI v0.3.1 is offered pack v3.0.2
+  although it fails the dev pack dev-v3.1.0);
+- an installed legacy release whose floor tested nothing on the station's
+  channel adds no reverse constraint;
 - a legacy release the file does not list at all is left to its legacy rule
   for every pair.
 

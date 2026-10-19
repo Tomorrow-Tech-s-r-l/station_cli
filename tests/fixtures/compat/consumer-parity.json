@@ -16974,6 +16974,56 @@
                   "evidence": []
                 }
               }
+            },
+            "v3.1.6": {
+              "version": "3.1.6",
+              "channel": "production",
+              "requires": {
+                "station_cli": {
+                  "min": "0.6.0",
+                  "min_tag": "v0.6.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.6.0"
+                  ],
+                  "failed": [],
+                  "evidence": []
+                },
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "evidence": []
+                }
+              }
+            },
+            "v3.0.6": {
+              "version": "3.0.6",
+              "channel": "production",
+              "requires": {
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "evidence": []
+                }
+              }
             }
           }
         },
@@ -17931,7 +17981,7 @@
     },
     {
       "doc": "computed",
-      "name": "board dev-v3.2.0: no compatible pack (dev pack fails)",
+      "name": "legacy board dev-v3.2.0 with cli dev-v0.5.0 + pack v3.0.2: both pairs tested PASS, the failing dev pack does not block them",
       "install": {
         "component": "S1TTXX",
         "tag": "dev-v3.2.0"
@@ -17946,7 +17996,7 @@
           "tag": "v3.0.2"
         }
       ],
-      "installable": false
+      "installable": true
     },
     {
       "doc": "computed",
@@ -18213,7 +18263,7 @@
     },
     {
       "doc": "computed",
-      "name": "development: pack v3.0.2 on board v3.0.3 + cli v0.3.1 (the cli has no compatible dev pack)",
+      "name": "development: legacy pack v3.0.2 on board v3.0.3 + cli v0.3.1: tested PASS with both, the cli's failing dev pack does not block it",
       "channel": "development",
       "install": {
         "component": "P1TT2C",
@@ -18229,7 +18279,7 @@
           "tag": "v0.3.1"
         }
       ],
-      "installable": false
+      "installable": true
     },
     {
       "doc": "computed",
@@ -18257,7 +18307,7 @@
     },
     {
       "doc": "computed",
-      "name": "development: cli dev-v0.5.0 on board v3.0.3 + pack v3.0.2",
+      "name": "development: legacy cli dev-v0.5.0 on board v3.0.3 + pack v3.0.2: tested PASS with both",
       "channel": "development",
       "install": {
         "component": "station_cli",
@@ -18273,7 +18323,7 @@
           "tag": "v3.0.2"
         }
       ],
-      "installable": false
+      "installable": true
     },
     {
       "doc": "computed",
@@ -18293,7 +18343,7 @@
     },
     {
       "doc": "computed",
-      "name": "development: pack dev-v3.1.0 on board v3.0.3 (dev-v3.2.0 fails its tail)",
+      "name": "development: legacy pack dev-v3.1.0 on board v3.0.3: tested PASS (dev-v3.2.0 fails its tail, a different pair)",
       "channel": "development",
       "install": {
         "component": "P1TT2C",
@@ -18305,7 +18355,7 @@
           "tag": "v3.0.3"
         }
       ],
-      "installable": false
+      "installable": true
     },
     {
       "doc": "computed",
@@ -19012,6 +19062,71 @@
         {
           "component": "station_cli",
           "tag": "dev-v0.5.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "development: legacy pack dev-v3.1.0 on board dev-v3.2.0: the tested failure (tail) blocks",
+      "channel": "development",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "dev-v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "dev-v3.2.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board whose pack floor has no compatible release: a pack it tested PASS with is allowed",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.6"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board whose pack floor has no compatible release: the pack it FAILED with is refused",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.6"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "dev-v3.1.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board whose pack floor has no compatible release: refused even next to a pack it passed with (full rule)",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.1.6"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        },
+        {
+          "component": "station_cli",
+          "tag": "v0.6.0"
         }
       ],
       "installable": false
