@@ -209,11 +209,15 @@ jobs:
       LEG: station-cli ${{ inputs.cli_tag || github.ref_name }} × fw ${{ matrix.fw }} × pack ${{ matrix.pack }}
     steps:
       # (the runner context is not available in a job's env)
+      # The self-hosted workspace persists between runs, and pack /
+      # pack-harness are only checked out when this leg docks a pack: drop
+      # an older run's trees so they are never taken for this leg's.
       - name: Work folders
         run: |
           echo "OUT=$RUNNER_TEMP/fw-contract" >> "$GITHUB_ENV"
           echo "REPORTS=$RUNNER_TEMP/fw-contract/reports" >> "$GITHUB_ENV"
           rm -rf "$RUNNER_TEMP/fw-contract" && mkdir -p "$RUNNER_TEMP/fw-contract/reports"
+          rm -rf fw pack pack-harness
 
       - name: Token available?
         id: token
@@ -445,6 +449,11 @@ jobs:
     outputs:
       report: ${{ steps.join.outputs.report }}
     steps:
+      # The self-hosted workspace persists between runs: an older run's
+      # reports would be joined, merged and gated with this run's.
+      - name: Clean the previous run's files
+        run: rm -rf reports evidence report.md gate.txt
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
