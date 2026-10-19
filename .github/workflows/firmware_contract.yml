@@ -450,9 +450,10 @@ jobs:
       report: ${{ steps.join.outputs.report }}
     steps:
       # The self-hosted workspace persists between runs: an older run's
-      # reports would be joined, merged and gated with this run's.
+      # reports would be joined, merged and gated with this run's, and its
+      # harness (checked out only with RELEASE_TOKEN) taken for this one.
       - name: Clean the previous run's files
-        run: rm -rf reports evidence report.md gate.txt
+        run: rm -rf reports evidence report.md gate.txt harness
 
       - uses: actions/setup-node@v4
         with:
