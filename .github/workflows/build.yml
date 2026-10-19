@@ -412,8 +412,13 @@ jobs:
       # targets the newest CLI tags of both channels, so the next
       # compatibility.json computes this tag's kiosk floor from evidence.
       # Nothing computed to carry: the step fails, and so does the release
-      # (release-metadata.js). `capabilities` is what the released binary
-      # itself reports.
+      # (release-metadata.js). Kiosks already in the field read
+      # min_kiosk_app_version, so it never ends up higher than what the newest
+      # earlier release published (any schema, same channel first) unless a
+      # tested kiosk failure at or above that value proves it: kept otherwise
+      # (computed.legacy_clamped, a notice), raised loudly when proven
+      # (computed.legacy_raised, a warning and a line in the job summary).
+      # `capabilities` is what the released binary itself reports.
       - name: Compute metadata.json
         env:
           GH_TOKEN: ${{ github.token }}
@@ -429,12 +434,19 @@ jobs:
 
           # The newest earlier release with a computed metadata.json (same
           # channel first); else the newest one with any, which
-          # release-metadata.js then refuses to carry from, saying why.
+          # release-metadata.js then refuses to carry from, saying why. The
+          # newest one with any metadata.json is also what deployed kiosks
+          # saw last: the value a legacy floor is held to (--published).
           gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' \
             | node scripts/release-metadata.js previous-tags "$TAG" | head -n 10 > "$W/previous-tags.txt" || true
+          PUBLISHED_TAG=""
           while read -r prev; do
             rm -rf "$W/candidate"
             gh release download "$prev" -R "$GITHUB_REPOSITORY" -p metadata.json -D "$W/candidate" 2>/dev/null || continue
+            if [ -z "$PUBLISHED_TAG" ]; then
+              PUBLISHED_TAG="$prev"
+              mkdir -p "$W/published" && cp "$W/candidate/metadata.json" "$W/published/metadata.json"
+            fi
             if node scripts/release-metadata.js has-provenance "$W/candidate/metadata.json"; then
               rm -rf "$W/previous" && mv "$W/candidate" "$W/previous"
               echo "::notice::legacy values may be carried from $prev"
@@ -473,6 +485,7 @@ jobs:
             fi
           fi
           [ -f "$W/previous/metadata.json" ] && args+=(--previous "$W/previous/metadata.json")
+          [ -n "$PUBLISHED_TAG" ] && args+=(--published "$W/published/metadata.json" --published-tag "$PUBLISHED_TAG")
 
           node scripts/release-metadata.js --tag "$TAG" --version "$VERSION" --out metadata.json \
             --capabilities "$W/capabilities.json" "${args[@]}" \

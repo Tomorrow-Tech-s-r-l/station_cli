@@ -8,7 +8,7 @@ const path = require("node:path");
 
 const { buildMatrix, tagsFrom } = require("../../scripts/contract-targets");
 const { legResult, legResults, verdict, merge } = require("../../scripts/contract-evidence");
-const { buildMetadata, previousTag, previousTags, hasProvenance, MetadataError } = require("../../scripts/release-metadata");
+const { buildMetadata, previousTag, previousTags, hasProvenance, clampToPublished, legacyReport, MetadataError } = require("../../scripts/release-metadata");
 
 test("targets: compat targets × packs, branches never get a tag", () => {
   const m = buildMatrix({
@@ -134,12 +134,13 @@ test("metadata: the kiosk floor from evidence, else carried from a computed valu
     tag: "dev-v0.6.0",
     version: "0.6.0",
     floor: { requires: { kiosk: { min: "1.3.14", no_compatible: false, tested: ["v1.3.14"] }, S1TTXX: { min: "3.0.3", no_compatible: false, tested: ["v3.0.3"] } } },
-    previous: computedPrevious(),
+    previous: computedPrevious({ min_kiosk_app_version: "1.3.0" }),
   }).meta;
   assert.equal(fromEvidence.schema, 2);
   assert.equal(fromEvidence.channel, "development");
   assert.equal(fromEvidence.cli_version, "0.6.0");
-  assert.equal(fromEvidence.min_kiosk_app_version, "1.3.14");
+  assert.equal(fromEvidence.min_kiosk_app_version, "1.3.0", "never above what the previous release published without a tested failure");
+  assert.deepEqual(fromEvidence.computed.legacy_clamped, { min_kiosk_app_version: { previous: "1.3.0", previous_tag: "v0.5.0", computed: "1.3.14" } });
   assert.equal(fromEvidence.requires.S1TTXX.min, "3.0.3");
   assert.deepEqual(fromEvidence.computed.carried_forward, [], "always present (release-compat's metadata schema)");
 
@@ -169,15 +170,20 @@ test("metadata: the kiosk floor `compat metadata --carry-compat` carried into --
     floor: { requires: { S1TTXX: { min: "3.0.3", no_compatible: false, tested: ["v3.0.3"] } } },
     previous: schema1,
   });
-  assert.equal(meta.min_kiosk_app_version, "1.3.17");
+  // Every published station_cli says 1.2.0 and no kiosk >= 1.2.0 failed:
+  // the deployed kiosks keep seeing 1.2.0.
+  assert.equal(meta.min_kiosk_app_version, "1.2.0");
+  assert.deepEqual(meta.computed.legacy_clamped, { min_kiosk_app_version: { previous: "1.2.0", previous_tag: null, computed: "1.3.17" } });
   assert.deepEqual(meta.computed.carried_forward, ["min_kiosk_app_version"]);
   assert.deepEqual(meta.computed.carried_from, { min_kiosk_app_version: origin });
   assert.equal(meta.requires.S1TTXX.min, "3.0.3");
   assert.match(warnings[0], /carried forward from dev-v0\.5\.0 \(compatibility\.json sequence 2/);
+  // With nothing published before it, the carried floor stands.
+  assert.equal(buildMetadata({ tag: "dev-v0.5.1", version: "0.5.1", base, previous: null }).meta.min_kiosk_app_version, "1.3.17");
 
   // The next release may carry it on through this metadata.json; the origin stays the entry.
   const next = buildMetadata({ tag: "dev-v0.5.2", version: "0.5.2", previous: meta }).meta;
-  assert.equal(next.min_kiosk_app_version, "1.3.17");
+  assert.equal(next.min_kiosk_app_version, "1.2.0");
   assert.deepEqual(next.computed.carried_from, { min_kiosk_app_version: origin });
   // An entry that names no evidence is no provenance.
   const bare = { ...meta, computed: { ...meta.computed, carried_from: { min_kiosk_app_version: { ...origin, evidence: [] } } } };
@@ -256,12 +262,61 @@ test("metadata: no compatible kiosk is never read as no floor by an old kiosk", 
   const { meta } = buildMetadata({
     tag: "v0.6.0",
     version: "0.6.0",
-    base: { requires: { kiosk: { min: null, no_compatible: true, tested: ["v1.3.17", "v1.4.0-dev.23"] } } },
+    base: { requires: { kiosk: { min: null, no_compatible: true, tested: ["v1.3.17", "v1.4.0-dev.23"], failed: ["v1.4.0-dev.23"] } } },
     previous: computedPrevious(),
   });
+  // Above the published 1.2.0, proven by the tested failure of 1.4.0-dev.23.
   assert.equal(meta.min_kiosk_app_version, "1.4.1");
   assert.deepEqual(meta.computed.legacy_blocked, ["min_kiosk_app_version"]);
   assert.deepEqual(meta.computed.carried_forward, []);
+  assert.deepEqual(meta.computed.legacy_raised, {
+    min_kiosk_app_version: { previous: "1.2.0", previous_tag: "v0.5.0", value: "1.4.1", failed: ["v1.4.0-dev.23"] },
+  });
+});
+
+test("metadata: deployed kiosks never get a higher floor without a tested failure at or above the published one", () => {
+  const pub = (v) => ({ tag: "v0.3.1", metadata: { cli_version: "0.3.1", min_kiosk_app_version: v } });
+  // Lower or equal: always fine.
+  assert.deepEqual(clampToPublished("1.0.0", "min_kiosk_app_version", [], pub("1.2.0")), { value: "1.0.0" });
+  assert.deepEqual(clampToPublished("1.2.0", "min_kiosk_app_version", [], pub("1.2.0")), { value: "1.2.0" });
+  // Higher, only untested or older failures: kept at the published value.
+  assert.deepEqual(clampToPublished("1.3.17", "min_kiosk_app_version", ["v1.1.0"], pub("1.2.0")), {
+    value: "1.2.0",
+    clamped: { previous: "1.2.0", previous_tag: "v0.3.1", computed: "1.3.17" },
+  });
+  // A failure at or above the published value proves the raise.
+  assert.deepEqual(clampToPublished("1.3.17", "min_kiosk_app_version", ["v1.1.0", "v1.2.10", "v1.3.0-dev.4"], pub("1.2.0")).raised, {
+    previous: "1.2.0",
+    previous_tag: "v0.3.1",
+    value: "1.3.17",
+    failed: ["v1.2.10", "v1.3.0-dev.4"],
+  });
+  // Nothing published, or an unreadable value: nothing to protect.
+  assert.deepEqual(clampToPublished("1.3.17", "min_kiosk_app_version", [], null), { value: "1.3.17" });
+  assert.deepEqual(clampToPublished("1.3.17", "min_kiosk_app_version", [], pub("latest")), { value: "1.3.17" });
+});
+
+test("metadata: --published (what kiosks saw last, any schema) is what the floor is held to", () => {
+  // The previous COMPUTED release says 1.0.0; the newest published one (schema 1) 1.2.0.
+  const floor = { requires: { kiosk: { min: "1.3.17", no_compatible: false, tested: ["v1.3.17"], failed: [] } } };
+  const held = buildMetadata({
+    tag: "v0.6.0", version: "0.6.0", floor,
+    previous: computedPrevious({ min_kiosk_app_version: "1.0.0" }),
+    published: { tag: "v0.5.1", metadata: { cli_version: "0.5.1", min_kiosk_app_version: "1.2.0" } },
+  }).meta;
+  assert.equal(held.min_kiosk_app_version, "1.2.0");
+  assert.equal(held.computed.legacy_clamped.min_kiosk_app_version.previous_tag, "v0.5.1");
+  const lines = legacyReport(held);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].level, "notice");
+
+  // A raise is loud.
+  const raisedFloor = { requires: { kiosk: { min: "1.3.17", no_compatible: false, tested: ["v1.2.10", "v1.3.17"], failed: ["v1.2.10"] } } };
+  const raised = buildMetadata({ tag: "v0.6.0", version: "0.6.0", floor: raisedFloor, published: { tag: "v0.5.1", metadata: { min_kiosk_app_version: "1.2.0" } } }).meta;
+  assert.equal(raised.min_kiosk_app_version, "1.3.17");
+  const [warning] = legacyReport(raised);
+  assert.equal(warning.level, "warning");
+  assert.match(warning.text, /1\.2\.0 \(v0\.5\.1\) -> 1\.3\.17; deployed kiosks below it will refuse this CLI\. Proven by tested failures: v1\.2\.10/);
 });
 
 test("metadata: the previous releases are found by grammar and precedence", () => {

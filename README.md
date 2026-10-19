@@ -321,7 +321,13 @@ compatibility.json — the floor of that channel of the newest earlier release
 in it that has one backed by evidence (`{source: "compatibility.json",
 sequence, tag, evidence}`); else an earlier release whose metadata.json
 computed it (schema 2 with `computed.run_url`). With nothing computed to
-carry, the release fails. The kiosk's nightly `kiosk_cli_contract` targets the
+carry, the release fails. Kiosks in the field must never break: the value
+never ends up higher than what the newest earlier release published (any
+schema, same channel first — every release so far says `1.2.0`) unless a
+kiosk tested at or above that value **failed**. Without that proof the
+published value is kept (`computed.legacy_clamped`, a notice); with it the
+raise goes through, listed in `computed.legacy_raised` with the failures, as
+a warning and a line in the release job's summary. The kiosk's nightly `kiosk_cli_contract` targets the
 newest CLI tags of both channels, so the next compatibility.json has evidence
 for the new tag.
 

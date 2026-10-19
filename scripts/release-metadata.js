@@ -6,6 +6,9 @@
  *       [--base <file>]          what `compat metadata` wrote (release-compat), if it ran
  *       [--floor <file>]         what `compat floor` printed for this tag, if it ran
  *       [--previous <file>]      the previous release's published metadata.json, if any
+ *       [--published <file> [--published-tag <tag>]]
+ *                                the newest earlier release's metadata.json, any
+ *                                schema (what kiosks in the field saw last)
  *       [--capabilities <file>]  `station-cli capabilities --json` of the binary released
  *       [--run-url <url>] [--suite-ref <sha>]
  *
@@ -40,6 +43,14 @@
  *          names its origin in `computed.carried_from`);
  *   - otherwise the script fails (exit 2) and so does the release — never a
  *     literal, never a value without provenance.
+ * Deployed kiosks must never break: a legacy floor never ends up HIGHER than
+ * the value the newest earlier release published (`--published`, any schema,
+ * same channel first), unless a TESTED failure at or above that value proves
+ * it — a kiosk tag that failed in the floor behind the value with X.Y.Z >= the
+ * published one. Raised with proof: `computed.legacy_raised`, a warning and a
+ * line in the job summary. Without proof: the published value is kept,
+ * `computed.legacy_clamped`. Lower is always fine (older kiosks only get
+ * more lenient; the consumer rule still guards new ones).
  * These are release-compat's legacy rules (lib/metadata.mjs).
  *
  * Legacy keys (read by kiosks already in the field): `cli_version`,
@@ -148,10 +159,35 @@ function computedSource(previous, field) {
   return { tag: previous.tag ?? null, run_url: c.run_url };
 }
 
+/** -1 / 0 / 1 for two X.Y.Z strings. */
+function cmpCore(a, b) {
+  const x = a.split(".").map(Number);
+  const y = b.split(".").map(Number);
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+}
+
+/**
+ * Never break deployed binaries (release-compat's clampToPublished): `value`
+ * for a legacy floor against what the newest earlier release published.
+ * `failed`: tags of the dependency that FAILED in the floor behind the value.
+ * @returns {{value: string, raised?: object, clamped?: object}}
+ */
+function clampToPublished(value, field, failed, published) {
+  const prev = published && published.metadata ? published.metadata[field] : undefined;
+  const prevCore = typeof prev === "string" && /^v?\d+\.\d+\.\d+/.test(prev.trim()) ? core(prev) : null;
+  if (!prevCore || cmpCore(value, prevCore) <= 0) return { value };
+  const previous = { previous: prevCore, previous_tag: published.tag ?? null };
+  const proof = (failed || []).filter((t) => core(t) && cmpCore(core(t), prevCore) >= 0);
+  if (proof.length) return { value, raised: { ...previous, value, failed: proof } };
+  return { value: prevCore, clamped: { ...previous, computed: value } };
+}
+
 class MetadataError extends Error {}
 
-function buildMetadata({ tag, version, base, floor, previous, capabilities, runUrl, suiteRef, now = new Date() }) {
+function buildMetadata({ tag, version, base, floor, previous, published, capabilities, runUrl, suiteRef, now = new Date() }) {
   const channel = channelOf(tag);
+  // What deployed kiosks saw last; without it, the previous release's.
+  if (published === undefined) published = previous ? { tag: previous.tag ?? null, metadata: previous } : null;
   if (!channel) throw new MetadataError(`"${tag}" is not a station_cli release tag (vX.Y.Z or dev-vX.Y.Z)`);
   const warnings = [];
   const meta = { ...(base || {}) };
@@ -173,12 +209,22 @@ function buildMetadata({ tag, version, base, floor, previous, capabilities, runU
   const carried = new Set();
   const carriedFrom = {};
   const blocked = new Set(computed.legacy_blocked || []);
+  const raised = { ...(computed.legacy_raised || {}) };
+  const clamped = { ...(computed.legacy_clamped || {}) };
 
   for (const [field, component] of Object.entries(LEGACY)) {
     // A channel floor nothing of that channel was tested for is no evidence.
     let req = channelFloor(meta.requires[component], channel);
     if (req && Array.isArray(req.tested) && req.tested.length === 0) req = null;
     blocked.delete(field);
+    // The failures behind the value: the proof a raise needs.
+    let failed = [];
+    if (req) {
+      // Computed here: what `compat metadata` decided for --base no longer applies.
+      delete raised[field];
+      delete clamped[field];
+      failed = req.failed || [];
+    }
     if (req && !req.no_compatible && core(req.min)) {
       meta[field] = core(req.min);
     } else if (req && abovePatch(req.tested)) {
@@ -198,6 +244,27 @@ function buildMetadata({ tag, version, base, floor, previous, capabilities, runU
       carried.add(field);
       carriedFrom[field] = source;
       warnings.push(`${field} carried forward from ${source.tag ?? "the previous release"} (${describeSource(source)})`);
+      if (fromBase) {
+        // `compat metadata` already checked it against its previous release:
+        // a raise it proved keeps its proof.
+        failed = (raised[field] && raised[field].failed) || [];
+      } else {
+        delete raised[field];
+        delete clamped[field];
+        failed = (channelFloor(previous.requires && previous.requires[component], channel) || {}).failed || [];
+      }
+    }
+
+    const g5 = clampToPublished(meta[field], field, failed, published);
+    meta[field] = g5.value;
+    if (g5.raised) {
+      raised[field] = g5.raised;
+      delete clamped[field];
+    }
+    if (g5.clamped) {
+      clamped[field] = g5.clamped;
+      delete raised[field];
+      blocked.delete(field);
     }
   }
   computed.carried_forward = [...carried].sort();
@@ -205,6 +272,10 @@ function buildMetadata({ tag, version, base, floor, previous, capabilities, runU
   else delete computed.carried_from;
   if (blocked.size) computed.legacy_blocked = [...blocked].sort();
   else delete computed.legacy_blocked;
+  if (Object.keys(raised).length) computed.legacy_raised = raised;
+  else delete computed.legacy_raised;
+  if (Object.keys(clamped).length) computed.legacy_clamped = clamped;
+  else delete computed.legacy_clamped;
   meta.computed = computed;
   if (capabilities) meta.capabilities = capabilities;
   return { meta, warnings };
@@ -242,7 +313,46 @@ function hasProvenance(meta) {
   return !!meta && meta.schema === 2 && !!meta.computed && typeof meta.computed.run_url === "string" && !!meta.computed.run_url;
 }
 
-module.exports = { buildMetadata, requiresFrom, previousTag, previousTags, computedSource, hasProvenance, isProvenance, channelFloor, MetadataError };
+/**
+ * The loud part of the never-break rule, for the release job: a raised
+ * legacy floor is a warning annotation and a WARNING line in the job
+ * summary (deployed kiosks below it will refuse this CLI); a kept one a notice.
+ */
+function legacyReport(meta) {
+  const c = meta.computed || {};
+  const lines = [];
+  for (const [f, r] of Object.entries(c.legacy_raised || {})) {
+    lines.push({
+      level: "warning",
+      title: `${f} raised`,
+      text:
+        `station_cli ${meta.tag}: ${f} ${r.previous} (${r.previous_tag ?? "previous release"}) -> ${r.value}; ` +
+        `deployed kiosks below it will refuse this CLI. Proven by tested failures: ${r.failed.join(", ")}`,
+    });
+  }
+  for (const [f, r] of Object.entries(c.legacy_clamped || {})) {
+    lines.push({
+      level: "notice",
+      title: `${f} kept`,
+      text: `station_cli ${meta.tag}: computed ${r.computed}, kept ${r.previous} (${r.previous_tag ?? "previous release"}): no tested failure at or above it`,
+    });
+  }
+  return lines;
+}
+
+module.exports = {
+  buildMetadata,
+  requiresFrom,
+  previousTag,
+  previousTags,
+  computedSource,
+  hasProvenance,
+  isProvenance,
+  channelFloor,
+  clampToPublished,
+  legacyReport,
+  MetadataError,
+};
 
 if (require.main === module && process.argv[2] === "previous-tags") {
   // node scripts/release-metadata.js previous-tags <tag> < tags (one per line)
@@ -261,7 +371,10 @@ if (require.main === module && process.argv[2] === "previous-tags") {
   const version = opt("--version");
   const out = opt("--out");
   if (!tag || !version || !out) {
-    console.error("usage: release-metadata.js --tag <tag> --version <X.Y.Z> --out <file> [--base f] [--floor f] [--previous f] [--capabilities f]");
+    console.error(
+      "usage: release-metadata.js --tag <tag> --version <X.Y.Z> --out <file> [--base f] [--floor f] [--previous f] " +
+        "[--published f [--published-tag t]] [--capabilities f]"
+    );
     process.exit(2);
   }
   let result;
@@ -272,6 +385,9 @@ if (require.main === module && process.argv[2] === "previous-tags") {
       base: readJson(opt("--base")),
       floor: readJson(opt("--floor")),
       previous: readJson(opt("--previous")),
+      published: opt("--published")
+        ? readJson(opt("--published")) && { tag: opt("--published-tag") ?? null, metadata: readJson(opt("--published")) }
+        : undefined,
       capabilities: readJson(opt("--capabilities")),
       runUrl: opt("--run-url"),
       suiteRef: opt("--suite-ref"),
@@ -283,6 +399,12 @@ if (require.main === module && process.argv[2] === "previous-tags") {
   }
   const { meta, warnings } = result;
   for (const w of warnings) console.log(`::warning::metadata.json ${w}`);
+  for (const r of legacyReport(meta)) {
+    console.log(`::${r.level} title=${r.title}::${r.text}`);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- **${r.level === "warning" ? "WARNING: " : ""}${r.title}**: ${r.text}\n`);
+    }
+  }
   fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(meta, null, 2) + "\n");
   console.log(fs.readFileSync(out, "utf8"));
