@@ -88,7 +88,11 @@ export interface ReleaseCandidate {
   /** API URL used to download the asset (works for private repos). */
   assetUrl: string;
   assetSizeBytes: number;
-  /** Minimum station-cli version this firmware requires, when declared. */
+  /**
+   * Minimum station-cli version this firmware requires, when declared: the
+   * computed floor, or for a legacy release never tested with this CLI its
+   * metadata.json `min_cli_version`.
+   */
   minCliVersion: Version | null;
   /** `sha256:<hex>` digest GitHub reports for the asset, when it reports one. */
   digest: string | null;
@@ -100,6 +104,10 @@ export interface ReleaseCandidate {
     sequence: number;
     origin: string;
     requires: Partial<Record<string, CompatRequirement>>;
+    /** Published before the cutover (see compat/compatibility.ts isLegacy). */
+    legacy?: boolean;
+    /** Components left to the release's legacy rule: legacy pairs nobody tested. */
+    untestedLegacy?: string[];
   };
 }
 

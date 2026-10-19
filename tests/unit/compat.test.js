@@ -15,6 +15,8 @@ const {
   interpretInstalled,
   channelFloor,
   stationChannel,
+  cutoverOf,
+  isLegacy,
 } = require("../../dist/compat/compatibility");
 
 const FIXTURES = path.join(__dirname, "..", "fixtures");
@@ -288,4 +290,75 @@ test("channels: a channel nothing was tested on blocks that channel only", () =>
   assert.equal(r.installable, false);
   assert.match(r.reasons.join(), /none of that channel was tested/);
   assert.equal(checkInstall(d, "station_cli", "dev-v0.5.0", boardOn, { channel: "development" }).installable, true);
+});
+
+// --- the cutover (legacy vs enforced releases) -----------------------------------
+
+test("cutover: enforced_from absent = classic, null = every release legacy, a tag = legacy below it", () => {
+  const d = doc();
+  assert.equal(cutoverOf(d, "S1TTXX"), undefined);
+  assert.equal(isLegacy(d, "S1TTXX", v("3.0.3")), false, "a file without enforced_from enforces everything");
+  d.components.S1TTXX.enforced_from = null;
+  assert.equal(isLegacy(d, "S1TTXX", v("3.0.3")), true);
+  d.components.S1TTXX.enforced_from = "v3.1.0";
+  assert.equal(isLegacy(d, "S1TTXX", v("3.0.3")), true);
+  assert.equal(isLegacy(d, "S1TTXX", v("3.1.0-dev")), true, "dev-v3.1.0 predates v3.1.0");
+  assert.equal(isLegacy(d, "S1TTXX", v("3.1.0")), false);
+  assert.equal(isLegacy(d, "S1TTXX", v("3.2.0")), false);
+  d.components.S1TTXX.enforced_from = "nightly";
+  assert.equal(isLegacy(d, "S1TTXX", v("1.0.0")), false, "an unreadable cutover enforces");
+});
+
+test("cutover: validation accepts enforced_from tag/null and untested_legacy, rejects other shapes", () => {
+  const d = doc();
+  d.components.S1TTXX.enforced_from = null;
+  d.components.S1TTXX.enforced_from_version = null;
+  d.components.station_cli.enforced_from = "v0.6.0";
+  d.components.station_cli.enforced_from_version = "0.6.0";
+  d.components.S1TTXX.releases["v3.0.3"].requires.station_cli.untested_legacy = ["v0.2.1"];
+  assert.deepEqual(validateCompatibility(d).errors, []);
+  d.components.S1TTXX.enforced_from = 3;
+  d.components.station_cli.enforced_from_version = "six";
+  d.components.S1TTXX.releases["v3.0.3"].requires.station_cli.untested_legacy = "v0.2.1";
+  const { doc: bad, errors } = validateCompatibility(d);
+  assert.equal(bad, null);
+  assert.equal(errors.length, 3, errors.join("\n"));
+});
+
+test("cutover: a legacy release without evidence on a pair is left to its legacy rule", () => {
+  const d = doc();
+  for (const id of Object.keys(d.components)) d.components[id].enforced_from = null;
+  // v3.0.1 was never tested with any CLI.
+  delete d.components.S1TTXX.releases["v3.0.1"].requires.station_cli;
+  const r = checkInstall(d, "S1TTXX", "v3.0.1", [cli(d, "v0.2.4")]);
+  assert.equal(r.installable, true, r.reasons.join());
+  assert.equal(r.legacy, true);
+  assert.deepEqual(r.untestedLegacy, ["station_cli"]);
+  assert.ok(r.notes.some((n) => /^untested-legacy: legacy v3\.0\.1 was never tested with station_cli/.test(n)), r.notes.join());
+
+  // Not in the file at all: every installed neighbour is left to the legacy rule.
+  const gone = checkInstall(d, "S1TTXX", "v2.0.0", [cli(d, "dev-v0.5.0"), pack(d, "3.0.2")]);
+  assert.equal(gone.installable, true);
+  assert.deepEqual(gone.untestedLegacy.sort(), ["P1TT2C", "station_cli"]);
+});
+
+test("cutover: a TESTED failure still blocks a legacy pair", () => {
+  const d = doc();
+  for (const id of Object.keys(d.components)) d.components[id].enforced_from = null;
+  const r = checkInstall(d, "S1TTXX", "v3.0.3", [cli(d, "v0.3.0")]);
+  assert.equal(r.legacy, true);
+  assert.equal(r.installable, false);
+  assert.match(r.reasons.join(), /needs station_cli >= 0\.3\.1/);
+  assert.deepEqual(r.untestedLegacy, []);
+});
+
+test("cutover: an enforced release needs a floor for every edge, installed or not", () => {
+  const d = doc();
+  d.components.S1TTXX.enforced_from = "v3.0.3";
+  delete d.components.S1TTXX.releases["v3.0.3"].requires.P1TT2C;
+  const r = checkInstall(d, "S1TTXX", "v3.0.3", [cli(d, "dev-v0.5.0")]);
+  assert.equal(r.legacy, false);
+  assert.equal(r.installable, false, "no pack is docked, yet the missing pack floor refuses it");
+  assert.match(r.reasons.join(), /enforced and has no computed floor for P1TT2C/);
+  assert.equal(checkInstall(d, "S1TTXX", "v9.0.0", [cli(d, "dev-v0.5.0")]).installable, false, "enforced and untested");
 });

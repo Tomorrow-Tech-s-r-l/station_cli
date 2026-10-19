@@ -32,7 +32,9 @@ const {
   HttpError,
   isGitHubApiHost,
 } = require("../dist/S1TTXX/fwu/http");
-const { ensureImage } = require("../dist/S1TTXX/fwu/catalog");
+const { ensureImage, selectGithubCandidate } = require("../dist/S1TTXX/fwu/catalog");
+const { parseCompatibility } = require("../dist/compat/compatibility");
+const { installedSet } = require("../dist/S1TTXX/fwu/engine");
 
 const CERT_DIR = process.env.FWU_TEST_CERT_DIR || path.join(os.tmpdir(), "fwu-test-cert");
 const haveCert =
@@ -354,6 +356,50 @@ test("a cached file of the wrong size is discarded and re-fetched", suite, async
     const resolved = await ensureImage(candidate, opts);
     assert.equal(hits, 1);
     assert.deepEqual(fs.readFileSync(resolved), IMAGE);
+  } finally {
+    await s.close();
+  }
+});
+
+// A legacy release (published before the cutover) that nobody tested with
+// this CLI keeps the rule it shipped with: its metadata.json min_cli_version,
+// downloaded as the catalog always did. Every release in the computed
+// fixture is legacy, and S1TTXX v3.0.1 was never tested with a CLI.
+test("a legacy release never tested with this CLI is gated by its metadata.json min_cli_version", suite, async () => {
+  const served = { "v3.0.1": { firmware_version: "3.0.1", min_cli_version: "0.3.0" }, "v2.0.2": { firmware_version: "2.0.2" } };
+  const s = await startServer((req, res) => {
+    const tag = decodeURIComponent(req.url.split("/").pop());
+    if (!served[tag]) {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "content-type": "application/octet-stream" });
+    res.end(JSON.stringify(served[tag]));
+  });
+  try {
+    const text = fs.readFileSync(path.join(__dirname, "fixtures", "compat", "compatibility.computed.json"), "utf8");
+    const { doc } = parseCompatibility(text);
+    const releases = ["v3.0.3", "v3.0.1", "v2.0.2"].map((tag, i) => ({
+      tag_name: tag,
+      assets: [
+        { name: `S1TTXX-firmware-${tag.slice(1)}.bin`, url: `${s.origin}/bin/${i}`, size: 100 },
+        { name: "metadata.json", url: `${s.origin}/meta/${tag}` },
+      ],
+    }));
+    const board = { kind: "interface", boardAddress: 0, slotIndex: null, name: null, versionRaw: "3.0.3", version: [3, 0, 3], status: 0, reachable: true, error: null };
+    const opts = {
+      channel: "stable", sources: {}, token: null, cliVersion: [0, 2, 4], cacheDir: tmpDir(), cacheKeepPerKind: 2, warnings: [],
+      compat: { doc, origin: "network", location: "x", sequence: doc.sequence, generatedAt: null, error: null },
+      installed: installedSet(doc, { cliVersion: [0, 2, 4], channel: "stable", cliTag: "v0.2.4" }, [board], []),
+    };
+    const c = await selectGithubCandidate("interface", { provider: "github", repo: "Tomorrow-Tech-s-r-l/S1TTXX-firmware" }, releases, opts);
+    // v3.0.3: refused by a TESTED failure (no metadata read); v3.0.1: its
+    // metadata.json needs 0.3.0; v2.0.2: declares no floor.
+    assert.equal(c?.tag, "v2.0.2", opts.warnings.join("\n"));
+    assert.equal(c.minCliVersion, null);
+    assert.ok(opts.warnings.some((w) => /v3\.0\.1 .*needs station-cli >= 0\.3\.0 per its metadata\.json/.test(w)), opts.warnings.join("\n"));
+    assert.deepEqual(s.seen.map((r) => r.url), ["/meta/v3.0.1", "/meta/v2.0.2"]);
   } finally {
     await s.close();
   }

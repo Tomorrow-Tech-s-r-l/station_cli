@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 
-import { httpGetJson, httpDownloadToFile, HttpError } from "./http";
+import { httpGetJson, httpDownloadToFile, httpGetBuffer, HttpError } from "./http";
 import {
   Version,
   parseVersion,
@@ -33,6 +33,13 @@ import { CompatLoad } from "../../compat/source";
  * and the first one the consumer rule accepts — tested, and compatible both
  * ways with this CLI and with the firmware installed on the station — wins.
  * No compatibility data means nothing is installed: the catalog fails closed.
+ *
+ * Releases published before the cutover (`enforced_from`, see
+ * src/compat/compatibility.ts `isLegacy`) are LEGACY: missing evidence never
+ * blocks them. For a pair nobody tested (`untestedLegacy`), the release keeps
+ * the rule it shipped with — towards this CLI, its `metadata.json`
+ * `min_cli_version` (absent meaning no floor); towards the board or the packs,
+ * none, as before compatibility.json. A TESTED failure still blocks it.
  *
  * A `dir` source (bench and emulator builds that were never published, so
  * cannot be in compatibility.json) keeps the legacy rule: the release folder's
@@ -118,6 +125,13 @@ export interface CatalogOptions {
   cacheKeepPerKind: number;
   /** Collected non-fatal problems, appended in place. */
   warnings: string[];
+  /**
+   * Reads a GitHub release's legacy CLI floor (`metadata.json`
+   * `min_cli_version`, null when it declares none), for a legacy release
+   * never tested with this CLI. Defaults to downloading that asset; tests
+   * inject it.
+   */
+  legacyMinCli?: (release: GitHubRelease, repo: string, opts: CatalogOptions) => Promise<Version | null>;
 }
 
 /** The accept/reject pair actually applied for a source. */
@@ -181,14 +195,15 @@ export async function resolveCandidate(
 
 /**
  * Picks the release to offer from a GitHub releases listing. Pure apart from
- * appending to `opts.warnings`, so the selection is tested from fixtures.
+ * appending to `opts.warnings` and reading a legacy release's metadata.json
+ * (`opts.legacyMinCli`), so the selection is tested from fixtures.
  */
-export function selectGithubCandidate(
+export async function selectGithubCandidate(
   kind: TargetKind,
   source: FirmwareSourceConfig,
   releases: GitHubRelease[],
   opts: CatalogOptions
-): ReleaseCandidate | null {
+): Promise<ReleaseCandidate | null> {
   const repo = source.repo ?? "";
   const component = COMPONENT_OF[kind];
   const doc = opts.compat?.doc ?? null;
@@ -264,13 +279,28 @@ export function selectGithubCandidate(
       skipped.push(`Asset ${asset.name} of ${tag} has no download URL — skipping.`);
       continue;
     }
+    // A legacy release never tested with this CLI: its own metadata.json
+    // floor decides, as it did before compatibility.json.
+    let minCliVersion: Version | null;
+    if (verdict.untestedLegacy.includes("station_cli")) {
+      minCliVersion = await (opts.legacyMinCli ?? readMinCliVersion)(entry.release, repo, opts);
+      if (minCliVersion && !isAtLeast(opts.cliVersion, minCliVersion)) {
+        skipped.push(
+          `Release ${tag} of ${repo} (legacy, never tested with this station-cli) needs station-cli >= ` +
+            `${formatVersion(minCliVersion)} per its metadata.json, running ${formatVersion(opts.cliVersion)} — skipping.`
+        );
+        continue;
+      }
+    } else {
+      const cliFloor = parseSemVer(
+        channelFloor(doc.components[component]?.releases[tag]?.requires.station_cli, channel)?.min ?? null
+      );
+      minCliVersion = cliFloor ? [cliFloor.major, cliFloor.minor, cliFloor.patch] : null;
+    }
     flushSkipped();
     for (const note of verdict.notes) opts.warnings.push(`compatibility: ${note}`);
 
     const v = entry.classified.version;
-    const cliFloor = parseSemVer(
-      channelFloor(doc.components[component]?.releases[tag]?.requires.station_cli, channel)?.min ?? null
-    );
     return {
       kind,
       tag,
@@ -279,12 +309,14 @@ export function selectGithubCandidate(
       assetName: asset.name,
       assetUrl,
       assetSizeBytes: asset.size ?? 0,
-      minCliVersion: cliFloor ? [cliFloor.major, cliFloor.minor, cliFloor.patch] : null,
+      minCliVersion,
       digest: asset.digest ?? null,
       compat: {
         sequence: doc.sequence,
         origin: opts.compat?.origin ?? "none",
         requires: doc.components[component]?.releases[tag]?.requires ?? {},
+        legacy: verdict.legacy,
+        untestedLegacy: verdict.untestedLegacy,
       },
     };
   }
@@ -407,6 +439,45 @@ async function readLocalMinCliVersion(
   } catch (e) {
     opts.warnings.push(
       `Cannot read metadata.json of ${tag}: ${e instanceof Error ? e.message : String(e)} — assuming no CLI floor.`
+    );
+    return null;
+  }
+}
+
+/**
+ * Reads `min_cli_version` from a GitHub release's `metadata.json` asset: the
+ * legacy CLI floor, still published (computed, and never raised without a
+ * tested failure) for CLIs that predate compatibility.json. Absent asset or
+ * field means "no declared floor"; an unreadable one is warned about and
+ * treated the same, as the catalog always did.
+ */
+async function readMinCliVersion(
+  release: GitHubRelease,
+  repo: string,
+  opts: CatalogOptions
+): Promise<Version | null> {
+  const asset = (release.assets ?? []).find((a) => a.name === "metadata.json");
+  const url = asset?.url ?? asset?.browser_download_url;
+  if (!url) return null;
+  try {
+    const body = await httpGetBuffer(url, {
+      token: opts.token,
+      accept: "application/octet-stream",
+      timeoutMs: 15_000,
+    });
+    const raw = (JSON.parse(body.toString("utf8")) as Record<string, unknown>).min_cli_version;
+    if (typeof raw !== "string") return null;
+    const parsed = parseVersion(raw);
+    if (!parsed) {
+      opts.warnings.push(
+        `metadata.json of ${release.tag_name} (${repo}) has unparseable min_cli_version "${raw}" — ignoring.`
+      );
+    }
+    return parsed;
+  } catch (e) {
+    opts.warnings.push(
+      `Cannot read metadata.json of ${release.tag_name} (${repo}): ` +
+        `${e instanceof Error ? e.message : String(e)} — assuming no CLI floor.`
     );
     return null;
   }

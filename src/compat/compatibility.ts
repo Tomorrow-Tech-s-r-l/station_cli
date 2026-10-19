@@ -33,6 +33,12 @@ export interface CompatFloor {
   tested: string[];
   failed: string[];
   unknown?: string[];
+  /**
+   * Legacy releases of the other component, untested or without a result,
+   * that the floor was lowered past (no older tested release failed, so lack
+   * of testing does not raise it).
+   */
+  untested_legacy?: string[];
 }
 
 /**
@@ -62,6 +68,13 @@ export interface CompatRelease {
 
 export interface CompatComponent {
   repo: string;
+  /**
+   * The cutover: the oldest release published with computed metadata (see
+   * isLegacy). null = every release is legacy; absent (a file written before
+   * cutovers existed) = every release is enforced.
+   */
+  enforced_from?: string | null;
+  enforced_from_version?: string | null;
   releases: Record<string, CompatRelease>;
 }
 
@@ -113,6 +126,16 @@ export function validateCompatibility(doc: unknown): { doc: CompatibilityDoc | n
         continue;
       }
       if (typeof comp.repo !== "string") err(`${at}.repo`, "must be a string");
+      if (comp.enforced_from !== undefined && comp.enforced_from !== null && typeof comp.enforced_from !== "string") {
+        err(`${at}.enforced_from`, "must be a release tag or null");
+      }
+      if (
+        comp.enforced_from_version !== undefined &&
+        comp.enforced_from_version !== null &&
+        !parseSemVer(comp.enforced_from_version as string)
+      ) {
+        err(`${at}.enforced_from_version`, "must be a semantic version or null");
+      }
       if (!isObject(comp.releases)) {
         err(`${at}.releases`, "must be an object");
         continue;
@@ -164,7 +187,7 @@ function validateFloor(at: string, floor: Record<string, unknown>, err: (p: stri
     err(`${at}.min_tag`, "must be a string or null");
   }
   if (typeof floor.no_compatible !== "boolean") err(`${at}.no_compatible`, "must be a boolean");
-  for (const k of ["tested", "failed", "unknown"]) {
+  for (const k of ["tested", "failed", "unknown", "untested_legacy"]) {
     if (floor[k] !== undefined && !isStringArray(floor[k])) err(`${at}.${k}`, "must be a list of strings");
   }
 }
@@ -272,6 +295,42 @@ export function channelFloor(
 }
 
 // ---------------------------------------------------------------------------
+// The cutover
+// ---------------------------------------------------------------------------
+
+/**
+ * `components[X].enforced_from` as the file states it: a tag, null (every
+ * release legacy), or undefined when the file predates cutovers.
+ */
+export function cutoverOf(doc: CompatibilityDoc, component: string): string | null | undefined {
+  const entry = doc.components[component];
+  return entry && Object.prototype.hasOwnProperty.call(entry, "enforced_from") ? entry.enforced_from : undefined;
+}
+
+/**
+ * True when `version` of `component` is a LEGACY release: published before
+ * the cutover, i.e. before release jobs wrote computed metadata. Missing
+ * evidence never breaks a legacy release; it keeps the behaviour it shipped
+ * with (release-compat's lib/cutover.mjs `isLegacyVersion`):
+ *
+ * - no `enforced_from` in the file: nothing is legacy (the strict rule);
+ * - `enforced_from: null`: everything is legacy;
+ * - else legacy iff `version < enforced_from` (an unreadable tag: not legacy).
+ */
+export function isLegacy(doc: CompatibilityDoc, component: ComponentId, version: SemVer): boolean {
+  const enforced = cutoverOf(doc, component);
+  if (enforced === undefined) return false;
+  if (enforced === null) return true;
+  const from = classifyTag(component, enforced);
+  return from ? compareSemVer(version, from.version) < 0 : false;
+}
+
+/** A release's floor on an edge is evidence iff it exists and tested something on that channel. */
+function hasEvidence(floor: CompatFloor | undefined): boolean {
+  return !!floor && (!Array.isArray(floor.tested) || floor.tested.length > 0);
+}
+
+// ---------------------------------------------------------------------------
 // The consumer rule
 // ---------------------------------------------------------------------------
 
@@ -279,6 +338,15 @@ export interface InstallVerdict {
   installable: boolean;
   /** The installing station's channel whose floors were read; null = the top level. */
   channel: ReleaseChannel | null;
+  /** True when the candidate is a legacy release (published before the cutover). */
+  legacy: boolean;
+  /**
+   * Components this candidate gets NO computed constraint towards: legacy
+   * pairs nobody tested. The consumer applies the rule the candidate shipped
+   * with to them (for firmware: the release's `metadata.json`
+   * `min_cli_version`). Empty for an enforced candidate.
+   */
+  untestedLegacy: ComponentId[];
   /** Why not, one line per broken requirement. Empty when installable. */
   reasons: string[];
   /** Non-blocking observations (an installed build the file does not list). */
@@ -300,14 +368,25 @@ function hasEdge(doc: CompatibilityDoc, a: string, b: string): boolean {
  * "May I install `component@tag` next to what is installed, on a station of
  * `channel`?" — identical in every consumer (release-compat's `compat
  * check`, the kiosk, the installer). Every floor below is the one for the
- * installing station's channel (channelFloor):
+ * installing station's channel (channelFloor).
  *
- *  1. The release must be in the file. Untested means not installable.
+ * A release is LEGACY (published before the cutover, see isLegacy) or
+ * ENFORCED; a file without `enforced_from` is read the way it was before
+ * cutovers (CLASSIC: every release enforced, without step 0 and 2a).
+ *
+ *  0. Legacy candidate: a pair where the candidate has no evidence on the
+ *     edge, or where the installed release is legacy and has no evidence on
+ *     it, gets NO computed constraint (`untestedLegacy`): the candidate's own
+ *     legacy rule decides it. Only a TESTED failure blocks a legacy pair. A
+ *     legacy candidate the file does not list is such a pair for everything.
+ *  1. Otherwise the release must be in the file. Untested means not installable.
+ *  2a. Enforced candidate: it needs a computed floor for every edge of its
+ *     component, installed or not.
  *  2. For each installed component it has an edge with, its own floor
  *     `requires[Y]` must exist, have a compatible version, and be met by every
  *     interpretation of what is installed. Floors are computed in both
- *     directions of an edge; a missing floor on the reverse side of an edge
- *     is tolerated (step 3 covers that direction) and noted.
+ *     directions of an edge; CLASSIC tolerates a missing floor on the
+ *     reverse side of an edge (step 3 covers that direction) and notes it.
  *  3. Reverse: each installed component's own release must accept this
  *     version (`requires[X].min <= version`).
  */
@@ -321,19 +400,55 @@ export function checkInstall(
   const channel = opts.channel ?? null;
   const reasons: string[] = [];
   const notes: string[] = [];
+  const untestedLegacy: ComponentId[] = [];
   const on = channel ? ` for a ${channel} station` : "";
   const rel = doc.components[component]?.releases?.[tag];
-  if (!rel) {
-    return {
-      installable: false,
-      channel,
-      reasons: [`${component} ${tag} is not in compatibility.json (untested)`],
-      notes,
-    };
-  }
-  const version = classifyTag(component, tag)?.version ?? parseSemVer(rel.version);
+  const version = classifyTag(component, tag)?.version ?? parseSemVer(rel?.version);
+  const verdict = (legacy: boolean): InstallVerdict => ({
+    installable: reasons.length === 0,
+    channel,
+    legacy,
+    untestedLegacy,
+    reasons: [...new Set(reasons)],
+    notes: [...new Set(notes)],
+  });
   if (!version) {
-    return { installable: false, channel, reasons: [`${component} ${tag} has no usable version`], notes };
+    reasons.push(
+      rel ? `${component} ${tag} has no usable version` : `${component} ${tag} is not a ${component} release tag`
+    );
+    return verdict(false);
+  }
+
+  const classic = cutoverOf(doc, component) === undefined;
+  const legacy = isLegacy(doc, component, version);
+  const neighbours = [
+    ...new Set(doc.edges.flatMap(([a, b]) => (a === component ? [b] : b === component ? [a] : []))),
+  ] as ComponentId[];
+  const leaveToLegacy = (Y: ComponentId, why: string) => {
+    if (!untestedLegacy.includes(Y)) untestedLegacy.push(Y);
+    notes.push(`untested-legacy: ${why}; no computed constraint, the legacy rule applies`);
+  };
+
+  // --- 1 (and 0 for a legacy release the file does not list) --------------
+  if (!rel) {
+    if (!legacy) {
+      reasons.push(`${component} ${tag} is not in compatibility.json (untested)`);
+      return verdict(false);
+    }
+    for (const inst of installed) {
+      if (inst.component !== component && neighbours.includes(inst.component)) {
+        leaveToLegacy(inst.component, `legacy ${tag} has no computed compatibility (${inst.component})`);
+      }
+    }
+    notes.push(`untested-legacy: legacy ${component} ${tag} has no computed compatibility; the legacy rule applies`);
+    return verdict(true);
+  }
+
+  // --- 2a: an enforced release has a floor for every edge -----------------
+  if (!classic && !legacy) {
+    for (const Y of neighbours) {
+      if (!rel.requires?.[Y]) reasons.push(`${component} ${tag} is enforced and has no computed floor for ${Y}`);
+    }
   }
 
   for (const inst of installed) {
@@ -343,19 +458,32 @@ export function checkInstall(
     const reverse = hasEdge(doc, Y, component);
     if (!forward && !reverse) continue;
 
-    // --- 2: this release's floor towards Y ---------------------------------
     const req = channelFloor(rel.requires?.[Y], channel);
-    if (!req) {
-      if (forward) reasons.push(`${component} ${tag} was never tested with ${Y}`);
-      else notes.push(`${component} ${tag} lists no floor for ${Y}`);
-    } else if (req.no_compatible || req.min === null) {
-      reasons.push(
-        `${component} ${tag} has no compatible ${Y} release${on} ` +
-          `(${NO_FLOOR_WHY[req.reason ?? ""] ?? "newest tested failed"})`
-      );
-    } else {
-      const min = parseSemVer(req.min);
-      for (const i of inst.interpretations) {
+    for (const i of inst.interpretations) {
+      const theirs = i.tag ? doc.components[Y]?.releases?.[i.tag] : undefined;
+      const back = theirs ? channelFloor(theirs.requires?.[component], channel) : undefined;
+      const as = `${inst.label} (${Y} ${i.tag ?? formatSemVer(i.version)})`;
+
+      // --- 0: a legacy pair without evidence on the edge ------------------
+      if (legacy && (!hasEvidence(req) || (!hasEvidence(back) && isLegacy(doc, Y, i.version)))) {
+        leaveToLegacy(
+          Y,
+          !hasEvidence(req) ? `legacy ${tag} was never tested with ${Y}` : `legacy ${as} was never tested with ${component}`
+        );
+        continue;
+      }
+
+      // --- 2: this release's floor towards Y -------------------------------
+      if (!req) {
+        if (classic && forward) reasons.push(`${component} ${tag} was never tested with ${Y}`);
+        else if (classic) notes.push(`${component} ${tag} lists no floor for ${Y}`);
+      } else if (req.no_compatible || req.min === null) {
+        reasons.push(
+          `${component} ${tag} has no compatible ${Y} release${on} ` +
+            `(${NO_FLOOR_WHY[req.reason ?? ""] ?? "newest tested failed"})`
+        );
+      } else {
+        const min = parseSemVer(req.min);
         if (!min || compareSemVer(i.version, min) < 0) {
           reasons.push(
             `${component} ${tag} needs ${Y} >= ${req.min}; ${inst.label} runs ` +
@@ -363,26 +491,22 @@ export function checkInstall(
           );
         }
       }
-    }
 
-    // --- 3: the installed release's floor towards this component ----------
-    for (const i of inst.interpretations) {
-      const theirs = i.tag ? doc.components[Y]?.releases?.[i.tag] : undefined;
+      // --- 3: the installed release's floor towards this component --------
       if (!theirs) {
         notes.push(`${inst.label} (${Y} ${formatSemVer(i.version)}) is not in compatibility.json`);
         continue;
       }
-      const back = channelFloor(theirs.requires?.[component], channel);
       if (!back) continue;
       if (back.no_compatible || back.min === null) {
-        reasons.push(`${inst.label} (${Y} ${i.tag}) has no compatible ${component} release${on}`);
+        reasons.push(`${as} has no compatible ${component} release${on}`);
         continue;
       }
       const min = parseSemVer(back.min);
       if (!min || compareSemVer(version, min) < 0) {
-        reasons.push(`${inst.label} (${Y} ${i.tag}) needs ${component} >= ${back.min}; ${tag} is older`);
+        reasons.push(`${as} needs ${component} >= ${back.min}; ${tag} is older`);
       }
     }
   }
-  return { installable: reasons.length === 0, channel, reasons: [...new Set(reasons)], notes: [...new Set(notes)] };
+  return verdict(legacy);
 }

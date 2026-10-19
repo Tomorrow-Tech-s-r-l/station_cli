@@ -68,9 +68,9 @@ function opts({ channel = "stable", cliVersion = [0, 5, 0], cliTag = "dev-v0.5.0
   };
 }
 
-test("catalog: stable picks the newest production release the rule accepts", () => {
+test("catalog: stable picks the newest production release the rule accepts", async () => {
   const o = opts({ interfaces: [device("interface", "3.0.1")], powerbanks: [device("powerbank", "3.0.2")] });
-  const c = selectGithubCandidate("interface", SOURCES.interface, boards, o);
+  const c = await selectGithubCandidate("interface", SOURCES.interface, boards, o);
   assert.equal(c.tag, "v3.0.3");
   assert.deepEqual(c.version, [3, 0, 3]);
   assert.equal(c.prerelease, false);
@@ -79,58 +79,58 @@ test("catalog: stable picks the newest production release the rule accepts", () 
   assert.equal(c.compat.sequence, 42);
 });
 
-test("catalog: beta skips a newer release whose pack floor is broken", () => {
+test("catalog: beta skips a newer release whose pack floor is broken", async () => {
   // dev-v3.2.0 is newest but compatible with no pack: v3.0.3 is offered.
   const o = opts({ channel: "beta", interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.2")] });
-  const c = selectGithubCandidate("interface", SOURCES.interface, boards, o);
+  const c = await selectGithubCandidate("interface", SOURCES.interface, boards, o);
   assert.equal(c.tag, "v3.0.3");
   assert.ok(o.warnings.some((w) => /dev-v3\.2\.0 .*not installable here: .*no compatible P1TT2C/.test(w)), o.warnings.join("\n"));
 });
 
-test("catalog: an old CLI is refused by the firmware's own floor", () => {
+test("catalog: an old CLI is refused by the firmware's own floor", async () => {
   const o = opts({ cliVersion: [0, 3, 0], cliTag: "v0.3.0", interfaces: [device("interface", "3.0.1")] });
-  const c = selectGithubCandidate("interface", SOURCES.interface, boards, o);
+  const c = await selectGithubCandidate("interface", SOURCES.interface, boards, o);
   assert.equal(c, null, "every tested release needs station_cli >= 0.3.1");
   assert.ok(o.warnings.some((w) => /v3\.0\.3 .*needs station_cli >= 0\.3\.1/.test(w)));
   // v0.3.0's own floor (S1TTXX >= 3.0.3) also refuses v3.0.1: the reverse rule.
   assert.ok(o.warnings.some((w) => /v3\.0\.1 .*this station-cli \(station_cli v0\.3\.0\) needs S1TTXX >= 3\.0\.3/.test(w)));
 });
 
-test("catalog: untested releases are never offered", () => {
+test("catalog: untested releases are never offered", async () => {
   // v2.0.x are real tags but not in compatibility.json.
   const d = compatDoc();
   for (const t of ["v3.0.3", "v3.0.1", "dev-v3.2.0"]) delete d.components.S1TTXX.releases[t];
   const o = opts({ doc: d, interfaces: [device("interface", "2.0.0")] });
-  assert.equal(selectGithubCandidate("interface", SOURCES.interface, boards, o), null);
+  assert.equal(await selectGithubCandidate("interface", SOURCES.interface, boards, o), null);
   assert.ok(o.warnings.some((w) => /v2\.0\.2 .*untested/.test(w)));
 });
 
-test("catalog: a pack image needs a board version that accepts it", () => {
+test("catalog: a pack image needs a board version that accepts it", async () => {
   const withBoard = opts({ interfaces: [device("interface", "3.0.3")], powerbanks: [device("powerbank", "3.0.0")] });
-  assert.equal(selectGithubCandidate("powerbank", SOURCES.powerbank, packs, withBoard).tag, "v3.0.2");
+  assert.equal((await selectGithubCandidate("powerbank", SOURCES.powerbank, packs, withBoard)).tag, "v3.0.2");
 
   const oldBoard = opts({ interfaces: [device("interface", "3.0.1")], powerbanks: [device("powerbank", "3.0.0")] });
-  assert.equal(selectGithubCandidate("powerbank", SOURCES.powerbank, packs, oldBoard), null, "every pack needs S1TTXX >= 3.0.3");
+  assert.equal(await selectGithubCandidate("powerbank", SOURCES.powerbank, packs, oldBoard), null, "every pack needs S1TTXX >= 3.0.3");
 
   const noBoard = opts({ interfaces: [device("interface", null, { reachable: false })] });
-  assert.equal(selectGithubCandidate("powerbank", SOURCES.powerbank, packs, noBoard), null);
+  assert.equal(await selectGithubCandidate("powerbank", SOURCES.powerbank, packs, noBoard), null);
   assert.ok(noBoard.warnings.some((w) => /no interface board firmware version could be read/.test(w)));
 });
 
-test("catalog: no compatibility data fails closed", () => {
+test("catalog: no compatibility data fails closed", async () => {
   const o = opts({ doc: null });
-  assert.equal(selectGithubCandidate("interface", SOURCES.interface, boards, o), null);
+  assert.equal(await selectGithubCandidate("interface", SOURCES.interface, boards, o), null);
   assert.match(o.warnings[0], /fail closed/);
 });
 
-test("catalog: a source that is not the repository the file describes is refused", () => {
+test("catalog: a source that is not the repository the file describes is refused", async () => {
   const o = opts({ interfaces: [device("interface", "3.0.1")] });
   const fork = { provider: "github", repo: "someone/S1TTXX-fork" };
-  assert.equal(selectGithubCandidate("interface", fork, boards, o), null);
+  assert.equal(await selectGithubCandidate("interface", fork, boards, o), null);
   assert.match(o.warnings[0], /describes S1TTXX releases of Tomorrow-Tech-s-r-l\/S1TTXX-firmware/);
 });
 
-test("catalog: drafts and tags outside the grammar are ignored", () => {
+test("catalog: drafts and tags outside the grammar are ignored", async () => {
   const extra = [
     { tag_name: "v9.9.9", draft: true, assets: [{ name: "S1TTXX-firmware-9.9.9.bin", url: "u" }] },
     { tag_name: "nightly", assets: [{ name: "S1TTXX-firmware-9.9.8.bin", url: "u" }] },
@@ -138,7 +138,7 @@ test("catalog: drafts and tags outside the grammar are ignored", () => {
   const d = compatDoc();
   d.components.S1TTXX.releases["v9.9.9"] = { version: "9.9.9", channel: "production", requires: d.components.S1TTXX.releases["v3.0.3"].requires };
   const o = opts({ doc: d, interfaces: [device("interface", "3.0.1")], powerbanks: [device("powerbank", "3.0.2")] });
-  assert.equal(selectGithubCandidate("interface", SOURCES.interface, [...extra, ...boards], o).tag, "v3.0.3");
+  assert.equal((await selectGithubCandidate("interface", SOURCES.interface, [...extra, ...boards], o)).tag, "v3.0.3");
 });
 
 // --- where compatibility.json comes from ---------------------------------------

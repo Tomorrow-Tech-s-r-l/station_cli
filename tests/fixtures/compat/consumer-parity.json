@@ -1,7 +1,3370 @@
 {
   "format": "compat-parity/v1",
-  "about": "Shared consumer-rule cases. release-compat's checkInstall, station_cli's catalog, the kiosk's CompatibilityData and install.sh's jq rule must all give `installable` for every case. A case's `channel` (production | development) is the channel of the installing station: floors are read from requires[Y].channels[channel]; no `channel`, or a requirement without `channels`, uses the top-level floor. Copy this file verbatim; the source of truth is release-compat/test/fixtures/consumer-parity.json.",
+  "about": "Shared consumer-rule cases. release-compat's checkInstall, station_cli's catalog, the kiosk's CompatibilityData and install.sh's jq rule must all give `installable` for every case. A case's `channel` (production | development) is the channel of the installing station: floors are read from requires[Y].channels[channel]; no `channel`, or a requirement without `channels`, uses the top-level floor. Cutover: components[X].enforced_from (a tag, or null = every release legacy) splits releases into LEGACY (version < it) and ENFORCED; a component without the key (the `synthetic` doc) is read by the classic rule. A LEGACY candidate gets no computed constraint on a pair when it has no evidence on that edge (no requires[Y] for the channel, or one that tested nothing) or the installed release is legacy without evidence on it (requires[X]); it is then installable as far as the file goes and the consumer applies the legacy rule (metadata keys) to that pair; a legacy candidate not in the file is installable that way. An ENFORCED candidate must be in the file with a floor for every edge of its component (installed or not) and passes the full rule. Copy this file verbatim; the source of truth is release-compat/test/fixtures/consumer-parity.json.",
   "docs": {
+    "computed": {
+      "format": "compatibility/v1",
+      "sequence": 3,
+      "generated_at": "2026-10-18T20:30:00Z",
+      "edges": [
+        [
+          "S1TTXX",
+          "station_cli"
+        ],
+        [
+          "S1TTXX",
+          "P1TT2C"
+        ],
+        [
+          "P1TT2C",
+          "station_cli"
+        ],
+        [
+          "kiosk",
+          "station_cli"
+        ]
+      ],
+      "components": {
+        "S1TTXX": {
+          "repo": "Tomorrow-Tech-s-r-l/S1TTXX-firmware",
+          "enforced_from": null,
+          "enforced_from_version": null,
+          "releases": {
+            "dev-v3.2.0": {
+              "version": "3.2.0-dev",
+              "channel": "development",
+              "requires": {
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "station_cli": {
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [
+                    "v0.2.4"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v3.0.3": {
+              "version": "3.0.3",
+              "channel": "production",
+              "requires": {
+                "P1TT2C": {
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "station_cli": {
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [
+                    "v0.2.4"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "0.3.1",
+                      "min_tag": "v0.3.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [
+                        "v0.2.4"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v3.0.1": {
+              "version": "3.0.1",
+              "channel": "production",
+              "requires": {
+                "P1TT2C": {
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "3.0.2",
+                      "min_tag": "v3.0.2",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v2.0.2": {
+              "version": "2.0.2",
+              "channel": "production",
+              "requires": {
+                "P1TT2C": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v2.0.1": {
+              "version": "2.0.1",
+              "channel": "production",
+              "requires": {
+                "P1TT2C": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v2.0.0": {
+              "version": "2.0.0",
+              "channel": "production",
+              "requires": {
+                "P1TT2C": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0",
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0",
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "P1TT2C": {
+          "repo": "Tomorrow-Tech-s-r-l/P1TT2C-firmware",
+          "enforced_from": null,
+          "enforced_from_version": null,
+          "releases": {
+            "dev-v3.1.0": {
+              "version": "3.1.0-dev",
+              "channel": "development",
+              "requires": {
+                "S1TTXX": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "station_cli": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [
+                        "v0.3.1"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v3.0.2": {
+              "version": "3.0.2",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": []
+                    }
+                  }
+                },
+                "station_cli": {
+                  "min": "0.0.1",
+                  "min_tag": "v0.0.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v0.0.1",
+                    "v0.0.2",
+                    "v0.0.3",
+                    "v0.0.4",
+                    "v0.0.5",
+                    "v0.0.6",
+                    "v0.0.8",
+                    "v0.0.9",
+                    "dev-v0.0.10",
+                    "v0.0.10",
+                    "dev-v0.0.11",
+                    "v0.0.11",
+                    "dev-v0.0.12",
+                    "v0.0.12",
+                    "dev-v0.0.13",
+                    "v0.0.13",
+                    "dev-v0.0.14",
+                    "dev-v0.0.15",
+                    "dev-v0.0.16",
+                    "dev-v0.0.17",
+                    "v0.0.17",
+                    "dev-v0.0.18",
+                    "v0.0.18",
+                    "dev-v0.0.19",
+                    "v0.0.19",
+                    "dev-v0.0.20",
+                    "v0.0.20",
+                    "dev-v0.0.21",
+                    "v0.0.21",
+                    "dev-v0.0.22",
+                    "v0.0.22",
+                    "dev-v0.0.25",
+                    "v0.0.25",
+                    "dev-v0.0.26",
+                    "dev-v0.0.27",
+                    "v0.0.27",
+                    "dev-v0.0.28",
+                    "dev-v0.0.29",
+                    "dev-v0.1.0",
+                    "v0.1.0",
+                    "dev-v0.2.0",
+                    "dev-v0.2.1",
+                    "v0.2.1",
+                    "dev-v0.2.2",
+                    "dev-v0.2.3",
+                    "dev-v0.2.4"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "0.0.1",
+                      "min_tag": "v0.0.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v0.0.1",
+                        "v0.0.2",
+                        "v0.0.3",
+                        "v0.0.4",
+                        "v0.0.5",
+                        "v0.0.6",
+                        "v0.0.8",
+                        "v0.0.9",
+                        "v0.0.10",
+                        "v0.0.11",
+                        "v0.0.12",
+                        "v0.0.13",
+                        "v0.0.17",
+                        "v0.0.18",
+                        "v0.0.19",
+                        "v0.0.20",
+                        "v0.0.21",
+                        "v0.0.22",
+                        "v0.0.25",
+                        "v0.0.27",
+                        "v0.1.0",
+                        "v0.2.1"
+                      ]
+                    },
+                    "development": {
+                      "min": "0.0.1",
+                      "min_tag": "v0.0.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v0.0.1",
+                        "v0.0.2",
+                        "v0.0.3",
+                        "v0.0.4",
+                        "v0.0.5",
+                        "v0.0.6",
+                        "v0.0.8",
+                        "v0.0.9",
+                        "dev-v0.0.10",
+                        "v0.0.10",
+                        "dev-v0.0.11",
+                        "v0.0.11",
+                        "dev-v0.0.12",
+                        "v0.0.12",
+                        "dev-v0.0.13",
+                        "v0.0.13",
+                        "dev-v0.0.14",
+                        "dev-v0.0.15",
+                        "dev-v0.0.16",
+                        "dev-v0.0.17",
+                        "v0.0.17",
+                        "dev-v0.0.18",
+                        "v0.0.18",
+                        "dev-v0.0.19",
+                        "v0.0.19",
+                        "dev-v0.0.20",
+                        "v0.0.20",
+                        "dev-v0.0.21",
+                        "v0.0.21",
+                        "dev-v0.0.22",
+                        "v0.0.22",
+                        "dev-v0.0.25",
+                        "v0.0.25",
+                        "dev-v0.0.26",
+                        "dev-v0.0.27",
+                        "v0.0.27",
+                        "dev-v0.0.28",
+                        "dev-v0.0.29",
+                        "dev-v0.1.0",
+                        "v0.1.0",
+                        "dev-v0.2.0",
+                        "dev-v0.2.1",
+                        "v0.2.1",
+                        "dev-v0.2.2",
+                        "dev-v0.2.3",
+                        "dev-v0.2.4"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "v3.0.0": {
+              "version": "3.0.0",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v2.0.2": {
+              "version": "2.0.2",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v2.0.1": {
+              "version": "2.0.1",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            },
+            "v2.0.0": {
+              "version": "2.0.0",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.1",
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.1",
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "station_cli": {
+          "repo": "Tomorrow-Tech-s-r-l/station_cli",
+          "enforced_from": null,
+          "enforced_from_version": null,
+          "releases": {
+            "dev-v0.5.0": {
+              "version": "0.5.0-dev",
+              "channel": "development",
+              "requires": {
+                "S1TTXX": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1"
+                      ]
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1"
+                      ]
+                    }
+                  }
+                },
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ]
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "kiosk": {
+                  "min": "1.0.0",
+                  "min_tag": "v1.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v1.0.0",
+                    "v1.0.1-dev.1",
+                    "v1.0.1",
+                    "v1.0.2-dev.1",
+                    "v1.0.2",
+                    "v1.0.4-dev.1",
+                    "v1.0.4",
+                    "v1.0.5-dev.1",
+                    "v1.0.5",
+                    "v1.0.6-dev.1",
+                    "v1.0.6",
+                    "v1.0.7-dev.1",
+                    "v1.0.7",
+                    "v1.0.8",
+                    "v1.0.9",
+                    "v1.0.10",
+                    "v1.0.11",
+                    "v1.0.12",
+                    "v1.0.13",
+                    "v1.0.14",
+                    "v1.0.15",
+                    "v1.0.16",
+                    "v1.0.17-dev.1",
+                    "v1.0.17",
+                    "v1.0.18-dev.1",
+                    "v1.0.19-dev.1",
+                    "v1.0.20-dev.1",
+                    "v1.0.22-dev.1",
+                    "v1.0.23-dev.1",
+                    "v1.0.23-dev.3",
+                    "v1.0.23-dev.4",
+                    "v1.0.23-dev.5",
+                    "v1.0.23-dev.6",
+                    "v1.0.23-dev.7",
+                    "v1.0.23",
+                    "v1.0.24-dev.1",
+                    "v1.0.24",
+                    "v1.0.25-dev.1",
+                    "v1.0.25",
+                    "v1.0.26-dev.1",
+                    "v1.0.26",
+                    "v1.0.27-dev.1",
+                    "v1.0.27-dev.2",
+                    "v1.0.27-dev.3",
+                    "v1.0.27-dev.4",
+                    "v1.0.27-dev.5",
+                    "v1.0.27",
+                    "v1.0.28",
+                    "v1.0.29-dev.1",
+                    "v1.0.29-dev.2",
+                    "v1.0.29-dev.3",
+                    "v1.0.29-dev.4",
+                    "v1.0.29-dev.5",
+                    "v1.0.29",
+                    "v1.0.30-dev.5",
+                    "v1.0.30",
+                    "v1.0.31-dev.1",
+                    "v1.0.31",
+                    "v1.0.32-dev.1",
+                    "v1.0.32-dev.2",
+                    "v1.0.32",
+                    "v1.0.34-dev.1",
+                    "v1.0.34-dev.2",
+                    "v1.0.35-dev.1",
+                    "v1.0.35-dev.2",
+                    "v1.0.35-dev.3",
+                    "v1.0.35-dev.4",
+                    "v1.0.35-dev.21",
+                    "v1.0.36-dev.22",
+                    "v1.0.36-dev.25",
+                    "v1.0.36",
+                    "v1.0.37-dev.26",
+                    "v1.0.37-dev.27",
+                    "v1.0.37-dev.28",
+                    "v1.0.37-dev.30",
+                    "v1.0.37-dev.31",
+                    "v1.0.37-dev.32",
+                    "v1.0.37-dev.35",
+                    "v1.0.37-dev.36",
+                    "v1.0.37-dev.37",
+                    "v1.0.37",
+                    "v1.0.38",
+                    "v1.0.39",
+                    "v1.0.40",
+                    "v1.0.41",
+                    "v1.0.42-dev.42",
+                    "v1.0.42",
+                    "v1.0.43-dev.43",
+                    "v1.0.43",
+                    "v1.0.44-dev.44",
+                    "v1.0.45-dev.45",
+                    "v1.0.46-dev.46",
+                    "v1.0.48-dev.48",
+                    "v1.0.49-dev.49",
+                    "v1.0.49",
+                    "v1.1.0-dev.50",
+                    "v1.2.0-dev.51",
+                    "v1.2.2-dev.53",
+                    "v1.2.3-dev.54",
+                    "v1.2.3-dev.56",
+                    "v1.2.3",
+                    "v1.2.4",
+                    "v1.2.5",
+                    "v1.2.6",
+                    "v1.2.7",
+                    "v1.2.8-dev.61",
+                    "v1.2.8",
+                    "v1.2.9",
+                    "v1.2.10",
+                    "v1.3.1-dev.1",
+                    "v1.3.2-dev.2",
+                    "v1.3.4-dev.3",
+                    "v1.3.4",
+                    "v1.3.5",
+                    "v1.3.6-dev.5",
+                    "v1.3.7-dev.6",
+                    "v1.3.8-dev.7",
+                    "v1.3.8",
+                    "v1.3.9-dev.8",
+                    "v1.3.9",
+                    "v1.3.10-dev.8",
+                    "v1.3.10",
+                    "v1.3.11",
+                    "v1.3.12",
+                    "v1.3.13",
+                    "v1.3.14",
+                    "v1.3.15-dev.12",
+                    "v1.3.16-dev.13",
+                    "v1.3.16",
+                    "v1.3.17-dev.16"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1",
+                        "v1.0.2",
+                        "v1.0.4",
+                        "v1.0.5",
+                        "v1.0.6",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17",
+                        "v1.0.23",
+                        "v1.0.24",
+                        "v1.0.25",
+                        "v1.0.26",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29",
+                        "v1.0.30",
+                        "v1.0.31",
+                        "v1.0.32",
+                        "v1.0.36",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42",
+                        "v1.0.43",
+                        "v1.0.49",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.8",
+                        "v1.3.9",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.16"
+                      ]
+                    },
+                    "development": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1-dev.1",
+                        "v1.0.1",
+                        "v1.0.2-dev.1",
+                        "v1.0.2",
+                        "v1.0.4-dev.1",
+                        "v1.0.4",
+                        "v1.0.5-dev.1",
+                        "v1.0.5",
+                        "v1.0.6-dev.1",
+                        "v1.0.6",
+                        "v1.0.7-dev.1",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17-dev.1",
+                        "v1.0.17",
+                        "v1.0.18-dev.1",
+                        "v1.0.19-dev.1",
+                        "v1.0.20-dev.1",
+                        "v1.0.22-dev.1",
+                        "v1.0.23-dev.1",
+                        "v1.0.23-dev.3",
+                        "v1.0.23-dev.4",
+                        "v1.0.23-dev.5",
+                        "v1.0.23-dev.6",
+                        "v1.0.23-dev.7",
+                        "v1.0.23",
+                        "v1.0.24-dev.1",
+                        "v1.0.24",
+                        "v1.0.25-dev.1",
+                        "v1.0.25",
+                        "v1.0.26-dev.1",
+                        "v1.0.26",
+                        "v1.0.27-dev.1",
+                        "v1.0.27-dev.2",
+                        "v1.0.27-dev.3",
+                        "v1.0.27-dev.4",
+                        "v1.0.27-dev.5",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29-dev.1",
+                        "v1.0.29-dev.2",
+                        "v1.0.29-dev.3",
+                        "v1.0.29-dev.4",
+                        "v1.0.29-dev.5",
+                        "v1.0.29",
+                        "v1.0.30-dev.5",
+                        "v1.0.30",
+                        "v1.0.31-dev.1",
+                        "v1.0.31",
+                        "v1.0.32-dev.1",
+                        "v1.0.32-dev.2",
+                        "v1.0.32",
+                        "v1.0.34-dev.1",
+                        "v1.0.34-dev.2",
+                        "v1.0.35-dev.1",
+                        "v1.0.35-dev.2",
+                        "v1.0.35-dev.3",
+                        "v1.0.35-dev.4",
+                        "v1.0.35-dev.21",
+                        "v1.0.36-dev.22",
+                        "v1.0.36-dev.25",
+                        "v1.0.36",
+                        "v1.0.37-dev.26",
+                        "v1.0.37-dev.27",
+                        "v1.0.37-dev.28",
+                        "v1.0.37-dev.30",
+                        "v1.0.37-dev.31",
+                        "v1.0.37-dev.32",
+                        "v1.0.37-dev.35",
+                        "v1.0.37-dev.36",
+                        "v1.0.37-dev.37",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42-dev.42",
+                        "v1.0.42",
+                        "v1.0.43-dev.43",
+                        "v1.0.43",
+                        "v1.0.44-dev.44",
+                        "v1.0.45-dev.45",
+                        "v1.0.46-dev.46",
+                        "v1.0.48-dev.48",
+                        "v1.0.49-dev.49",
+                        "v1.0.49",
+                        "v1.1.0-dev.50",
+                        "v1.2.0-dev.51",
+                        "v1.2.2-dev.53",
+                        "v1.2.3-dev.54",
+                        "v1.2.3-dev.56",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8-dev.61",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.1-dev.1",
+                        "v1.3.2-dev.2",
+                        "v1.3.4-dev.3",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.6-dev.5",
+                        "v1.3.7-dev.6",
+                        "v1.3.8-dev.7",
+                        "v1.3.8",
+                        "v1.3.9-dev.8",
+                        "v1.3.9",
+                        "v1.3.10-dev.8",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.15-dev.12",
+                        "v1.3.16-dev.13",
+                        "v1.3.16",
+                        "v1.3.17-dev.16"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "dev-v0.4.0": {
+              "version": "0.4.0-dev",
+              "channel": "development",
+              "requires": {
+                "S1TTXX": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1"
+                      ]
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1"
+                      ]
+                    }
+                  }
+                },
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ]
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "kiosk": {
+                  "min": "1.0.0",
+                  "min_tag": "v1.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v1.0.0",
+                    "v1.0.1-dev.1",
+                    "v1.0.1",
+                    "v1.0.2-dev.1",
+                    "v1.0.2",
+                    "v1.0.4-dev.1",
+                    "v1.0.4",
+                    "v1.0.5-dev.1",
+                    "v1.0.5",
+                    "v1.0.6-dev.1",
+                    "v1.0.6",
+                    "v1.0.7-dev.1",
+                    "v1.0.7",
+                    "v1.0.8",
+                    "v1.0.9",
+                    "v1.0.10",
+                    "v1.0.11",
+                    "v1.0.12",
+                    "v1.0.13",
+                    "v1.0.14",
+                    "v1.0.15",
+                    "v1.0.16",
+                    "v1.0.17-dev.1",
+                    "v1.0.17",
+                    "v1.0.18-dev.1",
+                    "v1.0.19-dev.1",
+                    "v1.0.20-dev.1",
+                    "v1.0.22-dev.1",
+                    "v1.0.23-dev.1",
+                    "v1.0.23-dev.3",
+                    "v1.0.23-dev.4",
+                    "v1.0.23-dev.5",
+                    "v1.0.23-dev.6",
+                    "v1.0.23-dev.7",
+                    "v1.0.23",
+                    "v1.0.24-dev.1",
+                    "v1.0.24",
+                    "v1.0.25-dev.1",
+                    "v1.0.25",
+                    "v1.0.26-dev.1",
+                    "v1.0.26",
+                    "v1.0.27-dev.1",
+                    "v1.0.27-dev.2",
+                    "v1.0.27-dev.3",
+                    "v1.0.27-dev.4",
+                    "v1.0.27-dev.5",
+                    "v1.0.27",
+                    "v1.0.28",
+                    "v1.0.29-dev.1",
+                    "v1.0.29-dev.2",
+                    "v1.0.29-dev.3",
+                    "v1.0.29-dev.4",
+                    "v1.0.29-dev.5",
+                    "v1.0.29",
+                    "v1.0.30-dev.5",
+                    "v1.0.30",
+                    "v1.0.31-dev.1",
+                    "v1.0.31",
+                    "v1.0.32-dev.1",
+                    "v1.0.32-dev.2",
+                    "v1.0.32",
+                    "v1.0.34-dev.1",
+                    "v1.0.34-dev.2",
+                    "v1.0.35-dev.1",
+                    "v1.0.35-dev.2",
+                    "v1.0.35-dev.3",
+                    "v1.0.35-dev.4",
+                    "v1.0.35-dev.21",
+                    "v1.0.36-dev.22",
+                    "v1.0.36-dev.25",
+                    "v1.0.36",
+                    "v1.0.37-dev.26",
+                    "v1.0.37-dev.27",
+                    "v1.0.37-dev.28",
+                    "v1.0.37-dev.30",
+                    "v1.0.37-dev.31",
+                    "v1.0.37-dev.32",
+                    "v1.0.37-dev.35",
+                    "v1.0.37-dev.36",
+                    "v1.0.37-dev.37",
+                    "v1.0.37",
+                    "v1.0.38",
+                    "v1.0.39",
+                    "v1.0.40",
+                    "v1.0.41",
+                    "v1.0.42-dev.42",
+                    "v1.0.42",
+                    "v1.0.43-dev.43",
+                    "v1.0.43",
+                    "v1.0.44-dev.44",
+                    "v1.0.45-dev.45",
+                    "v1.0.46-dev.46",
+                    "v1.0.48-dev.48",
+                    "v1.0.49-dev.49",
+                    "v1.0.49",
+                    "v1.1.0-dev.50",
+                    "v1.2.0-dev.51",
+                    "v1.2.2-dev.53",
+                    "v1.2.3-dev.54",
+                    "v1.2.3-dev.56",
+                    "v1.2.3",
+                    "v1.2.4",
+                    "v1.2.5",
+                    "v1.2.6",
+                    "v1.2.7",
+                    "v1.2.8-dev.61",
+                    "v1.2.8",
+                    "v1.2.9",
+                    "v1.2.10",
+                    "v1.3.1-dev.1",
+                    "v1.3.2-dev.2",
+                    "v1.3.4-dev.3",
+                    "v1.3.4",
+                    "v1.3.5",
+                    "v1.3.6-dev.5",
+                    "v1.3.7-dev.6",
+                    "v1.3.8-dev.7",
+                    "v1.3.8",
+                    "v1.3.9-dev.8",
+                    "v1.3.9",
+                    "v1.3.10-dev.8",
+                    "v1.3.10",
+                    "v1.3.11",
+                    "v1.3.12",
+                    "v1.3.13",
+                    "v1.3.14",
+                    "v1.3.15-dev.12",
+                    "v1.3.16-dev.13",
+                    "v1.3.16",
+                    "v1.3.17-dev.16"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1",
+                        "v1.0.2",
+                        "v1.0.4",
+                        "v1.0.5",
+                        "v1.0.6",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17",
+                        "v1.0.23",
+                        "v1.0.24",
+                        "v1.0.25",
+                        "v1.0.26",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29",
+                        "v1.0.30",
+                        "v1.0.31",
+                        "v1.0.32",
+                        "v1.0.36",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42",
+                        "v1.0.43",
+                        "v1.0.49",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.8",
+                        "v1.3.9",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.16"
+                      ]
+                    },
+                    "development": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1-dev.1",
+                        "v1.0.1",
+                        "v1.0.2-dev.1",
+                        "v1.0.2",
+                        "v1.0.4-dev.1",
+                        "v1.0.4",
+                        "v1.0.5-dev.1",
+                        "v1.0.5",
+                        "v1.0.6-dev.1",
+                        "v1.0.6",
+                        "v1.0.7-dev.1",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17-dev.1",
+                        "v1.0.17",
+                        "v1.0.18-dev.1",
+                        "v1.0.19-dev.1",
+                        "v1.0.20-dev.1",
+                        "v1.0.22-dev.1",
+                        "v1.0.23-dev.1",
+                        "v1.0.23-dev.3",
+                        "v1.0.23-dev.4",
+                        "v1.0.23-dev.5",
+                        "v1.0.23-dev.6",
+                        "v1.0.23-dev.7",
+                        "v1.0.23",
+                        "v1.0.24-dev.1",
+                        "v1.0.24",
+                        "v1.0.25-dev.1",
+                        "v1.0.25",
+                        "v1.0.26-dev.1",
+                        "v1.0.26",
+                        "v1.0.27-dev.1",
+                        "v1.0.27-dev.2",
+                        "v1.0.27-dev.3",
+                        "v1.0.27-dev.4",
+                        "v1.0.27-dev.5",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29-dev.1",
+                        "v1.0.29-dev.2",
+                        "v1.0.29-dev.3",
+                        "v1.0.29-dev.4",
+                        "v1.0.29-dev.5",
+                        "v1.0.29",
+                        "v1.0.30-dev.5",
+                        "v1.0.30",
+                        "v1.0.31-dev.1",
+                        "v1.0.31",
+                        "v1.0.32-dev.1",
+                        "v1.0.32-dev.2",
+                        "v1.0.32",
+                        "v1.0.34-dev.1",
+                        "v1.0.34-dev.2",
+                        "v1.0.35-dev.1",
+                        "v1.0.35-dev.2",
+                        "v1.0.35-dev.3",
+                        "v1.0.35-dev.4",
+                        "v1.0.35-dev.21",
+                        "v1.0.36-dev.22",
+                        "v1.0.36-dev.25",
+                        "v1.0.36",
+                        "v1.0.37-dev.26",
+                        "v1.0.37-dev.27",
+                        "v1.0.37-dev.28",
+                        "v1.0.37-dev.30",
+                        "v1.0.37-dev.31",
+                        "v1.0.37-dev.32",
+                        "v1.0.37-dev.35",
+                        "v1.0.37-dev.36",
+                        "v1.0.37-dev.37",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42-dev.42",
+                        "v1.0.42",
+                        "v1.0.43-dev.43",
+                        "v1.0.43",
+                        "v1.0.44-dev.44",
+                        "v1.0.45-dev.45",
+                        "v1.0.46-dev.46",
+                        "v1.0.48-dev.48",
+                        "v1.0.49-dev.49",
+                        "v1.0.49",
+                        "v1.1.0-dev.50",
+                        "v1.2.0-dev.51",
+                        "v1.2.2-dev.53",
+                        "v1.2.3-dev.54",
+                        "v1.2.3-dev.56",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8-dev.61",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.1-dev.1",
+                        "v1.3.2-dev.2",
+                        "v1.3.4-dev.3",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.6-dev.5",
+                        "v1.3.7-dev.6",
+                        "v1.3.8-dev.7",
+                        "v1.3.8",
+                        "v1.3.9-dev.8",
+                        "v1.3.9",
+                        "v1.3.10-dev.8",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.15-dev.12",
+                        "v1.3.16-dev.13",
+                        "v1.3.16",
+                        "v1.3.17-dev.16"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "v0.3.1": {
+              "version": "0.3.1",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.1"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1"
+                      ]
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.1"
+                      ]
+                    }
+                  }
+                },
+                "P1TT2C": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [
+                    "dev-v3.1.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ]
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [
+                        "dev-v3.1.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "kiosk": {
+                  "min": "1.0.0",
+                  "min_tag": "v1.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v1.0.0",
+                    "v1.0.1-dev.1",
+                    "v1.0.1",
+                    "v1.0.2-dev.1",
+                    "v1.0.2",
+                    "v1.0.4-dev.1",
+                    "v1.0.4",
+                    "v1.0.5-dev.1",
+                    "v1.0.5",
+                    "v1.0.6-dev.1",
+                    "v1.0.6",
+                    "v1.0.7-dev.1",
+                    "v1.0.7",
+                    "v1.0.8",
+                    "v1.0.9",
+                    "v1.0.10",
+                    "v1.0.11",
+                    "v1.0.12",
+                    "v1.0.13",
+                    "v1.0.14",
+                    "v1.0.15",
+                    "v1.0.16",
+                    "v1.0.17-dev.1",
+                    "v1.0.17",
+                    "v1.0.18-dev.1",
+                    "v1.0.19-dev.1",
+                    "v1.0.20-dev.1",
+                    "v1.0.22-dev.1",
+                    "v1.0.23-dev.1",
+                    "v1.0.23-dev.3",
+                    "v1.0.23-dev.4",
+                    "v1.0.23-dev.5",
+                    "v1.0.23-dev.6",
+                    "v1.0.23-dev.7",
+                    "v1.0.23",
+                    "v1.0.24-dev.1",
+                    "v1.0.24",
+                    "v1.0.25-dev.1",
+                    "v1.0.25",
+                    "v1.0.26-dev.1",
+                    "v1.0.26",
+                    "v1.0.27-dev.1",
+                    "v1.0.27-dev.2",
+                    "v1.0.27-dev.3",
+                    "v1.0.27-dev.4",
+                    "v1.0.27-dev.5",
+                    "v1.0.27",
+                    "v1.0.28",
+                    "v1.0.29-dev.1",
+                    "v1.0.29-dev.2",
+                    "v1.0.29-dev.3",
+                    "v1.0.29-dev.4",
+                    "v1.0.29-dev.5",
+                    "v1.0.29",
+                    "v1.0.30-dev.5",
+                    "v1.0.30",
+                    "v1.0.31-dev.1",
+                    "v1.0.31",
+                    "v1.0.32-dev.1",
+                    "v1.0.32-dev.2",
+                    "v1.0.32",
+                    "v1.0.34-dev.1",
+                    "v1.0.34-dev.2",
+                    "v1.0.35-dev.1",
+                    "v1.0.35-dev.2",
+                    "v1.0.35-dev.3",
+                    "v1.0.35-dev.4",
+                    "v1.0.35-dev.21",
+                    "v1.0.36-dev.22",
+                    "v1.0.36-dev.25",
+                    "v1.0.36",
+                    "v1.0.37-dev.26",
+                    "v1.0.37-dev.27",
+                    "v1.0.37-dev.28",
+                    "v1.0.37-dev.30",
+                    "v1.0.37-dev.31",
+                    "v1.0.37-dev.32",
+                    "v1.0.37-dev.35",
+                    "v1.0.37-dev.36",
+                    "v1.0.37-dev.37",
+                    "v1.0.37",
+                    "v1.0.38",
+                    "v1.0.39",
+                    "v1.0.40",
+                    "v1.0.41",
+                    "v1.0.42-dev.42",
+                    "v1.0.42",
+                    "v1.0.43-dev.43",
+                    "v1.0.43",
+                    "v1.0.44-dev.44",
+                    "v1.0.45-dev.45",
+                    "v1.0.46-dev.46",
+                    "v1.0.48-dev.48",
+                    "v1.0.49-dev.49",
+                    "v1.0.49",
+                    "v1.1.0-dev.50",
+                    "v1.2.0-dev.51",
+                    "v1.2.2-dev.53",
+                    "v1.2.3-dev.54",
+                    "v1.2.3-dev.56",
+                    "v1.2.3",
+                    "v1.2.4",
+                    "v1.2.5",
+                    "v1.2.6",
+                    "v1.2.7",
+                    "v1.2.8-dev.61",
+                    "v1.2.8",
+                    "v1.2.9",
+                    "v1.2.10",
+                    "v1.3.1-dev.1",
+                    "v1.3.2-dev.2",
+                    "v1.3.4-dev.3",
+                    "v1.3.4",
+                    "v1.3.5",
+                    "v1.3.6-dev.5",
+                    "v1.3.7-dev.6",
+                    "v1.3.8-dev.7",
+                    "v1.3.8",
+                    "v1.3.9-dev.8",
+                    "v1.3.9",
+                    "v1.3.10-dev.8",
+                    "v1.3.10",
+                    "v1.3.11",
+                    "v1.3.12",
+                    "v1.3.13",
+                    "v1.3.14",
+                    "v1.3.15-dev.12",
+                    "v1.3.16-dev.13",
+                    "v1.3.16",
+                    "v1.3.17-dev.16"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1",
+                        "v1.0.2",
+                        "v1.0.4",
+                        "v1.0.5",
+                        "v1.0.6",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17",
+                        "v1.0.23",
+                        "v1.0.24",
+                        "v1.0.25",
+                        "v1.0.26",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29",
+                        "v1.0.30",
+                        "v1.0.31",
+                        "v1.0.32",
+                        "v1.0.36",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42",
+                        "v1.0.43",
+                        "v1.0.49",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.8",
+                        "v1.3.9",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.16"
+                      ]
+                    },
+                    "development": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1-dev.1",
+                        "v1.0.1",
+                        "v1.0.2-dev.1",
+                        "v1.0.2",
+                        "v1.0.4-dev.1",
+                        "v1.0.4",
+                        "v1.0.5-dev.1",
+                        "v1.0.5",
+                        "v1.0.6-dev.1",
+                        "v1.0.6",
+                        "v1.0.7-dev.1",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17-dev.1",
+                        "v1.0.17",
+                        "v1.0.18-dev.1",
+                        "v1.0.19-dev.1",
+                        "v1.0.20-dev.1",
+                        "v1.0.22-dev.1",
+                        "v1.0.23-dev.1",
+                        "v1.0.23-dev.3",
+                        "v1.0.23-dev.4",
+                        "v1.0.23-dev.5",
+                        "v1.0.23-dev.6",
+                        "v1.0.23-dev.7",
+                        "v1.0.23",
+                        "v1.0.24-dev.1",
+                        "v1.0.24",
+                        "v1.0.25-dev.1",
+                        "v1.0.25",
+                        "v1.0.26-dev.1",
+                        "v1.0.26",
+                        "v1.0.27-dev.1",
+                        "v1.0.27-dev.2",
+                        "v1.0.27-dev.3",
+                        "v1.0.27-dev.4",
+                        "v1.0.27-dev.5",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29-dev.1",
+                        "v1.0.29-dev.2",
+                        "v1.0.29-dev.3",
+                        "v1.0.29-dev.4",
+                        "v1.0.29-dev.5",
+                        "v1.0.29",
+                        "v1.0.30-dev.5",
+                        "v1.0.30",
+                        "v1.0.31-dev.1",
+                        "v1.0.31",
+                        "v1.0.32-dev.1",
+                        "v1.0.32-dev.2",
+                        "v1.0.32",
+                        "v1.0.34-dev.1",
+                        "v1.0.34-dev.2",
+                        "v1.0.35-dev.1",
+                        "v1.0.35-dev.2",
+                        "v1.0.35-dev.3",
+                        "v1.0.35-dev.4",
+                        "v1.0.35-dev.21",
+                        "v1.0.36-dev.22",
+                        "v1.0.36-dev.25",
+                        "v1.0.36",
+                        "v1.0.37-dev.26",
+                        "v1.0.37-dev.27",
+                        "v1.0.37-dev.28",
+                        "v1.0.37-dev.30",
+                        "v1.0.37-dev.31",
+                        "v1.0.37-dev.32",
+                        "v1.0.37-dev.35",
+                        "v1.0.37-dev.36",
+                        "v1.0.37-dev.37",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42-dev.42",
+                        "v1.0.42",
+                        "v1.0.43-dev.43",
+                        "v1.0.43",
+                        "v1.0.44-dev.44",
+                        "v1.0.45-dev.45",
+                        "v1.0.46-dev.46",
+                        "v1.0.48-dev.48",
+                        "v1.0.49-dev.49",
+                        "v1.0.49",
+                        "v1.1.0-dev.50",
+                        "v1.2.0-dev.51",
+                        "v1.2.2-dev.53",
+                        "v1.2.3-dev.54",
+                        "v1.2.3-dev.56",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8-dev.61",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.1-dev.1",
+                        "v1.3.2-dev.2",
+                        "v1.3.4-dev.3",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.6-dev.5",
+                        "v1.3.7-dev.6",
+                        "v1.3.8-dev.7",
+                        "v1.3.8",
+                        "v1.3.9-dev.8",
+                        "v1.3.9",
+                        "v1.3.10-dev.8",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.15-dev.12",
+                        "v1.3.16-dev.13",
+                        "v1.3.16",
+                        "v1.3.17-dev.16"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "v0.2.4": {
+              "version": "0.2.4",
+              "channel": "production",
+              "requires": {
+                "S1TTXX": {
+                  "min": null,
+                  "min_tag": null,
+                  "no_compatible": true,
+                  "reason": "newest_failed",
+                  "tested": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "failed": [
+                    "v3.0.3",
+                    "dev-v3.2.0"
+                  ],
+                  "unknown": [],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.3"
+                      ],
+                      "failed": [
+                        "v3.0.3"
+                      ],
+                      "unknown": []
+                    },
+                    "development": {
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "reason": "newest_failed",
+                      "tested": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "failed": [
+                        "v3.0.3",
+                        "dev-v3.2.0"
+                      ],
+                      "unknown": []
+                    }
+                  }
+                },
+                "P1TT2C": {
+                  "min": "2.0.0",
+                  "min_tag": "v2.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2",
+                    "dev-v3.1.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v2.0.0",
+                    "v2.0.1",
+                    "v2.0.2",
+                    "v3.0.0"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
+                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ]
+                    },
+                    "development": {
+                      "min": "2.0.0",
+                      "min_tag": "v2.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v3.0.2",
+                        "dev-v3.1.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v2.0.0",
+                        "v2.0.1",
+                        "v2.0.2",
+                        "v3.0.0"
+                      ]
+                    }
+                  }
+                },
+                "kiosk": {
+                  "min": "1.0.0",
+                  "min_tag": "v1.0.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v1.3.17",
+                    "v1.4.0-dev.23"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v1.0.0",
+                    "v1.0.1-dev.1",
+                    "v1.0.1",
+                    "v1.0.2-dev.1",
+                    "v1.0.2",
+                    "v1.0.4-dev.1",
+                    "v1.0.4",
+                    "v1.0.5-dev.1",
+                    "v1.0.5",
+                    "v1.0.6-dev.1",
+                    "v1.0.6",
+                    "v1.0.7-dev.1",
+                    "v1.0.7",
+                    "v1.0.8",
+                    "v1.0.9",
+                    "v1.0.10",
+                    "v1.0.11",
+                    "v1.0.12",
+                    "v1.0.13",
+                    "v1.0.14",
+                    "v1.0.15",
+                    "v1.0.16",
+                    "v1.0.17-dev.1",
+                    "v1.0.17",
+                    "v1.0.18-dev.1",
+                    "v1.0.19-dev.1",
+                    "v1.0.20-dev.1",
+                    "v1.0.22-dev.1",
+                    "v1.0.23-dev.1",
+                    "v1.0.23-dev.3",
+                    "v1.0.23-dev.4",
+                    "v1.0.23-dev.5",
+                    "v1.0.23-dev.6",
+                    "v1.0.23-dev.7",
+                    "v1.0.23",
+                    "v1.0.24-dev.1",
+                    "v1.0.24",
+                    "v1.0.25-dev.1",
+                    "v1.0.25",
+                    "v1.0.26-dev.1",
+                    "v1.0.26",
+                    "v1.0.27-dev.1",
+                    "v1.0.27-dev.2",
+                    "v1.0.27-dev.3",
+                    "v1.0.27-dev.4",
+                    "v1.0.27-dev.5",
+                    "v1.0.27",
+                    "v1.0.28",
+                    "v1.0.29-dev.1",
+                    "v1.0.29-dev.2",
+                    "v1.0.29-dev.3",
+                    "v1.0.29-dev.4",
+                    "v1.0.29-dev.5",
+                    "v1.0.29",
+                    "v1.0.30-dev.5",
+                    "v1.0.30",
+                    "v1.0.31-dev.1",
+                    "v1.0.31",
+                    "v1.0.32-dev.1",
+                    "v1.0.32-dev.2",
+                    "v1.0.32",
+                    "v1.0.34-dev.1",
+                    "v1.0.34-dev.2",
+                    "v1.0.35-dev.1",
+                    "v1.0.35-dev.2",
+                    "v1.0.35-dev.3",
+                    "v1.0.35-dev.4",
+                    "v1.0.35-dev.21",
+                    "v1.0.36-dev.22",
+                    "v1.0.36-dev.25",
+                    "v1.0.36",
+                    "v1.0.37-dev.26",
+                    "v1.0.37-dev.27",
+                    "v1.0.37-dev.28",
+                    "v1.0.37-dev.30",
+                    "v1.0.37-dev.31",
+                    "v1.0.37-dev.32",
+                    "v1.0.37-dev.35",
+                    "v1.0.37-dev.36",
+                    "v1.0.37-dev.37",
+                    "v1.0.37",
+                    "v1.0.38",
+                    "v1.0.39",
+                    "v1.0.40",
+                    "v1.0.41",
+                    "v1.0.42-dev.42",
+                    "v1.0.42",
+                    "v1.0.43-dev.43",
+                    "v1.0.43",
+                    "v1.0.44-dev.44",
+                    "v1.0.45-dev.45",
+                    "v1.0.46-dev.46",
+                    "v1.0.48-dev.48",
+                    "v1.0.49-dev.49",
+                    "v1.0.49",
+                    "v1.1.0-dev.50",
+                    "v1.2.0-dev.51",
+                    "v1.2.2-dev.53",
+                    "v1.2.3-dev.54",
+                    "v1.2.3-dev.56",
+                    "v1.2.3",
+                    "v1.2.4",
+                    "v1.2.5",
+                    "v1.2.6",
+                    "v1.2.7",
+                    "v1.2.8-dev.61",
+                    "v1.2.8",
+                    "v1.2.9",
+                    "v1.2.10",
+                    "v1.3.1-dev.1",
+                    "v1.3.2-dev.2",
+                    "v1.3.4-dev.3",
+                    "v1.3.4",
+                    "v1.3.5",
+                    "v1.3.6-dev.5",
+                    "v1.3.7-dev.6",
+                    "v1.3.8-dev.7",
+                    "v1.3.8",
+                    "v1.3.9-dev.8",
+                    "v1.3.9",
+                    "v1.3.10-dev.8",
+                    "v1.3.10",
+                    "v1.3.11",
+                    "v1.3.12",
+                    "v1.3.13",
+                    "v1.3.14",
+                    "v1.3.15-dev.12",
+                    "v1.3.16-dev.13",
+                    "v1.3.16",
+                    "v1.3.17-dev.16"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1",
+                        "v1.0.2",
+                        "v1.0.4",
+                        "v1.0.5",
+                        "v1.0.6",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17",
+                        "v1.0.23",
+                        "v1.0.24",
+                        "v1.0.25",
+                        "v1.0.26",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29",
+                        "v1.0.30",
+                        "v1.0.31",
+                        "v1.0.32",
+                        "v1.0.36",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42",
+                        "v1.0.43",
+                        "v1.0.49",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.8",
+                        "v1.3.9",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.16"
+                      ]
+                    },
+                    "development": {
+                      "min": "1.0.0",
+                      "min_tag": "v1.0.0",
+                      "no_compatible": false,
+                      "tested": [
+                        "v1.3.17",
+                        "v1.4.0-dev.23"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v1.0.0",
+                        "v1.0.1-dev.1",
+                        "v1.0.1",
+                        "v1.0.2-dev.1",
+                        "v1.0.2",
+                        "v1.0.4-dev.1",
+                        "v1.0.4",
+                        "v1.0.5-dev.1",
+                        "v1.0.5",
+                        "v1.0.6-dev.1",
+                        "v1.0.6",
+                        "v1.0.7-dev.1",
+                        "v1.0.7",
+                        "v1.0.8",
+                        "v1.0.9",
+                        "v1.0.10",
+                        "v1.0.11",
+                        "v1.0.12",
+                        "v1.0.13",
+                        "v1.0.14",
+                        "v1.0.15",
+                        "v1.0.16",
+                        "v1.0.17-dev.1",
+                        "v1.0.17",
+                        "v1.0.18-dev.1",
+                        "v1.0.19-dev.1",
+                        "v1.0.20-dev.1",
+                        "v1.0.22-dev.1",
+                        "v1.0.23-dev.1",
+                        "v1.0.23-dev.3",
+                        "v1.0.23-dev.4",
+                        "v1.0.23-dev.5",
+                        "v1.0.23-dev.6",
+                        "v1.0.23-dev.7",
+                        "v1.0.23",
+                        "v1.0.24-dev.1",
+                        "v1.0.24",
+                        "v1.0.25-dev.1",
+                        "v1.0.25",
+                        "v1.0.26-dev.1",
+                        "v1.0.26",
+                        "v1.0.27-dev.1",
+                        "v1.0.27-dev.2",
+                        "v1.0.27-dev.3",
+                        "v1.0.27-dev.4",
+                        "v1.0.27-dev.5",
+                        "v1.0.27",
+                        "v1.0.28",
+                        "v1.0.29-dev.1",
+                        "v1.0.29-dev.2",
+                        "v1.0.29-dev.3",
+                        "v1.0.29-dev.4",
+                        "v1.0.29-dev.5",
+                        "v1.0.29",
+                        "v1.0.30-dev.5",
+                        "v1.0.30",
+                        "v1.0.31-dev.1",
+                        "v1.0.31",
+                        "v1.0.32-dev.1",
+                        "v1.0.32-dev.2",
+                        "v1.0.32",
+                        "v1.0.34-dev.1",
+                        "v1.0.34-dev.2",
+                        "v1.0.35-dev.1",
+                        "v1.0.35-dev.2",
+                        "v1.0.35-dev.3",
+                        "v1.0.35-dev.4",
+                        "v1.0.35-dev.21",
+                        "v1.0.36-dev.22",
+                        "v1.0.36-dev.25",
+                        "v1.0.36",
+                        "v1.0.37-dev.26",
+                        "v1.0.37-dev.27",
+                        "v1.0.37-dev.28",
+                        "v1.0.37-dev.30",
+                        "v1.0.37-dev.31",
+                        "v1.0.37-dev.32",
+                        "v1.0.37-dev.35",
+                        "v1.0.37-dev.36",
+                        "v1.0.37-dev.37",
+                        "v1.0.37",
+                        "v1.0.38",
+                        "v1.0.39",
+                        "v1.0.40",
+                        "v1.0.41",
+                        "v1.0.42-dev.42",
+                        "v1.0.42",
+                        "v1.0.43-dev.43",
+                        "v1.0.43",
+                        "v1.0.44-dev.44",
+                        "v1.0.45-dev.45",
+                        "v1.0.46-dev.46",
+                        "v1.0.48-dev.48",
+                        "v1.0.49-dev.49",
+                        "v1.0.49",
+                        "v1.1.0-dev.50",
+                        "v1.2.0-dev.51",
+                        "v1.2.2-dev.53",
+                        "v1.2.3-dev.54",
+                        "v1.2.3-dev.56",
+                        "v1.2.3",
+                        "v1.2.4",
+                        "v1.2.5",
+                        "v1.2.6",
+                        "v1.2.7",
+                        "v1.2.8-dev.61",
+                        "v1.2.8",
+                        "v1.2.9",
+                        "v1.2.10",
+                        "v1.3.1-dev.1",
+                        "v1.3.2-dev.2",
+                        "v1.3.4-dev.3",
+                        "v1.3.4",
+                        "v1.3.5",
+                        "v1.3.6-dev.5",
+                        "v1.3.7-dev.6",
+                        "v1.3.8-dev.7",
+                        "v1.3.8",
+                        "v1.3.9-dev.8",
+                        "v1.3.9",
+                        "v1.3.10-dev.8",
+                        "v1.3.10",
+                        "v1.3.11",
+                        "v1.3.12",
+                        "v1.3.13",
+                        "v1.3.14",
+                        "v1.3.15-dev.12",
+                        "v1.3.16-dev.13",
+                        "v1.3.16",
+                        "v1.3.17-dev.16"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "kiosk": {
+          "repo": "Tomorrow-Tech-s-r-l/amperry-kiosk-local",
+          "enforced_from": null,
+          "enforced_from_version": null,
+          "releases": {
+            "v1.4.0-dev.23": {
+              "version": "1.4.0-dev.23",
+              "channel": "development",
+              "requires": {
+                "station_cli": {
+                  "min": "0.0.1",
+                  "min_tag": "v0.0.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v0.0.1",
+                    "v0.0.2",
+                    "v0.0.3",
+                    "v0.0.4",
+                    "v0.0.5",
+                    "v0.0.6",
+                    "v0.0.8",
+                    "v0.0.9",
+                    "dev-v0.0.10",
+                    "v0.0.10",
+                    "dev-v0.0.11",
+                    "v0.0.11",
+                    "dev-v0.0.12",
+                    "v0.0.12",
+                    "dev-v0.0.13",
+                    "v0.0.13",
+                    "dev-v0.0.14",
+                    "dev-v0.0.15",
+                    "dev-v0.0.16",
+                    "dev-v0.0.17",
+                    "v0.0.17",
+                    "dev-v0.0.18",
+                    "v0.0.18",
+                    "dev-v0.0.19",
+                    "v0.0.19",
+                    "dev-v0.0.20",
+                    "v0.0.20",
+                    "dev-v0.0.21",
+                    "v0.0.21",
+                    "dev-v0.0.22",
+                    "v0.0.22",
+                    "dev-v0.0.25",
+                    "v0.0.25",
+                    "dev-v0.0.26",
+                    "dev-v0.0.27",
+                    "v0.0.27",
+                    "dev-v0.0.28",
+                    "dev-v0.0.29",
+                    "dev-v0.1.0",
+                    "v0.1.0",
+                    "dev-v0.2.0",
+                    "dev-v0.2.1",
+                    "v0.2.1",
+                    "dev-v0.2.2",
+                    "dev-v0.2.3",
+                    "dev-v0.2.4"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "0.0.1",
+                      "min_tag": "v0.0.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v0.0.1",
+                        "v0.0.2",
+                        "v0.0.3",
+                        "v0.0.4",
+                        "v0.0.5",
+                        "v0.0.6",
+                        "v0.0.8",
+                        "v0.0.9",
+                        "v0.0.10",
+                        "v0.0.11",
+                        "v0.0.12",
+                        "v0.0.13",
+                        "v0.0.17",
+                        "v0.0.18",
+                        "v0.0.19",
+                        "v0.0.20",
+                        "v0.0.21",
+                        "v0.0.22",
+                        "v0.0.25",
+                        "v0.0.27",
+                        "v0.1.0",
+                        "v0.2.1"
+                      ]
+                    },
+                    "development": {
+                      "min": "0.0.1",
+                      "min_tag": "v0.0.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v0.0.1",
+                        "v0.0.2",
+                        "v0.0.3",
+                        "v0.0.4",
+                        "v0.0.5",
+                        "v0.0.6",
+                        "v0.0.8",
+                        "v0.0.9",
+                        "dev-v0.0.10",
+                        "v0.0.10",
+                        "dev-v0.0.11",
+                        "v0.0.11",
+                        "dev-v0.0.12",
+                        "v0.0.12",
+                        "dev-v0.0.13",
+                        "v0.0.13",
+                        "dev-v0.0.14",
+                        "dev-v0.0.15",
+                        "dev-v0.0.16",
+                        "dev-v0.0.17",
+                        "v0.0.17",
+                        "dev-v0.0.18",
+                        "v0.0.18",
+                        "dev-v0.0.19",
+                        "v0.0.19",
+                        "dev-v0.0.20",
+                        "v0.0.20",
+                        "dev-v0.0.21",
+                        "v0.0.21",
+                        "dev-v0.0.22",
+                        "v0.0.22",
+                        "dev-v0.0.25",
+                        "v0.0.25",
+                        "dev-v0.0.26",
+                        "dev-v0.0.27",
+                        "v0.0.27",
+                        "dev-v0.0.28",
+                        "dev-v0.0.29",
+                        "dev-v0.1.0",
+                        "v0.1.0",
+                        "dev-v0.2.0",
+                        "dev-v0.2.1",
+                        "v0.2.1",
+                        "dev-v0.2.2",
+                        "dev-v0.2.3",
+                        "dev-v0.2.4"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "v1.3.17": {
+              "version": "1.3.17",
+              "channel": "production",
+              "requires": {
+                "station_cli": {
+                  "min": "0.0.1",
+                  "min_tag": "v0.0.1",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.2.4",
+                    "v0.3.1",
+                    "dev-v0.4.0",
+                    "dev-v0.5.0"
+                  ],
+                  "failed": [],
+                  "unknown": [],
+                  "untested_legacy": [
+                    "v0.0.1",
+                    "v0.0.2",
+                    "v0.0.3",
+                    "v0.0.4",
+                    "v0.0.5",
+                    "v0.0.6",
+                    "v0.0.8",
+                    "v0.0.9",
+                    "dev-v0.0.10",
+                    "v0.0.10",
+                    "dev-v0.0.11",
+                    "v0.0.11",
+                    "dev-v0.0.12",
+                    "v0.0.12",
+                    "dev-v0.0.13",
+                    "v0.0.13",
+                    "dev-v0.0.14",
+                    "dev-v0.0.15",
+                    "dev-v0.0.16",
+                    "dev-v0.0.17",
+                    "v0.0.17",
+                    "dev-v0.0.18",
+                    "v0.0.18",
+                    "dev-v0.0.19",
+                    "v0.0.19",
+                    "dev-v0.0.20",
+                    "v0.0.20",
+                    "dev-v0.0.21",
+                    "v0.0.21",
+                    "dev-v0.0.22",
+                    "v0.0.22",
+                    "dev-v0.0.25",
+                    "v0.0.25",
+                    "dev-v0.0.26",
+                    "dev-v0.0.27",
+                    "v0.0.27",
+                    "dev-v0.0.28",
+                    "dev-v0.0.29",
+                    "dev-v0.1.0",
+                    "v0.1.0",
+                    "dev-v0.2.0",
+                    "dev-v0.2.1",
+                    "v0.2.1",
+                    "dev-v0.2.2",
+                    "dev-v0.2.3",
+                    "dev-v0.2.4"
+                  ],
+                  "evidence": [
+                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+                  ],
+                  "channels": {
+                    "production": {
+                      "min": "0.0.1",
+                      "min_tag": "v0.0.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v0.0.1",
+                        "v0.0.2",
+                        "v0.0.3",
+                        "v0.0.4",
+                        "v0.0.5",
+                        "v0.0.6",
+                        "v0.0.8",
+                        "v0.0.9",
+                        "v0.0.10",
+                        "v0.0.11",
+                        "v0.0.12",
+                        "v0.0.13",
+                        "v0.0.17",
+                        "v0.0.18",
+                        "v0.0.19",
+                        "v0.0.20",
+                        "v0.0.21",
+                        "v0.0.22",
+                        "v0.0.25",
+                        "v0.0.27",
+                        "v0.1.0",
+                        "v0.2.1"
+                      ]
+                    },
+                    "development": {
+                      "min": "0.0.1",
+                      "min_tag": "v0.0.1",
+                      "no_compatible": false,
+                      "tested": [
+                        "v0.2.4",
+                        "v0.3.1",
+                        "dev-v0.4.0",
+                        "dev-v0.5.0"
+                      ],
+                      "failed": [],
+                      "unknown": [],
+                      "untested_legacy": [
+                        "v0.0.1",
+                        "v0.0.2",
+                        "v0.0.3",
+                        "v0.0.4",
+                        "v0.0.5",
+                        "v0.0.6",
+                        "v0.0.8",
+                        "v0.0.9",
+                        "dev-v0.0.10",
+                        "v0.0.10",
+                        "dev-v0.0.11",
+                        "v0.0.11",
+                        "dev-v0.0.12",
+                        "v0.0.12",
+                        "dev-v0.0.13",
+                        "v0.0.13",
+                        "dev-v0.0.14",
+                        "dev-v0.0.15",
+                        "dev-v0.0.16",
+                        "dev-v0.0.17",
+                        "v0.0.17",
+                        "dev-v0.0.18",
+                        "v0.0.18",
+                        "dev-v0.0.19",
+                        "v0.0.19",
+                        "dev-v0.0.20",
+                        "v0.0.20",
+                        "dev-v0.0.21",
+                        "v0.0.21",
+                        "dev-v0.0.22",
+                        "v0.0.22",
+                        "dev-v0.0.25",
+                        "v0.0.25",
+                        "dev-v0.0.26",
+                        "dev-v0.0.27",
+                        "v0.0.27",
+                        "dev-v0.0.28",
+                        "dev-v0.0.29",
+                        "dev-v0.1.0",
+                        "v0.1.0",
+                        "dev-v0.2.0",
+                        "dev-v0.2.1",
+                        "v0.2.1",
+                        "dev-v0.2.2",
+                        "dev-v0.2.3",
+                        "dev-v0.2.4"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "synthetic": {
       "format": "compatibility/v1",
       "sequence": 7,
@@ -445,10 +3808,10 @@
         }
       }
     },
-    "computed": {
+    "cutover": {
       "format": "compatibility/v1",
-      "sequence": 2,
-      "generated_at": "2026-10-18T19:30:00Z",
+      "sequence": 11,
+      "generated_at": "2026-10-18T00:00:00Z",
       "edges": [
         [
           "S1TTXX",
@@ -470,125 +3833,134 @@
       "components": {
         "S1TTXX": {
           "repo": "Tomorrow-Tech-s-r-l/S1TTXX-firmware",
+          "enforced_from": "v3.1.0",
+          "enforced_from_version": "3.1.0",
           "releases": {
-            "dev-v3.2.0": {
-              "version": "3.2.0-dev",
-              "channel": "development",
+            "v3.2.0": {
+              "version": "3.2.0",
+              "channel": "production",
               "requires": {
-                "P1TT2C": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
+                "station_cli": {
+                  "min": "0.6.0",
+                  "min_tag": "v0.6.0",
+                  "no_compatible": false,
                   "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "v3.0.2",
+                    "v0.6.0"
+                  ],
+                  "failed": [],
+                  "evidence": []
+                }
+              }
+            },
+            "v3.1.5": {
+              "version": "3.1.5",
+              "channel": "production",
+              "requires": {
+                "station_cli": {
+                  "min": "0.6.0",
+                  "min_tag": "v0.6.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.6.0"
+                  ],
+                  "failed": [],
+                  "evidence": []
+                },
+                "P1TT2C": {
+                  "min": "3.1.0-dev",
+                  "min_tag": "dev-v3.1.0",
+                  "no_compatible": false,
+                  "tested": [
                     "dev-v3.1.0"
                   ],
-                  "failed": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "dev-v3.1.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
+                  "failed": [],
+                  "evidence": [],
                   "channels": {
                     "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2"
-                      ],
-                      "failed": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
                       "min": null,
                       "min_tag": null,
                       "no_compatible": true,
-                      "reason": "newest_failed",
+                      "tested": [],
+                      "failed": []
+                    },
+                    "development": {
+                      "min": "3.1.0-dev",
+                      "min_tag": "dev-v3.1.0",
+                      "no_compatible": false,
                       "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2",
                         "dev-v3.1.0"
                       ],
-                      "failed": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "dev-v3.1.0"
-                      ],
-                      "unknown": []
+                      "failed": []
                     }
                   }
+                }
+              }
+            },
+            "v3.1.0": {
+              "version": "3.1.0",
+              "channel": "production",
+              "requires": {
+                "station_cli": {
+                  "min": "0.4.0",
+                  "min_tag": "v0.4.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "v0.4.0"
+                  ],
+                  "failed": [],
+                  "evidence": []
                 },
+                "P1TT2C": {
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
+                  "tested": [
+                    "v3.0.2"
+                  ],
+                  "failed": [],
+                  "evidence": []
+                }
+              }
+            },
+            "v3.0.5": {
+              "version": "3.0.5",
+              "channel": "production",
+              "requires": {
                 "station_cli": {
                   "min": "0.3.1",
                   "min_tag": "v0.3.1",
                   "no_compatible": false,
                   "tested": [
-                    "v0.2.4",
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
+                    "v0.3.1"
                   ],
-                  "failed": [
-                    "v0.2.4"
+                  "failed": [],
+                  "evidence": []
+                },
+                "P1TT2C": {
+                  "min": "3.1.0-dev",
+                  "min_tag": "dev-v3.1.0",
+                  "no_compatible": false,
+                  "tested": [
+                    "dev-v3.1.0"
                   ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
+                  "failed": [],
+                  "evidence": [],
                   "channels": {
                     "production": {
-                      "min": "0.3.1",
-                      "min_tag": "v0.3.1",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1"
-                      ],
-                      "failed": [
-                        "v0.2.4"
-                      ],
-                      "unknown": []
+                      "min": null,
+                      "min_tag": null,
+                      "no_compatible": true,
+                      "tested": [],
+                      "failed": []
                     },
                     "development": {
-                      "min": "0.3.1",
-                      "min_tag": "v0.3.1",
+                      "min": "3.1.0-dev",
+                      "min_tag": "dev-v3.1.0",
                       "no_compatible": false,
                       "tested": [
-                        "v0.2.4",
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
+                        "dev-v3.1.0"
                       ],
-                      "failed": [
-                        "v0.2.4"
-                      ],
-                      "unknown": []
+                      "failed": []
                     }
                   }
                 }
@@ -598,354 +3970,28 @@
               "version": "3.0.3",
               "channel": "production",
               "requires": {
-                "P1TT2C": {
-                  "min": "3.0.2",
-                  "min_tag": "v3.0.2",
-                  "no_compatible": false,
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2"
-                      ],
-                      "failed": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                },
                 "station_cli": {
                   "min": "0.3.1",
                   "min_tag": "v0.3.1",
                   "no_compatible": false,
                   "tested": [
                     "v0.2.4",
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
+                    "v0.3.1"
                   ],
                   "failed": [
                     "v0.2.4"
                   ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "0.3.1",
-                      "min_tag": "v0.3.1",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1"
-                      ],
-                      "failed": [
-                        "v0.2.4"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "0.3.1",
-                      "min_tag": "v0.3.1",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
-                      ],
-                      "failed": [
-                        "v0.2.4"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v3.0.1": {
-              "version": "3.0.1",
-              "channel": "production",
-              "requires": {
+                  "evidence": []
+                },
                 "P1TT2C": {
                   "min": "3.0.2",
                   "min_tag": "v3.0.2",
                   "no_compatible": false,
                   "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2"
-                      ],
-                      "failed": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v2.0.2": {
-              "version": "2.0.2",
-              "channel": "production",
-              "requires": {
-                "P1TT2C": {
-                  "min": "2.0.0",
-                  "min_tag": "v2.0.0",
-                  "no_compatible": false,
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "v3.0.2",
-                    "dev-v3.1.0"
+                    "v3.0.2"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v2.0.1": {
-              "version": "2.0.1",
-              "channel": "production",
-              "requires": {
-                "P1TT2C": {
-                  "min": "2.0.0",
-                  "min_tag": "v2.0.0",
-                  "no_compatible": false,
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v2.0.0": {
-              "version": "2.0.0",
-              "channel": "production",
-              "requires": {
-                "P1TT2C": {
-                  "min": "2.0.0",
-                  "min_tag": "v2.0.0",
-                  "no_compatible": false,
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.0",
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.0",
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             }
@@ -953,497 +3999,32 @@
         },
         "P1TT2C": {
           "repo": "Tomorrow-Tech-s-r-l/P1TT2C-firmware",
+          "enforced_from": null,
+          "enforced_from_version": null,
           "releases": {
-            "dev-v3.1.0": {
-              "version": "3.1.0-dev",
-              "channel": "development",
-              "requires": {
-                "S1TTXX": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "failed": [
-                    "dev-v3.2.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [
-                        "dev-v3.2.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                },
-                "station_cli": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v0.2.4",
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
-                  ],
-                  "failed": [
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1"
-                      ],
-                      "failed": [
-                        "v0.3.1"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
-                      ],
-                      "failed": [
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
             "v3.0.2": {
               "version": "3.0.2",
               "channel": "production",
               "requires": {
                 "S1TTXX": {
-                  "min": "2.0.0",
-                  "min_tag": "v2.0.0",
+                  "min": "3.0.3",
+                  "min_tag": "v3.0.3",
                   "no_compatible": false,
                   "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
+                    "v3.0.3"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "2.0.0",
-                      "min_tag": "v2.0.0",
-                      "no_compatible": false,
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 },
                 "station_cli": {
-                  "min": "0.2.4",
-                  "min_tag": "v0.2.4",
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
                   "no_compatible": false,
                   "tested": [
-                    "v0.2.4",
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
+                    "v0.3.1"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "0.2.4",
-                      "min_tag": "v0.2.4",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "0.2.4",
-                      "min_tag": "v0.2.4",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v3.0.0": {
-              "version": "3.0.0",
-              "channel": "production",
-              "requires": {
-                "S1TTXX": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "failed": [
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v2.0.2": {
-              "version": "2.0.2",
-              "channel": "production",
-              "requires": {
-                "S1TTXX": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "failed": [
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v2.0.1": {
-              "version": "2.0.1",
-              "channel": "production",
-              "requires": {
-                "S1TTXX": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "failed": [
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                }
-              }
-            },
-            "v2.0.0": {
-              "version": "2.0.0",
-              "channel": "production",
-              "requires": {
-                "S1TTXX": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v2.0.0",
-                    "v2.0.1",
-                    "v2.0.2",
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "failed": [
-                    "v3.0.1",
-                    "v3.0.3",
-                    "dev-v3.2.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v2.0.0",
-                        "v2.0.1",
-                        "v2.0.2",
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [
-                        "v3.0.1",
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             }
@@ -1451,258 +4032,68 @@
         },
         "station_cli": {
           "repo": "Tomorrow-Tech-s-r-l/station_cli",
+          "enforced_from": "v0.6.0",
+          "enforced_from_version": "0.6.0",
           "releases": {
-            "dev-v0.5.0": {
-              "version": "0.5.0-dev",
-              "channel": "development",
+            "v0.6.1": {
+              "version": "0.6.1",
+              "channel": "production",
               "requires": {
                 "S1TTXX": {
-                  "min": "3.0.3",
-                  "min_tag": "v3.0.3",
+                  "min": "3.1.0",
+                  "min_tag": "v3.1.0",
                   "no_compatible": false,
                   "tested": [
-                    "v3.0.3",
-                    "dev-v3.2.0"
+                    "v3.1.0"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.3",
-                      "min_tag": "v3.0.3",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.3"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "3.0.3",
-                      "min_tag": "v3.0.3",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
-                },
-                "P1TT2C": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [
-                    "dev-v3.1.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [
-                        "dev-v3.1.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 },
                 "kiosk": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
                   "no_compatible": false,
                   "tested": [
-                    "v1.3.17",
-                    "v1.4.0-dev.23"
+                    "v1.3.17"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17",
-                        "v1.4.0-dev.23"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             },
-            "dev-v0.4.0": {
-              "version": "0.4.0-dev",
-              "channel": "development",
+            "v0.6.0": {
+              "version": "0.6.0",
+              "channel": "production",
               "requires": {
                 "S1TTXX": {
-                  "min": "3.0.3",
-                  "min_tag": "v3.0.3",
+                  "min": "3.1.0",
+                  "min_tag": "v3.1.0",
                   "no_compatible": false,
                   "tested": [
-                    "v3.0.3",
-                    "dev-v3.2.0"
+                    "v3.1.0"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.3",
-                      "min_tag": "v3.0.3",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.3"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "3.0.3",
-                      "min_tag": "v3.0.3",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 },
                 "P1TT2C": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
+                  "min": "3.0.2",
+                  "min_tag": "v3.0.2",
+                  "no_compatible": false,
                   "tested": [
-                    "v3.0.2",
-                    "dev-v3.1.0"
+                    "v3.0.2"
                   ],
-                  "failed": [
-                    "dev-v3.1.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [
-                        "dev-v3.1.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
+                  "failed": [],
+                  "evidence": []
                 },
                 "kiosk": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
                   "no_compatible": false,
                   "tested": [
-                    "v1.3.17",
-                    "v1.4.0-dev.23"
+                    "v1.3.17"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17",
-                        "v1.4.0-dev.23"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             },
@@ -1715,121 +4106,20 @@
                   "min_tag": "v3.0.3",
                   "no_compatible": false,
                   "tested": [
-                    "v3.0.3",
-                    "dev-v3.2.0"
+                    "v3.0.3"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.3",
-                      "min_tag": "v3.0.3",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.3"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "3.0.3",
-                      "min_tag": "v3.0.3",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
-                },
-                "P1TT2C": {
-                  "min": null,
-                  "min_tag": null,
-                  "no_compatible": true,
-                  "reason": "newest_failed",
-                  "tested": [
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [
-                    "dev-v3.1.0"
-                  ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [
-                        "dev-v3.1.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 },
                 "kiosk": {
                   "min": "1.3.17",
                   "min_tag": "v1.3.17",
                   "no_compatible": false,
                   "tested": [
-                    "v1.3.17",
-                    "v1.4.0-dev.23"
+                    "v1.3.17"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17",
-                        "v1.4.0-dev.23"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             },
@@ -1841,127 +4131,13 @@
                   "min": null,
                   "min_tag": null,
                   "no_compatible": true,
-                  "reason": "newest_failed",
                   "tested": [
-                    "v3.0.3",
-                    "dev-v3.2.0"
+                    "v3.0.3"
                   ],
                   "failed": [
-                    "v3.0.3",
-                    "dev-v3.2.0"
+                    "v3.0.3"
                   ],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v3.0.3"
-                      ],
-                      "failed": [
-                        "v3.0.3"
-                      ],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": null,
-                      "min_tag": null,
-                      "no_compatible": true,
-                      "reason": "newest_failed",
-                      "tested": [
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "failed": [
-                        "v3.0.3",
-                        "dev-v3.2.0"
-                      ],
-                      "unknown": []
-                    }
-                  }
-                },
-                "P1TT2C": {
-                  "min": "3.0.2",
-                  "min_tag": "v3.0.2",
-                  "no_compatible": false,
-                  "tested": [
-                    "v3.0.2",
-                    "dev-v3.1.0"
-                  ],
-                  "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/P1TT2C-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/S1TTXX-firmware/actions/runs/0",
-                    "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.2"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "3.0.2",
-                      "min_tag": "v3.0.2",
-                      "no_compatible": false,
-                      "tested": [
-                        "v3.0.2",
-                        "dev-v3.1.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
-                },
-                "kiosk": {
-                  "min": "1.3.17",
-                  "min_tag": "v1.3.17",
-                  "no_compatible": false,
-                  "tested": [
-                    "v1.3.17",
-                    "v1.4.0-dev.23"
-                  ],
-                  "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "1.3.17",
-                      "min_tag": "v1.3.17",
-                      "no_compatible": false,
-                      "tested": [
-                        "v1.3.17",
-                        "v1.4.0-dev.23"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             }
@@ -1969,52 +4145,22 @@
         },
         "kiosk": {
           "repo": "Tomorrow-Tech-s-r-l/amperry-kiosk-local",
+          "enforced_from": "v1.5.0",
+          "enforced_from_version": "1.5.0",
           "releases": {
-            "v1.4.0-dev.23": {
-              "version": "1.4.0-dev.23",
-              "channel": "development",
+            "v1.5.0": {
+              "version": "1.5.0",
+              "channel": "production",
               "requires": {
                 "station_cli": {
-                  "min": "0.2.4",
-                  "min_tag": "v0.2.4",
+                  "min": "0.6.0",
+                  "min_tag": "v0.6.0",
                   "no_compatible": false,
                   "tested": [
-                    "v0.2.4",
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
+                    "v0.6.0"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "0.2.4",
-                      "min_tag": "v0.2.4",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "0.2.4",
-                      "min_tag": "v0.2.4",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             },
@@ -2023,46 +4169,14 @@
               "channel": "production",
               "requires": {
                 "station_cli": {
-                  "min": "0.2.4",
-                  "min_tag": "v0.2.4",
+                  "min": "0.3.1",
+                  "min_tag": "v0.3.1",
                   "no_compatible": false,
                   "tested": [
-                    "v0.2.4",
-                    "v0.3.1",
-                    "dev-v0.4.0",
-                    "dev-v0.5.0"
+                    "v0.3.1"
                   ],
                   "failed": [],
-                  "unknown": [],
-                  "evidence": [
-                    "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
-                  ],
-                  "channels": {
-                    "production": {
-                      "min": "0.2.4",
-                      "min_tag": "v0.2.4",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    },
-                    "development": {
-                      "min": "0.2.4",
-                      "min_tag": "v0.2.4",
-                      "no_compatible": false,
-                      "tested": [
-                        "v0.2.4",
-                        "v0.3.1",
-                        "dev-v0.4.0",
-                        "dev-v0.5.0"
-                      ],
-                      "failed": [],
-                      "unknown": []
-                    }
-                  }
+                  "evidence": []
                 }
               }
             }
@@ -2934,23 +5048,23 @@
     },
     {
       "doc": "computed",
-      "name": "cli dev-v0.4.1: untested",
+      "name": "legacy cli dev-v0.4.1, not in the file: left to the legacy rule",
       "install": {
         "component": "station_cli",
         "tag": "dev-v0.4.1"
       },
       "installed": [],
-      "installable": false
+      "installable": true
     },
     {
       "doc": "computed",
-      "name": "kiosk dev.22: untested",
+      "name": "legacy kiosk dev.22, not in the file: left to the legacy rule",
       "install": {
         "component": "kiosk",
         "tag": "v1.4.0-dev.22"
       },
       "installed": [],
-      "installable": false
+      "installable": true
     },
     {
       "doc": "computed",
@@ -3177,6 +5291,567 @@
         }
       ],
       "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy cli v0.3.1 next to board v2.0.0 (never cli-tested): allowed",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.3.1"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v2.0.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy cli v0.3.1 next to board v2.0.0 (never cli-tested): allowed",
+      "channel": "production",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.3.1"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v2.0.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy cli v0.3.1 next to board v3.0.1 (pogo evidence only): allowed",
+      "channel": "production",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.3.1"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.1"
+        },
+        {
+          "component": "kiosk",
+          "tag": "v1.3.17"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy cli v0.2.4 on board v3.0.3: the tested failure blocks",
+      "channel": "production",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.2.4"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "legacy board v3.0.3 with cli v0.2.4: the tested failure blocks",
+      "channel": "development",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.4"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "legacy cli dev-v0.5.0 on kiosk v1.2.10 (never tested together): allowed",
+      "channel": "development",
+      "install": {
+        "component": "station_cli",
+        "tag": "dev-v0.5.0"
+      },
+      "installed": [
+        {
+          "component": "kiosk",
+          "tag": "v1.2.10"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy cli v0.3.1 on kiosk v1.2.10 (never tested together): allowed",
+      "channel": "production",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.3.1"
+      },
+      "installed": [
+        {
+          "component": "kiosk",
+          "tag": "v1.2.10"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy kiosk v1.2.10 with cli dev-v0.5.0 (never tested together): allowed",
+      "channel": "development",
+      "install": {
+        "component": "kiosk",
+        "tag": "v1.2.10"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "dev-v0.5.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy kiosk v1.3.17 with an old cli v0.2.1: cli floor reaches the oldest cli",
+      "channel": "production",
+      "install": {
+        "component": "kiosk",
+        "tag": "v1.3.17"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.1"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy pack v2.0.0 on board v3.0.3: the tested failure blocks",
+      "channel": "production",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "v2.0.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "computed",
+      "name": "legacy board v3.0.1 with cli v0.3.1 and pack v3.0.2: allowed (no cli evidence on v3.0.1)",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.1"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "computed",
+      "name": "legacy board v3.0.1 with pack v3.0.0: the tested failure blocks",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.1"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board, installed cli never tested with it: no computed constraint",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.1"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board, installed cli by a bare version no release has: no computed constraint",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "version": "0.2.1"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board below a TESTED failing cli: blocked",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.4"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board not in the file: left to the legacy rule",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v2.0.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board with every floor met",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.3"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board not in the file: untested, refused",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.3.0"
+      },
+      "installed": [],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board without a pack floor: refused even with no pack installed",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.2.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.6.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board with every floor met",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.6.0"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board: an installed legacy cli below its floor is refused (full rule)",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board: an installed legacy cli without any record is refused (below its floor)",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.1.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.2.1"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy cli below an enforced board's floor: refused (the enforced side was tested)",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.3.1"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.1.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced cli without a pack floor: refused",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.6.1"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.1.0"
+        },
+        {
+          "component": "kiosk",
+          "tag": "v1.3.17"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced cli not in the file: untested, refused",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.7.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.1.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced cli with every floor met",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.6.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.1.0"
+        },
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        },
+        {
+          "component": "kiosk",
+          "tag": "v1.5.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced cli: installed legacy kiosk below its floor is refused",
+      "install": {
+        "component": "station_cli",
+        "tag": "v0.6.0"
+      },
+      "installed": [
+        {
+          "component": "kiosk",
+          "tag": "v1.2.10"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced kiosk: installed legacy cli below its floor is refused",
+      "install": {
+        "component": "kiosk",
+        "tag": "v1.5.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.3.1"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced kiosk with an enforced cli",
+      "install": {
+        "component": "kiosk",
+        "tag": "v1.5.0"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.6.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy kiosk not in the file next to an enforced cli: left to the legacy rule",
+      "install": {
+        "component": "kiosk",
+        "tag": "v1.2.10"
+      },
+      "installed": [
+        {
+          "component": "station_cli",
+          "tag": "v0.6.0"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "every pack legacy (enforced_from null): a pack not in the file is left to the legacy rule",
+      "install": {
+        "component": "P1TT2C",
+        "tag": "v3.0.0"
+      },
+      "installed": [
+        {
+          "component": "S1TTXX",
+          "tag": "v3.0.3"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board: no production pack tested -> no constraint on a production station",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.5"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": true
+    },
+    {
+      "doc": "cutover",
+      "name": "legacy board: the development pack floor still applies on development",
+      "channel": "development",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.0.5"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "enforced board: no production pack tested -> refused on a production station",
+      "channel": "production",
+      "install": {
+        "component": "S1TTXX",
+        "tag": "v3.1.5"
+      },
+      "installed": [
+        {
+          "component": "P1TT2C",
+          "tag": "v3.0.2"
+        },
+        {
+          "component": "station_cli",
+          "tag": "v0.6.0"
+        }
+      ],
+      "installable": false
+    },
+    {
+      "doc": "cutover",
+      "name": "timestamp kiosk tag is never a release, legacy or not",
+      "install": {
+        "component": "kiosk",
+        "tag": "20251008155508-18349902862-e6fa170"
+      },
+      "installed": [],
+      "installable": false
     }
   ]
 }

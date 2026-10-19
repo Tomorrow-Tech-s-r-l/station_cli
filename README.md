@@ -108,7 +108,11 @@ echo '{"credentials":{"github":{"token":"'"$TOKEN"'"}}}' \
    slots still reads them). No compatibility data — not published, not
    cached, not bundled — means nothing is offered (fail closed); the JSON's
    `compatibility` field says which copy was used, and `warnings` why each
-   newer release was skipped. See [Compatibility](#compatibility).
+   newer release was skipped. A firmware release published before the
+   cutover (legacy) is never refused for lack of testing: a pair nobody
+   tested keeps the rule it shipped with (its `metadata.json`
+   `min_cli_version`), and only a tested failure blocks it. See
+   [Compatibility](#compatibility).
 3. **Plan** — a pure function (`src/S1TTXX/fwu/policy.ts`) that gives *every*
    device a verdict. A device not updated always carries a stable
    `skipReason` token, never silence.
@@ -266,6 +270,30 @@ a file without `channels` uses the top level. The JSON's
 `compatibility.channel` says which were read. The rule is release-compat's,
 pinned by its shared parity cases
 (`tests/fixtures/compat/consumer-parity.json`, a verbatim copy).
+
+**Legacy and enforced releases (the cutover).** Nothing already released
+breaks because it was never tested. Each component in the file has an
+`enforced_from`, computed by release-compat (never typed): the oldest release
+published with computed metadata (schema 2, with `computed.run_url`) — `null`
+while there is none, so today every release is **legacy**. For a legacy
+firmware release:
+
+- a pair with no evidence — the release was never tested with that component,
+  or the installed release is legacy and never tested with it — gets no
+  computed constraint. The catalog applies the release's own legacy rule
+  instead: towards this CLI, the release's `metadata.json` `min_cli_version`
+  (absent: no floor), exactly as before compatibility.json; towards the board
+  or the packs, none, as before. The JSON's candidate `compat` lists these in
+  `untestedLegacy` and `warnings` says `untested-legacy: …`;
+- a pair with evidence follows the full rule, so a **tested failure still
+  blocks** it (CLI v0.2.4 is never offered board v3.0.3);
+- a legacy release the file does not list at all is left to its legacy rule
+  for every pair.
+
+A release at or after the cutover is **enforced**: it must be in the file
+with a floor for every edge of its component (installed or not), and the
+full rule applies, failing closed. A file without `enforced_from` (written
+before cutovers) is read the strict way, every release enforced.
 
 ```json
 "compat": { "repo": "Tomorrow-Tech-s-r-l/release-compat", "tag": "current", "asset": "compatibility.json" }
