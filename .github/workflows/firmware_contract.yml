@@ -39,7 +39,8 @@ name: Firmware contract
 #   - every push to a feature branch (this CLI built from source);
 #   - main / development: called from build.yml with the linux-x64 executable
 #     that build just made, and the release waits for it (build.yml reports
-#     the evidence once the release exists);
+#     the evidence once the release exists; when the run publishes nothing —
+#     dev-v<version> already exists — it is untagged and never reported);
 #   - nightly, so a firmware change that breaks this CLI is reported on a day
 #     nothing is pushed here;
 #   - on request (cli_tag: a published release of this CLI, whose evidence is
@@ -519,21 +520,24 @@ jobs:
       # tag point at another commit), so it is uploaded as
       # compat-evidence-unpublished and the release job re-uploads it as
       # compat-evidence once published — as S1TTXX-firmware's release does.
+      # A build.yml run that publishes nothing (its dev tag already exists)
+      # passes no tag, and its evidence stays unpublished.
       # Any other ref (a feature branch push, a dispatch from one — whose
       # harness and scripts are that branch's) uploads compat-evidence-branch:
       # it gates this run only.
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development') && 'compat-evidence-branch' || ((inputs.cli_artifact != '' && inputs.cli_tag != '') && 'compat-evidence-unpublished' || 'compat-evidence') }}
+          name: ${{ (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development') && 'compat-evidence-branch' || (inputs.cli_artifact != '' && 'compat-evidence-unpublished' || 'compat-evidence') }}
           path: evidence/evidence.json
           retention-days: 30
 
       # A published CLI release was tested: hand the evidence to release-compatibility-cli
       # — from main / development only, as above. (build.yml does this for a
-      # new release, once it is published.)
+      # new release, once it is published; a dispatched build.yml calls this
+      # workflow as a workflow_dispatch too, hence cli_artifact.)
       - name: Report the evidence to release-compatibility-cli
         if: >-
-          github.event_name == 'workflow_dispatch' && inputs.cli_tag != '' && needs.targets.outputs.compat == 'true' &&
+          github.event_name == 'workflow_dispatch' && inputs.cli_tag != '' && inputs.cli_artifact == '' && needs.targets.outputs.compat == 'true' &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         env:
           GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}

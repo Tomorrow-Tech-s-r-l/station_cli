@@ -5,9 +5,20 @@ on:
     branches:
       - main
       - development
+  # A dev release is published once per version (see the release job). This
+  # replaces the existing dev-v<version> on purpose; development only.
+  workflow_dispatch:
+    inputs:
+      force_republish:
+        description: "Replace dev-v<package.json version> even though it is already published"
+        type: boolean
+        default: false
 
 jobs:
   build:
+    # Dispatched: development only, so a dispatch can never publish a
+    # production release from another branch.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/development'
     # `os` is just the leg's identifier — the per-step `if:` guards below
     # compare against it — while `runner` carries the actual label set. It has to
     # be a JSON string because a matrix value can only be expanded into `runs-on`
@@ -15,6 +26,7 @@ jobs:
     runs-on: ${{ fromJSON(matrix.runner) }}
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      release_tag: ${{ steps.get_version.outputs.release_tag }}
       commit_message: ${{ steps.get_commit_message.outputs.commit_message }}
       is_development: ${{ steps.check_branch.outputs.is_development }}
     strategy:
@@ -165,9 +177,28 @@ jobs:
           # them as Release assets — not charged to the org's storage quota.
           retention-days: 1
 
+      # release_tag: the tag this run publishes, empty when it publishes none
+      # (a dev tag already published, see the release job) — what fw-contract
+      # labels this executable's evidence with.
       - name: Get version
         id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        env:
+          IS_DEV: ${{ steps.check_branch.outputs.is_development }}
+          FORCE: ${{ inputs.force_republish }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$IS_DEV" = "true" ]; then TAG="dev-v$VERSION"; else TAG="v$VERSION"; fi
+          # --exit-code: 2 when the tag does not exist; anything else is an error.
+          rc=2
+          if [ "$IS_DEV" = "true" ] && [ "$FORCE" != "true" ]; then
+            rc=0; git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null || rc=$?
+          fi
+          case "$rc" in
+            0) echo "release_tag=" >> "$GITHUB_OUTPUT" ;;
+            2) echo "release_tag=$TAG" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::could not check whether $TAG exists"; exit 1 ;;
+          esac
         shell: bash
 
       - name: Get commit message
@@ -323,7 +354,9 @@ jobs:
     uses: ./.github/workflows/firmware_contract.yml
     with:
       cli_artifact: station-cli-linux-x64
-      cli_tag: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
+      # Empty when this run publishes no release: the evidence is then about
+      # this commit, never about the binaries already published under the tag.
+      cli_tag: ${{ needs.build.outputs.release_tag }}
     secrets: inherit
 
   # Never released past a red gate: every gate below is required.
@@ -336,10 +369,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # A dev release is published once per version. Publishing it again put
+      # new binaries under the same tag, so release-compatibility-cli (rightly)
+      # dropped the evidence recorded against the old sha256: its pairs went
+      # untested and stations stopped updating until the nightly. So when
+      # dev-v<version> exists, this job changes nothing — no assets, no
+      # metadata.json, no evidence under that tag (fw-contract tested this
+      # commit untagged) — while every gate above still ran. Bump the
+      # package.json version to publish a new one, or dispatch this workflow
+      # with force_republish to replace it on purpose. Checked again here:
+      # another run may have published the tag while this one was testing.
+      # main is unchanged.
+      - name: Publish?
+        id: publish
+        env:
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+          IS_DEV: ${{ needs.build.outputs.is_development }}
+          FORCE: ${{ inputs.force_republish }}
+        run: |
+          ok=true
+          if [ -z "$RELEASE_TAG" ]; then
+            ok=false
+          elif [ "$IS_DEV" = "true" ] && [ "$FORCE" != "true" ]; then
+            rc=0; git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" > /dev/null || rc=$?
+            case "$rc" in
+              0) ok=false ;;
+              2) ;;
+              *) echo "::error::could not check whether $RELEASE_TAG exists"; exit 1 ;;
+            esac
+          fi
+          if [ "$ok" = false ]; then
+            echo "::notice::dev-v$VERSION already published; bump package.json version to publish a new dev release"
+          fi
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+
       - name: Download all artifacts
+        if: steps.publish.outputs.ok == 'true'
         uses: actions/download-artifact@v4
 
       - name: Move artifacts to root directory
+        if: steps.publish.outputs.ok == 'true'
         run: |
           # List contents to debug
           ls -la station-cli-linux-arm64/
@@ -369,11 +439,13 @@ jobs:
           ls -la station-cli-*
 
       - uses: actions/setup-node@v4
+        if: steps.publish.outputs.ok == 'true'
         with:
           node-version: '22'
 
       - name: release-compatibility-cli available?
         id: compat
+        if: steps.publish.outputs.ok == 'true'
         env:
           COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
           COMPAT_REF: ${{ vars.COMPAT_REF }}
@@ -421,6 +493,7 @@ jobs:
       # (computed.legacy_raised, a warning and a line in the job summary).
       # `capabilities` is what the released binary itself reports.
       - name: Compute metadata.json
+        if: steps.publish.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
@@ -499,6 +572,7 @@ jobs:
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --suite-ref "$GITHUB_SHA"
 
       - name: Create Release
+        if: steps.publish.outputs.ok == 'true'
         # v2: v1 runs on the retired node16 runtime.
         uses: softprops/action-gh-release@v2
         with:
@@ -542,7 +616,7 @@ jobs:
       # development (the only branches this workflow runs on; guarded anyway,
       # as release-compatibility-cli trusts nothing else).
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+        if: steps.publish.outputs.ok == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         with:
           name: compat-evidence
           path: compat-evidence-unpublished/evidence.json
@@ -550,7 +624,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Report the contract evidence to release-compatibility-cli
-        if: steps.compat.outputs.ok == 'true' && hashFiles('compat-evidence-unpublished/evidence.json') != '' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+        if: steps.publish.outputs.ok == 'true' && steps.compat.outputs.ok == 'true' && hashFiles('compat-evidence-unpublished/evidence.json') != '' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         env:
           GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
         run: |
@@ -564,6 +638,7 @@ jobs:
       # Best effort: the nightly runs in both repositories cover a token
       # without actions:write on S1TTXX-firmware.
       - name: Re-test S1TTXX-firmware with this release
+        if: steps.publish.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           TARGET: ${{ needs.build.outputs.is_development == 'true' && 'dev-release' || 'release' }}
