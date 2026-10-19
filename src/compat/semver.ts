@@ -6,7 +6,7 @@
  * header stores and what a device reports. This module is the other half: the
  * order of RELEASES, where a pre-release ranks below its release
  * (`0.5.0-dev < 0.5.0`) and `dev.N` compares numerically. The rules are the
- * ones release-compat computes floors with (its `lib/semver.mjs`); a tag must
+ * ones release-compatibility-cli computes floors with (its `lib/semver.mjs`); a tag must
  * sort identically here, in the kiosk and in the installer, or a floor would
  * mean different things to different readers.
  */

@@ -25,7 +25,7 @@ test("targets: compat targets × packs, branches never get a tag", () => {
   assert.equal(rel.pack_tag, "v3.0.2");
 });
 
-test("targets: without release-compat the legacy selectors and the pack branch", () => {
+test("targets: without release-compatibility-cli the legacy selectors and the pack branch", () => {
   // The harness has no pack of its own any more (run.sh needs PACK_SRC).
   const m = buildMatrix({ fwBranches: ["development", "main"], packBranches: ["development"] });
   assert.deepEqual(m.include.map((l) => l.fw), ["development", "main", "release", "dev-release"]);
@@ -109,7 +109,7 @@ test("evidence: two releases tested with a branch build as third component move 
   // Same the other way round: released pack, firmware branch.
   const branchFw = legResults({ fwTag: "", fwRef: "abc", cliTag: "v0.5.0", cliRef: "def", packTag: "v3.0.2", packRef: "123", report: checks });
   assert.deepEqual(branchFw.map((r) => [r.a.component, r.a.tag]), [["S1TTXX", null]]);
-  // A branch build of this CLI: kept (gates CI, release-compat drops it).
+  // A branch build of this CLI: kept (gates CI, release-compatibility-cli drops it).
   assert.equal(legResults({ fwTag: "v3.0.3", fwRef: "abc", cliTag: "", cliRef: "def", packTag: "", packRef: "123", report: checks }).length, 2);
 });
 
@@ -156,7 +156,7 @@ test("metadata: the kiosk floor from evidence, else carried from a computed valu
   assert.equal(fromEvidence.min_kiosk_app_version, "1.3.0", "never above what the previous release published without a tested failure");
   assert.deepEqual(fromEvidence.computed.legacy_clamped, { min_kiosk_app_version: { previous: "1.3.0", previous_tag: "v0.5.0", computed: "1.3.14" } });
   assert.equal(fromEvidence.requires.S1TTXX.min, "3.0.3");
-  assert.deepEqual(fromEvidence.computed.carried_forward, [], "always present (release-compat's metadata schema)");
+  assert.deepEqual(fromEvidence.computed.carried_forward, [], "always present (release-compatibility-cli's metadata schema)");
 
   const carried = buildMetadata({ tag: "v0.6.0", version: "0.6.0", previous: computedPrevious(), runUrl: "https://github.com/o/r/actions/runs/8" }).meta;
   assert.equal(carried.min_kiosk_app_version, "1.2.0");
@@ -169,7 +169,7 @@ test("metadata: the kiosk floor from evidence, else carried from a computed valu
 });
 
 test("metadata: the kiosk floor `compat metadata --carry-compat` carried into --base is kept", () => {
-  // What release-compat's `compat metadata --carry-compat` wrote for
+  // What release-compatibility-cli's `compat metadata --carry-compat` wrote for
   // dev-v0.5.1 from the real computed compatibility.json (sequence 2), with
   // only schema-1 metadata.json behind it.
   const base = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "compat", "metadata-carried-dev-v0.5.1.json"), "utf8"));

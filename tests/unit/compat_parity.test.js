@@ -1,6 +1,6 @@
 // The consumer rule against the cases every consumer shares
 // (tests/fixtures/compat/consumer-parity.json, a verbatim copy of
-// release-compat's test/fixtures/consumer-parity.json), and the catalog fed
+// release-compatibility-cli's test/fixtures/consumer-parity.json), and the catalog fed
 // the compatibility.json computed from real contract runs
 // (tests/fixtures/compat/compatibility.computed.json: P1TT2C pogo matrix,
 // S1TTXX cli_contract with released CLIs, kiosk cli contract). Run with

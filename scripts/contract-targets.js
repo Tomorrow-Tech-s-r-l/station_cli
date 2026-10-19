@@ -16,10 +16,10 @@
  * `fw_tag` / `pack_tag` are set only for releases: a branch build is tested
  * (it gates CI) but never produces a compatibility floor.
  *
- * Which releases are tested is release-compat's list (`compat resolve`:
+ * Which releases are tested is release-compatibility-cli's list (`compat resolve`:
  * every release, so a floor only stays low over releases that were tested;
  * or `compat targets` for the newest per channel), not a version written
- * here. Without release-compat (no COMPAT_TOKEN) the legacy
+ * here. Without release-compatibility-cli (no COMPAT_TOKEN) the legacy
  * selectors `release` / `dev-release` are passed through, resolved per leg
  * by the harness's release.js, and the packs are the P1TT2C branches only
  * (the harness needs a pack tree: it has no pack of its own any more).
@@ -83,7 +83,7 @@ function buildMatrix(opts) {
   } else {
     fw = [...opts.fwBranches, "release", "dev-release"].map(entry);
   }
-  // Without release-compat, the pack branches alone (never a floor).
+  // Without release-compatibility-cli, the pack branches alone (never a floor).
   const packs = [...opts.packBranches, ...(opts.packTargets || [])].map(entry);
 
   const seen = new Set();

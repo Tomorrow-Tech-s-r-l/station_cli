@@ -146,7 +146,7 @@ test("catalog: drafts and tags outside the grammar are ignored", async () => {
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "compat-src-"));
 }
-const SRC = { repo: "Tomorrow-Tech-s-r-l/release-compat", tag: "current", asset: "compatibility.json" };
+const SRC = { repo: "Tomorrow-Tech-s-r-l/release-compatibility-cli", tag: "current", asset: "compatibility.json" };
 const withSeq = (n) => JSON.stringify({ ...JSON.parse(compatText), sequence: n });
 
 test("source: the published file is used and cached", async () => {

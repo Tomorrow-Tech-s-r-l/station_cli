@@ -11,7 +11,7 @@ import {
 
 /**
  * `compatibility.json` (format `compatibility/v1`): the minimum versions
- * between firmware, station_cli and the kiosk, computed by release-compat
+ * between firmware, station_cli and the kiosk, computed by release-compatibility-cli
  * from contract runs of the real code against real releases. Nothing in this
  * CLI declares a floor by hand any more; it reads them from this file.
  *
@@ -230,7 +230,7 @@ export interface InstalledComponent {
 
 /**
  * Maps a reported version onto the releases the file knows (the readings of
- * release-compat's lib/check.mjs, pinned by the shared parity cases).
+ * release-compatibility-cli's lib/check.mjs, pinned by the shared parity cases).
  *
  * - An exact tag (this CLI knows its own) is used as is.
  * - A version with a pre-release (`3.2.0-dev`) matches that release only.
@@ -282,7 +282,7 @@ export function stationChannel(channel: "stable" | "beta"): ReleaseChannel {
 }
 
 /**
- * The floor a station of `channel` uses (release-compat's `channelFloor`):
+ * The floor a station of `channel` uses (release-compatibility-cli's `channelFloor`):
  * `requires[Y].channels[channel]`; with no channel, or a file without
  * `channels`, the top level (= the development floor).
  */
@@ -311,7 +311,7 @@ export function cutoverOf(doc: CompatibilityDoc, component: string): string | nu
  * True when `version` of `component` is a LEGACY release: published before
  * the cutover, i.e. before release jobs wrote computed metadata. Missing
  * evidence never breaks a legacy release; it keeps the behaviour it shipped
- * with (release-compat's lib/cutover.mjs `isLegacyVersion`):
+ * with (release-compatibility-cli's lib/cutover.mjs `isLegacyVersion`):
  *
  * - no `enforced_from` in the file: nothing is legacy (the strict rule);
  * - `enforced_from: null`: everything is legacy;
@@ -369,7 +369,7 @@ export interface InstallVerdict {
   notes: string[];
 }
 
-/** release-compat's `reason` for a floor with no compatible version. */
+/** release-compatibility-cli's `reason` for a floor with no compatible version. */
 const NO_FLOOR_WHY: Record<string, string> = {
   newest_failed: "newest tested failed",
   newest_unknown: "newest tested has no result",
@@ -382,7 +382,7 @@ function hasEdge(doc: CompatibilityDoc, a: string, b: string): boolean {
 
 /**
  * "May I install `component@tag` next to what is installed, on a station of
- * `channel`?" — identical in every consumer (release-compat's `compat
+ * `channel`?" — identical in every consumer (release-compatibility-cli's `compat
  * check`, the kiosk, the installer). Every floor below is the one for the
  * installing station's channel (channelFloor).
  *

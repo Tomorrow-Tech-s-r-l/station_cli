@@ -250,7 +250,7 @@ Which firmware, station-cli and kiosk versions work together is not written
 anywhere by hand. Contract suites run the real code of each pair against real
 releases (`firmware_contract.yml` here, `cli_contract.yml` / `pogo_contract.yml`
 in the firmware repositories, `kiosk_cli_contract.yml` in the kiosk), and
-release-compat turns their evidence into `compatibility.json` — the floors of
+release-compatibility-cli turns their evidence into `compatibility.json` — the floors of
 every release towards every other component — published as asset
 `compatibility.json` of its release `current`.
 
@@ -267,13 +267,13 @@ and `channels.development` over both channels (the same as the top level).
 The CLI reads the floors of its update channel (`--channel` / the
 `firmware.channel` config): `stable` = `production`, `beta` = `development`;
 a file without `channels` uses the top level. The JSON's
-`compatibility.channel` says which were read. The rule is release-compat's,
+`compatibility.channel` says which were read. The rule is release-compatibility-cli's,
 pinned by its shared parity cases
 (`tests/fixtures/compat/consumer-parity.json`, a verbatim copy).
 
 **Legacy and enforced releases (the cutover).** Nothing already released
 breaks because it was never tested. Each component in the file has an
-`enforced_from`, computed by release-compat (never typed): the oldest release
+`enforced_from`, computed by release-compatibility-cli (never typed): the oldest release
 published with computed metadata (schema 2, with `computed.run_url`) — `null`
 while there is none, so today every release is **legacy**. For a legacy
 firmware release:
@@ -301,7 +301,7 @@ full rule applies, failing closed. A file without `enforced_from` (written
 before cutovers) is read the strict way, every release enforced.
 
 ```json
-"compat": { "repo": "Tomorrow-Tech-s-r-l/release-compat", "tag": "current", "asset": "compatibility.json" }
+"compat": { "repo": "Tomorrow-Tech-s-r-l/release-compatibility-cli", "tag": "current", "asset": "compatibility.json" }
 ```
 
 (the default; `STATION_CLI_COMPAT_REPO` / `_TAG` / `_ASSET` override it).
@@ -374,7 +374,7 @@ protocol, so the real code runs end to end. CI runs the suite on every build.
 | `fwu_cli.test.js` | The built binary, spawned: refusals and the stdout/stderr contract |
 | `fwu_http.test.js`, `fwu_catalog.test.js`, `fwu_wire_validation.test.js`, `check_workflows.test.js` | Downloads, asset rules, host-side guards, the CI guard |
 | `unit/compat.test.js`, `unit/compat_catalog.test.js` (`npm test`) | SemVer precedence and the tag grammar on the real release lists, compatibility.json validation, the consumer rule, firmware candidate selection, network/cache/bundled fallback |
-| `unit/compat_parity.test.js` (`npm test`) | release-compat's shared consumer-rule cases (per installing channel), and the catalog on the compatibility.json computed from real contract runs |
+| `unit/compat_parity.test.js` (`npm test`) | release-compatibility-cli's shared consumer-rule cases (per installing channel), and the catalog on the compatibility.json computed from real contract runs |
 | `unit/contract_scripts.test.js` (`npm test`) | The CI helpers: contract matrix, evidence verdicts, the release gate, metadata.json floors per channel and carry-forward provenance |
 
 If a golden test fails, the wire protocol changed. Regenerate only when that
@@ -390,7 +390,7 @@ tree docked in it. It checks every command the kiosk app
 uses (`slots`, `status`, `charge`, `initialize-powerbank` with read-back,
 `unlock`, `firmware`, `stats`), plus `pb-firmware`, `pb-link-stats` and the
 testing modes (`--raw`, `--no-retry`, `pb-link-attempts`), down to the values
-in the JSON. The legs are S1TTXX × P1TT2C: every release release-compat
+in the JSON. The legs are S1TTXX × P1TT2C: every release release-compatibility-cli
 lists (`compat resolve`; a dispatch can narrow either axis to the newest N
 per channel with `newest` / `pack_newest`), plus the `development` / `main`
 branches. Old releases too: stations still run them, and floors stay low only
@@ -399,10 +399,10 @@ not tested, never as a failure of this CLI. Every leg
 becomes a `compat-evidence/v1` result (artifact `compat-evidence`; in a
 release run `compat-evidence-unpublished` until the release job has published
 the tag, then re-uploaded as `compat-evidence`); for a release of this CLI the
-release job sends it to release-compat, which recomputes the floors. Only
+release job sends it to release-compatibility-cli, which recomputes the floors. Only
 runs on `main` / `development` (the release, the nightly, a dispatch on those
 refs) publish or report evidence: elsewhere it is `compat-evidence-branch`,
-which release-compat never reads. A pairing
+which release-compatibility-cli never reads. A pairing
 of two releases tested next to a branch build is left out of the evidence.
 The run (and so the release) goes red when a leg dies, or when this CLI fails
 a core check against the newest production S1TTXX and P1TT2C releases tested;

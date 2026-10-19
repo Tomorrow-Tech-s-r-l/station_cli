@@ -1,6 +1,6 @@
 // compatibility.json: SemVer precedence, the tag grammar, validation and the
 // consumer rule (src/compat). Fixtures: tests/fixtures/compat (a document in
-// release-compat's compatibility/v1 shape) and tests/fixtures/releases (the
+// release-compatibility-cli's compatibility/v1 shape) and tests/fixtures/releases (the
 // real release lists of the four repositories). Run with `npm test`.
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -134,7 +134,7 @@ test("validation: any structural error rejects the whole file", () => {
   assert.equal(parseCompatibility("{not json").doc, null);
 });
 
-// A per-channel floor (release-compat's `floor` def).
+// A per-channel floor (release-compatibility-cli's `floor` def).
 function floor(min, extra = {}) {
   return { min, min_tag: min ? `v${min}` : null, no_compatible: min === null, tested: [], failed: [], ...extra };
 }
@@ -149,7 +149,7 @@ test("installed: a bare X.Y.Z can be the release or its dev build", () => {
     ["dev-v3.2.0"]
   );
   // Both builds listed: both interpretations — the update channel does not
-  // say which build a device runs (release-compat's readings).
+  // say which build a device runs (release-compatibility-cli's readings).
   d.components.S1TTXX.releases["v3.2.0"] = { version: "3.2.0", channel: "production", requires: {} };
   assert.deepEqual(
     interpretInstalled(d, "S1TTXX", "3.2.0", "board 0").interpretations.map((i) => i.tag).sort(),

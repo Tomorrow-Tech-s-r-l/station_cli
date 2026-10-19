@@ -372,7 +372,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: release-compat available?
+      - name: release-compatibility-cli available?
         id: compat
         env:
           COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
@@ -388,14 +388,14 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.compat.outputs.ok == 'true'
         with:
-          repository: Tomorrow-Tech-s-r-l/release-compat
+          repository: Tomorrow-Tech-s-r-l/release-compatibility-cli
           ref: ${{ vars.COMPAT_REF }}
-          path: release-compat
+          path: release-compatibility-cli
           token: ${{ secrets.COMPAT_TOKEN }}
 
       # metadata.json, schema 2, computed — never declared. The floors come
       # from this run's contract evidence (fw-contract → artifact
-      # compat-evidence-unpublished) through release-compat (`compat floor`),
+      # compat-evidence-unpublished) through release-compatibility-cli (`compat floor`),
       # and for what this run did not test (the kiosk) from the published
       # compatibility.json (`compat metadata`). The legacy
       # min_kiosk_app_version, which kiosks in the field read, uses the floor
@@ -470,7 +470,7 @@ jobs:
             ev_args=()
             if [ -f "$EVIDENCE" ]; then
               ev_args=(--evidence "$EVIDENCE")
-              if node release-compat/bin/compat.mjs floor --evidence "$EVIDENCE" --component station_cli --tag "$TAG" > "$W/floor.json"; then
+              if node release-compatibility-cli/bin/compat.mjs floor --evidence "$EVIDENCE" --component station_cli --tag "$TAG" > "$W/floor.json"; then
                 args+=(--floor "$W/floor.json")
               else
                 echo "::warning::compat floor failed — metadata.json carries no computed floors"
@@ -482,8 +482,8 @@ jobs:
             # what this run did not test, and the carry source of a legacy
             # field with no evidence for this tag.
             mkdir -p "$W/compat"
-            if node release-compat/bin/compat.mjs fetch --out "$W/compat/compatibility.json" \
-              && node release-compat/bin/compat.mjs metadata --component station_cli --tag "$TAG" \
+            if node release-compatibility-cli/bin/compat.mjs fetch --out "$W/compat/compatibility.json" \
+              && node release-compatibility-cli/bin/compat.mjs metadata --component station_cli --tag "$TAG" \
                    --compat "$W/compat/compatibility.json" --carry-compat "$W/compat/compatibility.json" \
                    "${ev_args[@]}" "${prev_args[@]}" --out "$W/base.json"; then
               args+=(--base "$W/base.json")
@@ -536,10 +536,10 @@ jobs:
           tag_name: ${{ needs.build.outputs.is_development == 'true' && format('dev-v{0}', needs.build.outputs.version) || format('v{0}', needs.build.outputs.version) }}
 
       # The release exists now, so the contract evidence of this run can move
-      # floors: publish it under the name release-compat ingests, and hand it
+      # floors: publish it under the name release-compatibility-cli ingests, and hand it
       # over, so compatibility.json is recomputed. Only from main /
       # development (the only branches this workflow runs on; guarded anyway,
-      # as release-compat trusts nothing else).
+      # as release-compatibility-cli trusts nothing else).
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
         with:
@@ -548,15 +548,15 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Report the contract evidence to release-compat
+      - name: Report the contract evidence to release-compatibility-cli
         if: steps.compat.outputs.ok == 'true' && hashFiles('compat-evidence-unpublished/evidence.json') != '' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         env:
           GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
         run: |
-          gh api repos/Tomorrow-Tech-s-r-l/release-compat/dispatches -f event_type=compat-evidence \
+          gh api repos/Tomorrow-Tech-s-r-l/release-compatibility-cli/dispatches -f event_type=compat-evidence \
             -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[run_id]=$GITHUB_RUN_ID" \
-            && echo "::notice::evidence of run $GITHUB_RUN_ID sent to release-compat" \
-            || echo "::warning::could not notify release-compat (COMPAT_TOKEN needs contents:write there); dispatch firmware_contract.yml with cli_tag to report it again"
+            && echo "::notice::evidence of run $GITHUB_RUN_ID sent to release-compatibility-cli" \
+            || echo "::warning::could not notify release-compatibility-cli (COMPAT_TOKEN needs contents:write there); dispatch firmware_contract.yml with cli_tag to report it again"
 
       # The other direction: S1TTXX-firmware re-runs its station-cli contract
       # with the executable just published, on its development and main.

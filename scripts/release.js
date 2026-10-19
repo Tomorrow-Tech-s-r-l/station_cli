@@ -26,7 +26,7 @@
  * Compatibility is not decided here. Which kiosks and firmware this CLI works
  * with is computed by CI from contract runs against the real releases
  * (firmware_contract.yml here, kiosk_cli_contract.yml in the kiosk repo) and
- * published by release-compat as compatibility.json; the release job writes
+ * published by release-compatibility-cli as compatibility.json; the release job writes
  * this release's metadata.json from it. Nothing to declare, nothing to scrape.
  *
  * Requires Node >= 18. No extra npm dependencies — Node built-ins only.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Turns firmware-contract leg reports into `compat-evidence/v1`, the format
- * release-compat computes floors from.
+ * release-compatibility-cli computes floors from.
  *
  *   node scripts/contract-evidence.js leg --out <result.json>
  *       [--report <leg.json>] [--skipped <reason>]
@@ -32,7 +32,7 @@
  *
  * A side that is a branch build has `tag: null`: such a result gates CI but
  * never moves a floor. It always carries a `ref` (the commit, else the branch
- * the leg named): release-compat rejects a whole evidence file over one side
+ * the leg named): release-compatibility-cli rejects a whole evidence file over one side
  * that has neither. A pairing of two releases tested with a branch build as
  * the third component is not emitted at all — its verdict would move a
  * release floor on unreleased code (the harness table still reports it).

@@ -3,7 +3,7 @@
  * Completes this release's metadata.json (schema 2) in the release job.
  *
  *   node scripts/release-metadata.js --tag <tag> --version <X.Y.Z> --out metadata.json
- *       [--base <file>]          what `compat metadata` wrote (release-compat), if it ran
+ *       [--base <file>]          what `compat metadata` wrote (release-compatibility-cli), if it ran
  *       [--floor <file>]         what `compat floor` printed for this tag, if it ran
  *       [--previous <file>]      the previous release's published metadata.json, if any
  *       [--published <file> [--published-tag <tag>]]
@@ -18,7 +18,7 @@
  *
  * Nothing here is a floor written by hand. The values come from, in order:
  *   - the contract evidence of this run (`--floor`, computed by
- *     release-compat): it wins over `--base` for every component it covers,
+ *     release-compatibility-cli): it wins over `--base` for every component it covers,
  *     because the published compatibility.json cannot have seen this run yet
  *     (for a tag that is published again it holds the previous build's);
  *   - the published compatibility.json (`--base`) for the rest (the kiosk
@@ -51,7 +51,7 @@
  * line in the job summary. Without proof: the published value is kept,
  * `computed.legacy_clamped`. Lower is always fine (older kiosks only get
  * more lenient; the consumer rule still guards new ones).
- * These are release-compat's legacy rules (lib/metadata.mjs).
+ * These are release-compatibility-cli's legacy rules (lib/metadata.mjs).
  *
  * Legacy keys (read by kiosks already in the field): `cli_version`,
  * `min_kiosk_app_version`.
@@ -107,7 +107,7 @@ function channelOf(tag) {
 }
 
 /**
- * The floor a station of `channel` uses (release-compat's channelFloor):
+ * The floor a station of `channel` uses (release-compatibility-cli's channelFloor):
  * `channels[channel]`, else the top level (files from before the split).
  */
 function channelFloor(req, channel) {
@@ -144,7 +144,7 @@ function describeSource(s) {
 /**
  * Where the previous release's legacy `field` was computed, {tag, run_url}
  * (or the compatibility.json entry it was carried from), or null when it has
- * no provenance and may not be carried (release-compat's computedSource).
+ * no provenance and may not be carried (release-compatibility-cli's computedSource).
  */
 function computedSource(previous, field) {
   const c = previous && previous.computed;
@@ -167,7 +167,7 @@ function cmpCore(a, b) {
 }
 
 /**
- * Never break deployed binaries (release-compat's clampToPublished): `value`
+ * Never break deployed binaries (release-compatibility-cli's clampToPublished): `value`
  * for a legacy floor against what the newest earlier release published.
  * `failed`: tags of the dependency that FAILED in the floor behind the value.
  * @returns {{value: string, raised?: object, clamped?: object}}

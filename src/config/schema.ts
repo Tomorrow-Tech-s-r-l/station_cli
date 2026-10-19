@@ -139,9 +139,9 @@ export function defaultConfig(): StationCliConfig {
   };
 }
 
-/** The published compatibility.json every component reads (release-compat's `current`). */
+/** The published compatibility.json every component reads (release-compatibility-cli's `current`). */
 export const DEFAULT_COMPAT_SOURCE: Readonly<CompatSourceConfig> = Object.freeze({
-  repo: "Tomorrow-Tech-s-r-l/release-compat",
+  repo: "Tomorrow-Tech-s-r-l/release-compatibility-cli",
   tag: "current",
   asset: "compatibility.json",
 });

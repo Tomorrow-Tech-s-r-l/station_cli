@@ -10,24 +10,24 @@ name: Firmware contract
 # same harness the other way round (its cli_contract.yml).
 #
 # Which firmware is tested is not written here: every release of S1TTXX and
-# of P1TT2C that release-compat lists (`compat resolve`; a dispatch may
+# of P1TT2C that release-compatibility-cli lists (`compat resolve`; a dispatch may
 # narrow it to the newest N per channel with `compat targets`), and the legs
 # are those × the development and main branches, for S1TTXX × P1TT2C. Every
 # release, not only the newest: stations still run old firmware, and a floor
 # only stays low over releases that were actually tested (an old tree the
 # harness cannot build is reported as not tested, never as a failure). Every leg's result goes into
-# `compat-evidence/v1` (artifact `compat-evidence`), from which release-compat
+# `compat-evidence/v1` (artifact `compat-evidence`), from which release-compatibility-cli
 # computes the floors in compatibility.json and in this CLI's metadata.json.
 # A branch build on any side never moves a floor, and only runs on main /
 # development (build.yml's call, the nightly, a dispatch on those refs) upload
-# `compat-evidence` or report to release-compat: anywhere else the same file
+# `compat-evidence` or report to release-compatibility-cli: anywhere else the same file
 # is `compat-evidence-branch`, which nothing ingests.
 #
 # The run goes red when a leg could not run, or when this CLI fails a core
 # check against the newest production S1TTXX and P1TT2C releases tested —
 # what stations run. Any other failing pair (an old or a development
 # release) is a fact for the floors, not a broken build: it is in the table
-# and in the evidence, and release-compat keeps stations from installing
+# and in the evidence, and release-compatibility-cli keeps stations from installing
 # the pair.
 #
 # When:
@@ -38,7 +38,7 @@ name: Firmware contract
 #   - nightly, so a firmware change that breaks this CLI is reported on a day
 #     nothing is pushed here;
 #   - on request (cli_tag: a published release of this CLI, whose evidence is
-#     then sent to release-compat when dispatched on main or development).
+#     then sent to release-compatibility-cli when dispatched on main or development).
 #
 # Without COMPAT_TOKEN / vars.COMPAT_REF it falls back to the legacy legs
 # (development, main, newest release, newest dev release) with the P1TT2C
@@ -101,7 +101,7 @@ permissions:
 env:
   FW_REPO: Tomorrow-Tech-s-r-l/S1TTXX-firmware
   PACK_REPO: Tomorrow-Tech-s-r-l/P1TT2C-firmware
-  COMPAT_REPO: Tomorrow-Tech-s-r-l/release-compat
+  COMPAT_REPO: Tomorrow-Tech-s-r-l/release-compatibility-cli
   # The harness is versioned with the firmware; development has the newest
   # checks. An old firmware tree it cannot build is reported as not tested.
   HARNESS_REF: ${{ vars.CONTRACT_HARNESS_REF || 'development' }}
@@ -123,7 +123,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: release-compat available?
+      - name: release-compatibility-cli available?
         id: compat
         env:
           COMPAT_TOKEN: ${{ secrets.COMPAT_TOKEN }}
@@ -143,7 +143,7 @@ jobs:
         with:
           repository: ${{ env.COMPAT_REPO }}
           ref: ${{ vars.COMPAT_REF }}
-          path: release-compat
+          path: release-compatibility-cli
           token: ${{ secrets.COMPAT_TOKEN }}
 
       - name: Matrix
@@ -160,9 +160,9 @@ jobs:
           # Every release of the component (empty), or the newest N per channel.
           releases() {
             if [ -z "$2" ]; then
-              node release-compat/bin/compat.mjs resolve --component "$1"
+              node release-compatibility-cli/bin/compat.mjs resolve --component "$1"
             else
-              node release-compat/bin/compat.mjs targets --component "$1" --newest "$2"
+              node release-compatibility-cli/bin/compat.mjs targets --component "$1" --newest "$2"
             fi
           }
           args=()
@@ -252,7 +252,7 @@ jobs:
           else
             case "$FW" in
               main|development) ref="$FW"; label="$FW" ;;
-              # legacy selectors (no release-compat) and tags from fw_refs
+              # legacy selectors (no release-compatibility-cli) and tags from fw_refs
               *) ref=$(node harness/tests/cli_contract/release.js tag "$FW_REPO" "$FW")
                  tag="$ref"; label="$FW $ref"
                  [ -n "$ref" ] || skip="no firmware $FW release" ;;
@@ -483,7 +483,7 @@ jobs:
             --suite cli_contract --suite-repo "$GITHUB_REPOSITORY" --suite-ref "$GITHUB_SHA" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-      # Named as release-compat downloads it (`gh run download -n compat-evidence`;
+      # Named as release-compatibility-cli downloads it (`gh run download -n compat-evidence`;
       # its nightly sweep ingests every such artifact of main / development).
       # A build.yml run labels the CLI with the tag it is about to be
       # released as: until the release job has published that tag from this
@@ -500,10 +500,10 @@ jobs:
           path: evidence/evidence.json
           retention-days: 30
 
-      # A published CLI release was tested: hand the evidence to release-compat
+      # A published CLI release was tested: hand the evidence to release-compatibility-cli
       # — from main / development only, as above. (build.yml does this for a
       # new release, once it is published.)
-      - name: Report the evidence to release-compat
+      - name: Report the evidence to release-compatibility-cli
         if: >-
           github.event_name == 'workflow_dispatch' && inputs.cli_tag != '' && needs.targets.outputs.compat == 'true' &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')

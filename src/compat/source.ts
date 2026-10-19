@@ -16,7 +16,7 @@ import { CompatibilityDoc, parseCompatibility } from "./compatibility";
  *   4. nothing — and then no firmware is installed from GitHub (fail closed).
  *
  * A copy with a lower `sequence` than another valid one is never preferred:
- * release-compat numbers its publications monotonically, so a lower number is
+ * release-compatibility-cli numbers its publications monotonically, so a lower number is
  * a stale read, not a correction.
  */
 

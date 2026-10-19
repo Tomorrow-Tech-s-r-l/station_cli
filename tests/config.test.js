@@ -56,7 +56,7 @@ test("built-in defaults carry no deployment knowledge", () => {
   for (const word of ["amperry", "tomorrow", "github.com"]) {
     assert.ok(!text.includes(word), `defaults must not mention "${word}"`);
   }
-  assert.deepEqual(compat, { repo: "Tomorrow-Tech-s-r-l/release-compat", tag: "current", asset: "compatibility.json" });
+  assert.deepEqual(compat, { repo: "Tomorrow-Tech-s-r-l/release-compatibility-cli", tag: "current", asset: "compatibility.json" });
 });
 
 test("defaults are conservative", () => {

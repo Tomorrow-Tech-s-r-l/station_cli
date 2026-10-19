@@ -76,7 +76,7 @@ export interface EngineOptions {
   online: boolean;
   sources: Partial<Record<TargetKind, FirmwareSourceConfig>>;
   token: Secret | null;
-  /** Where compatibility.json is published. Default: release-compat's `current`. */
+  /** Where compatibility.json is published. Default: release-compatibility-cli's `current`. */
   compat?: CompatSourceConfig;
   /** Last good compatibility.json. Default: `<cacheDir>/compatibility.json`. */
   compatCacheFile?: string;

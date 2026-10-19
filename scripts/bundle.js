@@ -4,7 +4,7 @@
  * `pkg.assets`) and src/utils/build_info.ts reads at run time:
  *
  *   bundle/build-info.json     {"tag", "commit"} of the release being built
- *   bundle/compatibility.json  release-compat's published compatibility.json,
+ *   bundle/compatibility.json  release-compatibility-cli's published compatibility.json,
  *                              the copy the CLI falls back to when it can
  *                              neither download nor find a cached one
  *
@@ -15,7 +15,7 @@
  * then needs the network or its cache to install firmware (it fails closed).
  * A downloaded file that is not `compatibility/v1` is refused.
  *
- * Env: COMPAT_TOKEN, COMPAT_REPO (default Tomorrow-Tech-s-r-l/release-compat),
+ * Env: COMPAT_TOKEN, COMPAT_REPO (default Tomorrow-Tech-s-r-l/release-compatibility-cli),
  * COMPAT_RELEASE (default current), COMPAT_ASSET (default compatibility.json).
  */
 
@@ -42,7 +42,7 @@ async function get(url, token, accept) {
 }
 
 async function fetchCompatibility(token) {
-  const repo = process.env.COMPAT_REPO || "Tomorrow-Tech-s-r-l/release-compat";
+  const repo = process.env.COMPAT_REPO || "Tomorrow-Tech-s-r-l/release-compatibility-cli";
   const release = process.env.COMPAT_RELEASE || "current";
   const assetName = process.env.COMPAT_ASSET || "compatibility.json";
   const rel = await (await get(`${API}/repos/${repo}/releases/tags/${encodeURIComponent(release)}`, token, "application/vnd.github+json")).json();
