@@ -398,7 +398,8 @@ over releases actually tested; a tree the harness cannot build is reported as
 not tested, never as a failure of this CLI. Every leg
 becomes a `compat-evidence/v1` result (artifact `compat-evidence`; in a
 release run `compat-evidence-unpublished` until the release job has published
-the tag, then re-uploaded as `compat-evidence`); for a release of this CLI the
+the tag, then re-uploaded as `compat-evidence`; a run that publishes nothing,
+its dev tag already existing, tests its commit untagged and never re-uploads it); for a release of this CLI the
 release job sends it to release-compatibility-cli, which recomputes the floors. Only
 runs on `main` / `development` (the release, the nightly, a dispatch on those
 refs) publish or report evidence: elsewhere it is `compat-evidence-branch`,
@@ -429,6 +430,21 @@ cover the pair within a day. Locally, from an S1TTXX-firmware checkout:
 tests/cli_contract/run.sh ../station_cli                # this checkout, built
 tests/cli_contract/run.sh ./station-cli-linux-x64       # a release executable
 ```
+
+## Releases
+
+Every push to `main` / `development` builds, tests and gates the executables
+(`build.yml`); the release job then publishes `vX.Y.Z` from `main`, or the
+prerelease `dev-vX.Y.Z` from `development`, at the `package.json` version
+(`npm run release` bumps it). A dev release is published **once per
+version**: when `dev-vX.Y.Z` already exists, the run still builds and runs
+every gate, but changes nothing — no assets, no `metadata.json`, no evidence
+under that tag — and ends with a notice to bump the version. Publishing it
+again would put new binaries under the old tag, and release-compatibility-cli
+drops the evidence recorded against the old ones, so stations would stop
+updating to it until the nightly contract runs re-test it. To replace a dev
+release on purpose, run *Build and Release* on `development` with
+`force_republish`.
 
 ## Documentation
 

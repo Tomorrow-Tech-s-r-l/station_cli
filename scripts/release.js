@@ -334,12 +334,19 @@ async function main() {
         [localExists ? "locally" : null, remoteExists ? "on origin" : null]
           .filter(Boolean).join(" and ");
       fail(`Tag ${c.bold(expectedTag)} already exists ${where}.`);
-      fail("Re-pushing would re-publish over an existing release. Bump the version instead.");
-      if (!confirm("Proceed anyway? (overwrites the existing release)")) {
+      // build.yml publishes a dev release once per version (force_republish
+      // replaces it on purpose); main re-publishes over it.
+      const dev = targetBranch === "development";
+      fail(dev
+        ? "CI builds and tests it but publishes nothing over an existing dev release. Bump the version instead."
+        : "Re-pushing would re-publish over an existing release. Bump the version instead.");
+      if (!confirm(dev ? "Proceed anyway? (no new dev release)" : "Proceed anyway? (overwrites the existing release)")) {
         fail("Aborted.");
         process.exit(1);
       }
-      warn(`Proceeding — the existing ${expectedTag} release will be overwritten by CI.`);
+      warn(dev
+        ? `Proceeding — ${expectedTag} stays as it is (run build.yml with force_republish to replace it).`
+        : `Proceeding — the existing ${expectedTag} release will be overwritten by CI.`);
     } else {
       ok(`Tag ${c.bold(expectedTag)} is available.`);
     }
