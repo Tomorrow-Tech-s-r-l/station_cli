@@ -24,14 +24,19 @@ const CMD_SLOTS = 0x05;
 const CMD_PB_FW_VER = 0x0a;
 const CMD_GET_FW_VER = 0x50;
 const STATUS_OK = 0x00;
+const STATUS_TIMEOUT = 0x01;
 const STATUS_ERR_INTERNAL = 0x04;
 
 const unpack = (w) => `${(w >>> 16) & 0xff}.${(w >>> 8) & 0xff}.${w & 0xff}`;
 
 class FakeStation {
   /**
-   * @param {object} spec  { boards: { [addr]: { version, dead?, faults?, slots: [pack|null ×6] } } }
-   *   pack = { id, version, level, locked?=true, faults?, reportsVersion? }
+   * @param {object} spec  { boards: { [addr]: { version, dead?, silent?, faults?, slots: [pack|null ×6] } } }
+   *   pack = { id, version, level, locked?=true, faults?, reportsVersion?, linkDead? }
+   *   dead      the board answers every frame with an error status
+   *   silent    the board never answers: every frame times out (transport throws)
+   *   linkDead  nothing comes back over the pogo link: the board answers every
+   *             request for this pack with STATUS_TIMEOUT (0x01)
    */
   constructor(spec, hooks = {}) {
     this.hooks = hooks;
@@ -43,6 +48,7 @@ class FakeStation {
       this.boards.set(boardAddress, {
         version: b.version,
         dead: b.dead === true,
+        silent: b.silent === true,
         device: new FakeBootloaderDevice({ kind: "station", boardAddress, faults: b.faults ?? {} }),
         slots: (b.slots ?? []).map((p, slotInBoard) => this.#makePack(boardAddress, slotInBoard, p)),
       });
@@ -84,7 +90,15 @@ class FakeStation {
       Buffer.concat([Buffer.from([boardAddress, command, status]), payload]);
 
     const board = this.boards.get(boardAddress);
+    if (board?.silent) throw new Error("Request timeout - no response received");
     if (!board || board.dead) return reply(STATUS_ERR_INTERNAL);
+
+    // Pack-routed opcodes for a pack that never answers on the pogo link.
+    const PACK_ROUTED = [CMD_STATUS, CMD_PB_FW_VER];
+    if (PACK_ROUTED.includes(command) || (command >= 0x10 && command <= 0x16)) {
+      const target = board.slots[data[0]];
+      if (target?.linkDead && board.device.mode !== "bl") return reply(STATUS_TIMEOUT);
+    }
 
     // Station FWU opcodes are answered by the board's own bootloader.
     if (command >= 0x60 && command <= 0x66) return board.device.sendMessage(message);
@@ -146,6 +160,16 @@ class FakeStation {
       }
     }
     return reply(0x02);
+  }
+
+  /** Count of frames with opcode `cmd` sent to one board (and slot, for pack-routed ones). */
+  framesOf(cmd, boardAddress, slotInBoard = null) {
+    return this.log.filter(
+      (e) =>
+        e.cmd === cmd &&
+        e.board === boardAddress &&
+        (slotInBoard === null || parseInt(e.data.slice(0, 2), 16) === slotInBoard)
+    ).length;
   }
 
   /** Count of FWU frames sent to one device class, for "was it touched?" asserts. */

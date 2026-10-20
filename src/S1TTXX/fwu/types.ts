@@ -73,6 +73,15 @@ export interface SlotCondition {
   lowVoltage: boolean;
   /** Pack serial, when known. */
   powerbankId: string | null;
+  /**
+   * False when the pack's STATUS (charge, low-voltage flag, serial) was not
+   * read because the plan did not need it: the pack could not be flashed this
+   * run anyway (already up to date, or past the per-run cap). The fields it
+   * fills are then unknown, not measured. Absent means it was read. A pack is
+   * never flashed on an unread charge: the plan reads it first, and the
+   * engine re-reads it immediately before the flash regardless.
+   */
+  chargeRead?: boolean;
 }
 
 /** A firmware build available for download. */
@@ -195,6 +204,17 @@ export interface ApplyItemResult {
    * one this CLI speaks. Present once a HELLO was answered.
    */
   bootloaderProtocol?: { reported: string; host: string; mismatch: boolean };
+  /**
+   * Why each failed attempt failed, in order — `error` above only holds the
+   * last one. Present when at least one attempt failed.
+   */
+  attemptErrors?: { attempt: number; stage: string; code?: number; message: string }[];
+  /**
+   * DATA chunks re-sent after the link lost them, or resynced on the
+   * bootloader's OFFSET_MISMATCH, over every attempt that got an answer.
+   * Present when non-zero.
+   */
+  chunkRetries?: number;
 }
 
 /** Per-target failure bookkeeping, persisted between runs. */

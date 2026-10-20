@@ -61,6 +61,13 @@ export interface FwuDataInfo {
   nextExpectedOffset: number;
 }
 
+/**
+ * A DATA request the host refused to send (a chunk the bootloader would
+ * reject or mis-program). A bug in the caller, never a link fault: the
+ * session never re-sends after it.
+ */
+export class FwuChunkError extends Error {}
+
 export interface FwuBeginParams {
   imgSize: number;
   imgCrc32: number;
@@ -154,12 +161,12 @@ export class FwuWire extends BaseCommand {
   async data(params: FwuDataParams): Promise<CommandResponse & { info?: FwuDataInfo }> {
     const name = this.target.dataCommandName;
     if (params.bytes.length > FWU_MAX_CHUNK) {
-      throw new Error(
+      throw new FwuChunkError(
         `${name} chunk too large: ${params.bytes.length} > ${FWU_MAX_CHUNK} (FWU_MAX_CHUNK)`
       );
     }
     if ((params.bytes.length & 1) === 1 && params.isFinal !== true) {
-      throw new Error(
+      throw new FwuChunkError(
         `${name} non-final chunk must be even-length (got ${params.bytes.length}); ` +
           `set isFinal=true on the last chunk only`
       );

@@ -180,3 +180,23 @@ test("dir: a missing folder is a warning, not a crash", async () => {
   assert.equal(await resolveCandidate("interface", o), null);
   assert.ok(o.warnings[0].startsWith("Cannot read firmware folder /nonexistent/fwu-dir"));
 });
+
+test("a release listing already fetched this run is reused, not fetched again", async () => {
+  const warnings = [];
+  const cache = new Map([["acme/pack", [{ tag_name: "v3.0.4", assets: [{ name: "P1TT2C-firmware-3.0.4.bin", url: "u" }] }]]]);
+  const r = await resolveCandidate("powerbank", {
+    channel: "stable",
+    sources: { powerbank: { provider: "github", repo: "Acme/Pack" } },
+    token: null,
+    cliVersion: [0, 4, 0],
+    cacheDir: os.tmpdir(),
+    cacheKeepPerKind: 2,
+    warnings,
+    releaseCache: cache,
+  });
+  // No compatibility data: fail closed — but from the cached listing. A
+  // network fetch would have warned "Cannot list releases".
+  assert.equal(r, null);
+  assert.ok(warnings.every((w) => !/Cannot list releases/.test(w)), warnings.join("\n"));
+  assert.ok(warnings.some((w) => /no compatibility data/.test(w)));
+});

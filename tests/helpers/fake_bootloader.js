@@ -29,13 +29,27 @@
  *   noValidApp        the application header is invalid (an earlier flash was
  *                     interrupted), so the device cannot leave its bootloader
  *                     until a new image is written
+ *
+ * Link faults on DATA, counted over every DATA frame that reaches the fake
+ * (`dataFrames`, 1-based), each a list of frame numbers:
+ *   lostRequestAt     the frame is lost on its way: nothing is written and the
+ *                     transport throws (SerialService's 5 s timeout)
+ *   lostReplyAt       the chunk IS written, but its reply is lost: the
+ *                     transport throws, and a re-send of the same offset is
+ *                     answered OFFSET_MISMATCH (what both bootloaders do)
+ *   linkTimeoutAt     the board's own pogo retries got no answer from the
+ *                     pack: status 0x01, with stack garbage where
+ *                     next_expected_offset goes (S1TTXX host_protocol.c)
+ *   silentFromData    from this frame on, the device never answers again
  */
 
 const STATUS_OK = 0x00;
 const STATUS_ERR_INVALID_CMD = 0x02;
 const STATUS_ERR_INVALID_ARGS = 0x03;
 const STATUS_ERR_INTERNAL = 0x04;
+const STATUS_LINK_TIMEOUT = 0x01;
 const STATUS_OFFSET_MISMATCH = 0x10;
+const STATUS_NO_SESSION = 0x13;
 
 /** Opcode base per device class; the step order is identical for both. */
 const OPCODE_BASE = { station: 0x60, powerbank: 0x10 };
@@ -69,6 +83,7 @@ class FakeBootloaderDevice {
     this.appValid = !this.faults.noValidApp;
     this.session = null;
     this.dataCalls = 0;
+    this.dataFrames = 0;
     this.headerVersion = null;
     this.transcript = [];
   }
@@ -81,6 +96,8 @@ class FakeBootloaderDevice {
       cmd: `0x${message.command.toString(16).padStart(2, "0")}`,
       data: data.toString("hex"),
     });
+
+    if (this.silent) throw new Error("Request timeout - no response received");
 
     const base = OPCODE_BASE[this.kind];
     const step = message.command - base;
@@ -144,6 +161,17 @@ class FakeBootloaderDevice {
       }
 
       case STEP.DATA: {
+        this.dataFrames++;
+        const at = (list) => Array.isArray(list) && list.includes(this.dataFrames);
+        if (this.faults.silentFromData && this.dataFrames >= this.faults.silentFromData) {
+          this.silent = true;
+        }
+        if (this.silent || at(this.faults.lostRequestAt)) {
+          throw new Error("Request timeout - no response received");
+        }
+        if (at(this.faults.linkTimeoutAt)) {
+          return reply(STATUS_LINK_TIMEOUT, Buffer.from([0xef, 0xbe, 0xad, 0xde]));
+        }
         if (this.faults.powerLossAt && this.dataCalls + 1 === this.faults.powerLossAt) {
           this.dataCalls++;
           delete this.faults.powerLossAt; // one-shot: the next power-up is healthy
@@ -153,6 +181,8 @@ class FakeBootloaderDevice {
           throw new Error("Request timeout - no response received");
         }
         const s = this.session;
+        // A bootloader with no open session (it reset since BEGIN) says so.
+        if (this.mode === "bl" && !s) return reply(STATUS_NO_SESSION, Buffer.alloc(4));
         if (this.mode !== "bl" || !s || body.length < 5) return reply(STATUS_ERR_INVALID_ARGS);
         this.dataCalls++;
         const offset = body.readUInt32LE(0);
@@ -176,6 +206,7 @@ class FakeBootloaderDevice {
         bytes.copy(s.image, offset);
         s.next += len;
         s.lastChunk = len;
+        if (at(this.faults.lostReplyAt)) throw new Error("Request timeout - no response received");
         return offsetReply(STATUS_OK, s.next);
       }
 

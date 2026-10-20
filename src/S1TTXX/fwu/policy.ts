@@ -91,6 +91,15 @@ export interface PlanInput {
    * fix is configuration rather than a missing release. Omitted means configured.
    */
   sourceConfigured?: Partial<Record<TargetKind, boolean>>;
+  /**
+   * Filled with the slot index of every pack that would be flashed within the
+   * per-run cap but whose charge was not read (`slot.chargeRead === false`).
+   * Such a pack is not planned for an update: it is reported BATTERY_UNKNOWN
+   * and holds its place in the budget, so the caller reads its charge and
+   * plans again. Packs past the cap are never listed — their charge is not
+   * needed to know they will not be flashed this run.
+   */
+  chargeNeeded?: number[];
 }
 
 /** A gate verdict: why a device must not be flashed, or null to proceed. */
@@ -120,6 +129,13 @@ export function slotGateVerdict(
     // would drop the link between BEGIN and END and leave the pack's app
     // header erased — i.e. a pack that only boots to its bootloader.
     return { reason: "SLOT_UNLOCKED", detail: "slot is not retaining the pack (mid-eject?)" };
+  }
+  if (slot.chargeRead === false) {
+    // Plan only: the charge was not read because this pack was not going to
+    // be flashed this run. buildPlan never lets such a pack update (it asks
+    // for the read instead, see `chargeNeeded`), and the check immediately
+    // before a flash always works on a fresh reading, where this is unset.
+    return null;
   }
   if (slot.lowVoltage) {
     return { reason: "LOW_VOLTAGE", detail: "pack reports a low-voltage condition" };
@@ -184,6 +200,14 @@ export function buildPlan(input: PlanInput): UpdatePlan {
         item.detail = `run capped at ${gates.maxTargets} target(s)`;
       } else {
         budget -= 1;
+        if (installed.kind === "powerbank" && installed.slot?.chargeRead === false) {
+          // Would be flashed, but its charge is unknown: never plan that.
+          input.chargeNeeded?.push(installed.slotIndex as number);
+          item.update = false;
+          item.skipReason = "BATTERY_UNKNOWN";
+          item.detail = "state of charge not read yet";
+          delete item.recovery;
+        }
       }
     }
     items.push(item);
@@ -216,6 +240,15 @@ export function summarizeItems(items: PlanItem[]): UpdatePlan["summary"] {
     interfaceToUpdate: toUpdate.filter((i) => i.target.kind === "interface").length,
     powerbankToUpdate: toUpdate.filter((i) => i.target.kind === "powerbank").length,
   };
+}
+
+/**
+ * The verdict for one target on its own — every gate except the per-run cap,
+ * which only buildPlan can apply. Used by the engine to re-plan a pack when
+ * the release it was planned for can no longer be installed.
+ */
+export function evaluateTarget(installed: InstalledTarget, input: PlanInput): PlanItem {
+  return evaluate(installed, input, input.gates, input.state);
 }
 
 /** Applies every gate to one target, in order of increasing cost to evaluate. */

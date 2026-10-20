@@ -33,6 +33,7 @@ import {
   Inventory,
   InventoryFilter,
   readInterfaceVersion,
+  readPackCharge,
   readPowerbankCondition,
 } from "./inventory";
 import {
@@ -40,6 +41,7 @@ import {
   PolicyGates,
   buildPlan,
   emptyState,
+  evaluateTarget,
   recordFailure,
   recordSuccess,
   slotGateVerdict,
@@ -107,6 +109,8 @@ export interface EngineOptions {
   catalog?: CatalogPort;
   /** Wait after a device resets into its new application. Default 1500 ms. */
   postFlashSettleMs?: number;
+  /** Waits before re-sending a DATA chunk the link lost (see session.ts). Tests pass zeros. */
+  dataResendBackoffMs?: readonly number[];
   /**
    * True when this process holds the firmware lock. Only then may state be
    * repaired (an interrupted flash recorded as a failure); without it another
@@ -237,7 +241,12 @@ export async function runEngine(
     }
   }
 
-  const inventory = await collectInventory(service, opts.filter);
+  // fw-plan / fw-apply read a pack's charge only when the plan may flash it
+  // (see buildPlan's chargeNeeded): on a full cabinet capped at a few targets
+  // a run otherwise spends most of its planning on STATUS reads it never uses.
+  // fw-status reports the whole station, so it still reads every pack.
+  const deferPackCharge = opts.online;
+  const inventory = await collectInventory(service, { ...opts.filter, deferPackCharge });
   for (const w of inventory.warnings) warn(w);
 
   // --- Catalog ------------------------------------------------------------
@@ -252,6 +261,7 @@ export async function runEngine(
     cacheDir: opts.cacheDir,
     cacheKeepPerKind: opts.cacheKeepPerKind,
     warnings: catalogWarnings,
+    releaseCache: new Map(),
   };
 
   for (const kind of opts.gates.kinds) sourceConfigured[kind] = !!opts.sources[kind];
@@ -263,6 +273,8 @@ export async function runEngine(
   // catalog (tests) brings its own release selection, and gets compatibility
   // data only when a loader is injected with it.
   let compat: CompatLoad | null = null;
+  let boardVersions: InstalledTarget[] = inventory.interfaces;
+  let packVersions: InstalledTarget[] = inventory.powerbanks;
   const needsCompat =
     opts.online &&
     (!opts.catalog || !!opts.compatLoader) &&
@@ -273,13 +285,13 @@ export async function runEngine(
     if (compat.doc) {
       // Pack images are judged against the boards they sit in; a run limited
       // to powerbanks has not read those yet.
-      const boardVersions =
+      boardVersions =
         inventory.interfaces.length || !opts.gates.kinds.includes("powerbank")
           ? inventory.interfaces
           : await readBoardsOfPacks(service, inventory.powerbanks);
       // And board images against every pack docked in them: a run limited
       // to interfaces, or to some slots, has not read all of those.
-      const packVersions =
+      packVersions =
         opts.gates.kinds.includes("interface") && (opts.filter.skipPowerbanks || !!opts.filter.slots?.length)
           ? await readDockedPacks(service, opts.filter, catalogWarnings)
           : inventory.powerbanks;
@@ -287,6 +299,9 @@ export async function runEngine(
     }
   }
 
+  // The pack release to fall back to when a board update this run was
+  // planned on does not complete (see "Packs once" below). Null: none needed.
+  let packFallback: { candidate: ReleaseCandidate | null; warnings: string[] } | null = null;
   if (opts.online) {
     // Interface first: a pack image must also suit the board release this
     // run may flash under it, not only the one the board runs now.
@@ -301,19 +316,67 @@ export async function runEngine(
         continue;
       }
       const board = candidates.interface;
-      const kindOpts =
+      const catalog = opts.catalog ?? githubCatalog;
+      const boardEntry =
         kind === "powerbank" && compat?.doc && board?.compat && catalogOpts.installed
-          ? {
-              ...catalogOpts,
-              installed: [
-                ...catalogOpts.installed,
-                ...[interpretInstalled(compat.doc, COMPONENT_OF.interface, formatVersion(board.version), `interface boards once on ${board.tag}`, { tag: board.tag })].filter(
-                  (i): i is InstalledComponent => i !== null
-                ),
-              ],
-            }
-          : catalogOpts;
-      candidates[kind] = await (opts.catalog ?? githubCatalog).resolve(kind, kindOpts);
+          ? interpretInstalled(compat.doc, COMPONENT_OF.interface, formatVersion(board.version), `interface boards once on ${board.tag}`, { tag: board.tag })
+          : null;
+      if (!boardEntry || !compat?.doc) {
+        candidates[kind] = await catalog.resolve(kind, catalogOpts);
+        continue;
+      }
+
+      // The rule so far: the pack release must suit every board as it runs
+      // now AND the board release this run installs. It stays the rule
+      // whenever a board update planned this run does not complete.
+      const asNow: string[] = [];
+      const conservative = await catalog.resolve(kind, {
+        ...catalogOpts,
+        warnings: asNow,
+        installed: [...catalogOpts.installed!, boardEntry],
+      });
+
+      // Packs once: P1TT2C releases follow S1TTXX ones (a pack release can
+      // need a board at least as new as the one this run installs), so
+      // judging packs against boards this run is about to replace offered an
+      // intermediate release, and every pack was flashed twice. A board that
+      // this run updates is judged as it will be — on the board release —
+      // and the result is only used once every one of those updates has
+      // been verified (apply, below); otherwise the conservative release is.
+      const upgrading = boardsThisRunUpdates(inventory.interfaces, candidates, opts.gates, state, sourceConfigured);
+      if (upgrading.size === 0) {
+        candidates[kind] = conservative;
+        catalogWarnings.push(...asNow);
+        continue;
+      }
+      const after: string[] = [];
+      const optimistic = await catalog.resolve(kind, {
+        ...catalogOpts,
+        warnings: after,
+        installed: [
+          ...installedSet(
+            compat.doc,
+            opts,
+            boardVersions.filter((b) => !upgrading.has(b.boardAddress)),
+            packVersions
+          ),
+          boardEntry,
+        ],
+      });
+      if (sameRelease(optimistic, conservative)) {
+        candidates[kind] = conservative;
+        catalogWarnings.push(...asNow);
+        continue;
+      }
+      candidates[kind] = optimistic;
+      catalogWarnings.push(...after);
+      packFallback = { candidate: conservative, warnings: asNow };
+      log.info("pack release chosen for the boards as this run leaves them", {
+        boards: [...upgrading],
+        boardTag: board!.tag,
+        packTag: optimistic?.tag ?? null,
+        fallbackTag: conservative?.tag ?? null,
+      });
     }
   } else {
     warn("offline mode — no releases were resolved, so nothing can be planned");
@@ -332,15 +395,28 @@ export async function runEngine(
     : null;
 
   // --- Plan ---------------------------------------------------------------
-  const plan = buildPlan({
-    interfaces: inventory.interfaces,
-    powerbanks: inventory.powerbanks,
-    candidates,
-    gates: opts.gates,
-    state,
-    warnings,
-    sourceConfigured,
-  });
+  // A pack's charge is read only once the plan would flash it within the
+  // per-run cap; a pack that turns out too low frees its place, so plan again
+  // until no unread pack is in line. Each round reads at least one new pack.
+  let plan: UpdatePlan;
+  for (;;) {
+    const chargeNeeded: number[] = [];
+    plan = buildPlan({
+      interfaces: inventory.interfaces,
+      powerbanks: inventory.powerbanks,
+      candidates,
+      gates: opts.gates,
+      state,
+      warnings,
+      sourceConfigured,
+      chargeNeeded,
+    });
+    if (chargeNeeded.length === 0) break;
+    for (const slotIndex of chargeNeeded) {
+      const p = inventory.powerbanks.find((x) => x.slotIndex === slotIndex);
+      if (p) await readPackCharge(service, p);
+    }
+  }
   const plannedCount = plan.summary.toUpdate;
   // Devices that do need the update but were left for a later run by the
   // per-run cap. They are still pending: without counting them, a capped run
@@ -397,8 +473,51 @@ export async function runEngine(
   };
 
   const queue = plan.items.filter((i) => i.update);
+  const boardsPlanned = new Set(
+    queue.filter((i) => i.target.kind === "interface").map((i) => i.target.boardAddress)
+  );
+  const boardsVerified = new Set<number>();
   for (let idx = 0; idx < queue.length; idx++) {
     const item = queue[idx];
+
+    // Packs once, the safe half: the pack release was chosen for the boards
+    // as this run leaves them. If any planned board update did not complete,
+    // the boards are not all on that release, so the packs go back to the
+    // release that suits every board as it runs now — re-planned with the
+    // same gates — before the first pack is touched.
+    if (item.target.kind === "powerbank" && packFallback && !opts.dryRun) {
+      const incomplete = [...boardsPlanned].filter((b) => !boardsVerified.has(b));
+      if (incomplete.length) {
+        const fallback = packFallback;
+        packFallback = null;
+        for (const w of fallback.warnings) warn(w);
+        candidates.powerbank = fallback.candidate;
+        report.available.powerbank = describeCandidate(fallback.candidate);
+        warn(
+          `interface board(s) ${incomplete.join(", ")} did not complete their update, so packs get ` +
+            `${fallback.candidate ? fallback.candidate.tag : "no release"} (compatible with the boards as they run now)`
+        );
+        for (const rest of queue.slice(idx)) {
+          if (rest.target.kind !== "powerbank") continue;
+          const planned = packByslot.get(rest.target.slotIndex as number);
+          const again = planned
+            ? evaluateTarget(planned, { interfaces: [], powerbanks: [], candidates, gates: opts.gates, state, sourceConfigured })
+            : null;
+          if (!again || !again.update) {
+            skipAtApply(
+              rest,
+              again?.skipReason ?? "NO_RELEASE",
+              `board update incomplete; against ${fallback.candidate?.tag ?? "no release"}: ${again?.detail ?? "nothing to install"}`
+            );
+          } else {
+            rest.candidateVersion = again.candidateVersion;
+            rest.candidateTag = again.candidateTag;
+          }
+        }
+      }
+    }
+    if (!item.update) continue; // re-planned away just above
+
     const candidate = candidates[item.target.kind];
     if (!candidate) continue; // an item only updates when a candidate exists
 
@@ -471,11 +590,13 @@ export async function runEngine(
     if (result.success) {
       report.summary.succeeded += 1;
       recordSuccess(state, item.target);
+      if (item.target.kind === "interface") boardsVerified.add(item.target.boardAddress);
       log.info(`updated ${item.label} → ${toVersion}`, {
         device: targetKey(item.target),
         verified: result.verifiedVersion,
         attempts: result.attempts,
         durationMs: result.durationMs,
+        ...(result.chunkRetries ? { chunkRetries: result.chunkRetries } : {}),
       });
     } else {
       report.summary.failed += 1;
@@ -488,6 +609,7 @@ export async function runEngine(
         code: result.error?.code,
         error: result.error?.message,
         attempts: result.attempts,
+        attemptErrors: result.attemptErrors,
       });
     }
     saveState(opts.stateFile, state);
@@ -502,6 +624,34 @@ export async function runEngine(
     durationMs: Date.now() - startedAt,
   });
   return report;
+}
+
+/**
+ * The interface boards this run will flash: the plan's own verdicts for them,
+ * with the same gates, state and cap. Boards are planned before packs and the
+ * cap is spent in that order, so a board's verdict never depends on the pack
+ * release — which is what lets the pack release be chosen from it.
+ */
+function boardsThisRunUpdates(
+  interfaces: InstalledTarget[],
+  candidates: Partial<Record<TargetKind, ReleaseCandidate | null>>,
+  gates: PolicyGates,
+  state: EngineState,
+  sourceConfigured: Partial<Record<TargetKind, boolean>>
+): Set<number> {
+  const plan = buildPlan({
+    interfaces,
+    powerbanks: [],
+    candidates: { interface: candidates.interface ?? null },
+    gates,
+    state,
+    sourceConfigured,
+  });
+  return new Set(plan.items.filter((i) => i.update).map((i) => i.target.boardAddress));
+}
+
+function sameRelease(a: ReleaseCandidate | null, b: ReleaseCandidate | null): boolean {
+  return (a?.tag ?? null) === (b?.tag ?? null) && (a?.assetName ?? null) === (b?.assetName ?? null);
 }
 
 function defaultCompatLoad(opts: EngineOptions, warnings: string[]): Promise<CompatLoad> {
@@ -534,7 +684,7 @@ async function readDockedPacks(
   filter: EngineOptions["filter"],
   warnings: string[]
 ): Promise<InstalledTarget[]> {
-  const inv = await collectInventory(service, { boards: filter.boards, skipInterfaces: true });
+  const inv = await collectInventory(service, { boards: filter.boards, skipInterfaces: true, deferPackCharge: true });
   for (const w of inv.warnings) warnings.push(w);
   return inv.powerbanks;
 }
@@ -639,6 +789,7 @@ function flashOnce(
         version: headerVersion,
         verbose: opts.verbose,
         interChunkDelayMs: opts.interChunkDelayMs,
+        dataResendBackoffMs: opts.dataResendBackoffMs,
       })
     : runPbFirmwareUpdate(service, {
         boardAddress: item.target.boardAddress,
@@ -647,6 +798,7 @@ function flashOnce(
         version: headerVersion,
         verbose: opts.verbose,
         interChunkDelayMs: opts.interChunkDelayMs,
+        dataResendBackoffMs: opts.dataResendBackoffMs,
       });
 }
 
@@ -690,8 +842,13 @@ async function applyOne(
   const attempts = Math.max(1, opts.attemptsPerTarget);
   const settle = opts.postFlashSettleMs ?? POST_FLASH_SETTLE_MS;
 
+  const failedAttempt = (attempt: number) => {
+    if (!result.error) return;
+    (result.attemptErrors ??= []).push({ attempt, ...result.error });
+  };
   for (let attempt = 1; attempt <= attempts; attempt++) {
     result.attempts = attempt;
+    if (attempt > 1) failedAttempt(attempt - 1);
     debug.log(`[FWU] ${item.label}: flashing ${candidate.tag} (attempt ${attempt}/${attempts})`);
 
     // A device that stops answering mid-flash (power loss, a lost reply on the
@@ -710,6 +867,10 @@ async function applyOne(
       if (attempt < attempts) await sleep(settle);
       continue;
     }
+
+    // Chunks re-sent or resynced: a flash that succeeded over a lossy link
+    // says so, instead of looking exactly like a clean one.
+    if (flash.retries > 0) result.chunkRetries = (result.chunkRetries ?? 0) + flash.retries;
 
     if (flash.blInfo) {
       result.bootloaderProtocol = {
@@ -744,6 +905,7 @@ async function applyOne(
     result.error = null;
     break;
   }
+  if (!result.success) failedAttempt(result.attempts);
 
   result.durationMs = Date.now() - startedAt;
   return result;

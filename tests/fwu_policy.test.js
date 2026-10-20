@@ -498,3 +498,72 @@ test("an unreachable device with no bootloader is still UNREACHABLE", () => {
   const result = plan([dead], [], { interface: candidate("interface", "1.1.0") });
   assert.equal(reasonFor(result, "interface board 0"), "UNREACHABLE");
 });
+
+// ---------------------------------------------------------------------------
+// Deferred charge reads (fw-plan / fw-apply read a pack's STATUS only when the
+// plan may flash it)
+// ---------------------------------------------------------------------------
+
+const { slotGateVerdict, evaluateTarget } = require("../dist/S1TTXX/fwu/policy");
+
+test("a pack whose charge was not read is never planned for an update: its read is asked for", () => {
+  const chargeNeeded = [];
+  const r = buildPlan({
+    interfaces: [],
+    powerbanks: [
+      pack(1, "3.0.3", { chargeRead: false, powerLevel: null }),
+      pack(2, "3.0.3", { chargeRead: false, powerLevel: null }),
+      pack(3, "3.0.3", { chargeRead: false, powerLevel: null }),
+    ],
+    candidates: { powerbank: candidate("powerbank", "3.0.4") },
+    gates: defaultGates({ cliVersion: [0, 3, 0], maxTargets: 2 }),
+    state: emptyState(),
+    chargeNeeded,
+  });
+  assert.deepEqual(chargeNeeded, [1, 2], "only the packs that fit the cap");
+  assert.equal(r.summary.toUpdate, 0);
+  assert.equal(reasonFor(r, "powerbank slot 1"), "BATTERY_UNKNOWN");
+  assert.equal(reasonFor(r, "powerbank slot 3"), "MAX_TARGETS_REACHED");
+});
+
+test("an unread charge does not stand in for a measured one where the gates decide", () => {
+  const chargeNeeded = [];
+  const r = buildPlan({
+    interfaces: [],
+    powerbanks: [pack(1, "3.0.4", { chargeRead: false, powerLevel: null }), pack(2, "3.0.3", { powerLevel: 10 })],
+    candidates: { powerbank: candidate("powerbank", "3.0.4") },
+    gates: defaultGates({ cliVersion: [0, 3, 0] }),
+    state: emptyState(),
+    chargeNeeded,
+  });
+  assert.deepEqual(chargeNeeded, [], "an up-to-date pack needs no charge");
+  assert.equal(reasonFor(r, "powerbank slot 1"), "UP_TO_DATE");
+  assert.equal(reasonFor(r, "powerbank slot 2"), "BATTERY_TOO_LOW");
+});
+
+test("the check before a flash never sees an unread charge as a pass", () => {
+  const gates = defaultGates();
+  // What readPowerbankCondition returns: no chargeRead field, real readings.
+  assert.equal(
+    slotGateVerdict({ present: true, locked: true, powerLevel: null, charging: false, lowVoltage: false, powerbankId: null }, gates)
+      .reason,
+    "BATTERY_UNKNOWN"
+  );
+  // Retention is read from SLOTS, so it still gates an unread pack.
+  assert.equal(
+    slotGateVerdict({ present: true, locked: false, powerLevel: null, charging: false, lowVoltage: false, powerbankId: null, chargeRead: false }, gates)
+      .reason,
+    "SLOT_UNLOCKED"
+  );
+});
+
+test("evaluateTarget re-plans one pack against another release with the same gates", () => {
+  const p = pack(1, "3.1.0");
+  const input = { interfaces: [], powerbanks: [], gates: defaultGates({ cliVersion: [0, 3, 0] }), state: emptyState() };
+  assert.equal(evaluateTarget(p, { ...input, candidates: { powerbank: candidate("powerbank", "3.1.1") } }).update, true);
+  assert.equal(
+    evaluateTarget(p, { ...input, candidates: { powerbank: candidate("powerbank", "3.1.0") } }).skipReason,
+    "UP_TO_DATE"
+  );
+  assert.equal(evaluateTarget(p, { ...input, candidates: { powerbank: null } }).skipReason, "NO_RELEASE");
+});

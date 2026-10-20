@@ -2,13 +2,14 @@ import { SerialService } from "../services/serial";
 import { SlotsCommand } from "../cli/commands/slots";
 import { StatusCommand } from "../cli/commands/status";
 import { PbFirmwareCommand } from "../cli/commands/pb_firmware";
-import { mapBoardToSlot } from "../utils/slot_mapping";
+import { mapBoardToSlot, mapSlotToBoard } from "../utils/slot_mapping";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import {
   CMD_GET_FW_VER,
   MINIMUM_BOARD_ADDRESS,
   PB_STATUS_CHARGING,
   SLOT_LOCKED,
+  STATUS_TIMEOUT,
 } from "../../utils/constants";
 import { getMaximumBoardAddress } from "../../utils/model";
 import { parseVersion } from "./version";
@@ -34,6 +35,13 @@ export interface InventoryFilter {
   skipPowerbanks?: boolean;
   /** Skip the per-board interface walk entirely. */
   skipInterfaces?: boolean;
+  /**
+   * Do not read each docked pack's STATUS (charge, low-voltage, serial): mark
+   * it `chargeRead: false` and leave it to `readPackCharge`, called only for
+   * the packs the plan may actually flash. The firmware version is still read
+   * for every pack — the catalog judges releases against all of them.
+   */
+  deferPackCharge?: boolean;
 }
 
 export interface Inventory {
@@ -73,11 +81,23 @@ export async function collectInventory(
   const boards = allBoardAddresses().filter((b) => !boardFilter || boardFilter.has(b));
 
   for (const boardAddress of boards) {
+    let board: InstalledTarget | null = null;
     if (!filter.skipInterfaces) {
-      interfaces.push(await readInterfaceVersion(service, boardAddress));
+      board = await readInterfaceVersion(service, boardAddress);
+      interfaces.push(board);
     }
 
     if (filter.skipPowerbanks) continue;
+
+    // A board whose application is not running relays nothing to its packs:
+    // one in its bootloader cannot, and one that did not answer at all would
+    // only make SLOTS wait out the transport's 5 s timeout as well.
+    if (board && !board.reachable && (board.inBootloader || board.status === -1)) {
+      warnings.push(
+        `Board ${boardAddress} application is not running (${board.error ?? "no answer"}) — its powerbanks are not visible this run.`
+      );
+      continue;
+    }
 
     // One `slots` call covers the board's six slots, so occupancy costs a
     // single frame per board rather than one per slot.
@@ -115,7 +135,11 @@ export async function collectInventory(
         continue;
       }
 
-      await enrichWithPackStatus(service, boardAddress, slotInBoard, target);
+      if (filter.deferPackCharge) {
+        slot.chargeRead = false;
+      } else {
+        await enrichWithPackStatus(service, boardAddress, slotInBoard, target);
+      }
       await enrichWithPackVersion(service, boardAddress, slotInBoard, target);
       powerbanks.push(target);
     }
@@ -269,6 +293,19 @@ async function readSlotConditions(
   }
 }
 
+/**
+ * Reads the charge of a pack the inventory left unread (`deferPackCharge`),
+ * with exactly the read a full inventory makes. Afterwards the slot reports
+ * `chargeRead` true, whether or not the pack answered (a pack that did not
+ * answer keeps a null charge, and the plan reports BATTERY_UNKNOWN).
+ */
+export async function readPackCharge(service: SerialService, target: InstalledTarget): Promise<void> {
+  if (!target.slot || target.slotIndex === null) return;
+  const { boardAddress, slotInBoard } = mapSlotToBoard(target.slotIndex);
+  await enrichWithPackStatus(service, boardAddress, slotInBoard, target);
+  delete target.slot.chargeRead;
+}
+
 /** Fills state-of-charge, charging and low-voltage flags for a docked pack. */
 async function enrichWithPackStatus(
   service: SerialService,
@@ -307,7 +344,15 @@ async function enrichWithPackVersion(
     target.status = r.status;
     if (!r.success || !r.info) {
       target.error = `Powerbank did not return a version (status ${r.status})`;
-      await probeBootloader(new FwuWire(service, powerbankTarget(boardAddress, slotInBoard)), target);
+      // STATUS_TIMEOUT: nothing answered on the pogo link at all, through the
+      // board's retries and ours (9 tries). A pack bootloader would have
+      // answered — it rejects an application opcode at once, and replies
+      // ~15 ms after the request, outside the window older boards lose
+      // (S1TTXX 3aaa4f6) — so asking it HELLO would only wait out the same
+      // ~5.6 s of retries again.
+      if (r.status !== STATUS_TIMEOUT) {
+        await probeBootloader(new FwuWire(service, powerbankTarget(boardAddress, slotInBoard)), target);
+      }
       return;
     }
     target.reachable = true;

@@ -132,6 +132,12 @@ export interface CatalogOptions {
    * inject it.
    */
   legacyMinCli?: (release: GitHubRelease, repo: string, opts: CatalogOptions) => Promise<Version | null>;
+  /**
+   * Release listings already fetched this run, by repository. A run that
+   * resolves the same class twice (the pack release, against the boards as
+   * they are and as this run leaves them) lists its releases once.
+   */
+  releaseCache?: Map<string, GitHubRelease[]>;
 }
 
 /** The accept/reject pair actually applied for a source. */
@@ -159,6 +165,8 @@ export async function resolveCandidate(
   if (source.provider === "dir") return resolveLocalCandidate(kind, source, opts);
 
   const repo = source.repo ?? "";
+  const cached = opts.releaseCache?.get(repo.toLowerCase());
+  if (cached) return selectGithubCandidate(kind, source, cached, opts);
 
   // Every page, not only the first: the listing is ordered by creation date,
   // not by version, so a patch release of an older line can sit on page 2.
@@ -189,6 +197,7 @@ export async function resolveCandidate(
     opts.warnings.push(`Unexpected releases payload for ${repo}`);
     return null;
   }
+  opts.releaseCache?.set(repo.toLowerCase(), releases);
 
   return selectGithubCandidate(kind, source, releases, opts);
 }
