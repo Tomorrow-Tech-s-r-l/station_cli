@@ -6,6 +6,7 @@ import { CommandFactory } from "../protocol/commands";
 import { SerialMessage } from "../protocol/types";
 import { BAUD_RATE, INTER_COMMAND_DELAY_MS, CMD_PB_LINK_ATTEMPTS } from "../../utils/constants";
 import { hex, isNoRetryMode, rawTrace, testNotice } from "../../utils/test_modes";
+import { isSerialTraceOn, serialTrace } from "../../utils/serial_trace";
 
 // Opcodes the station forwards to a docked powerbank over the pogo link —
 // the ones its own link retries apply to (see --no-retry).
@@ -91,6 +92,12 @@ export class SerialService {
 
         this.parser.on("data", (data: Buffer) => {
           debug.hex("Received raw data", data);
+          if (isSerialTraceOn()) serialTrace(
+            "rx",
+            this.portPath,
+            data,
+            `${Math.round(performance.now() - this.sentAt)}ms after tx${this.quiet ? " (bookkeeping)" : ""}`
+          );
           if (!this.quiet) rawTrace("RX frame", `${hex(data)}  (${Math.round(performance.now() - this.sentAt)}ms after TX)`);
           if (this.responseResolver) {
             const payload = TransportProtocol.parseFrame(data);
@@ -205,6 +212,13 @@ export class SerialService {
         resolve(response);
       };
 
+      if (isSerialTraceOn()) serialTrace(
+        "tx",
+        this.portPath,
+        frame,
+        `board=${message.boardAddress} cmd=0x${message.command.toString(16).padStart(2, "0")}` +
+          (this.quiet ? " (bookkeeping)" : "")
+      );
       this.port!.write(frame, (err: any) => {
         if (err) {
           cleanup();
