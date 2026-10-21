@@ -80,31 +80,39 @@ export class JsonlLog {
       msg,
       ...(ctx && Object.keys(ctx).length ? { ctx } : {}),
     };
-    try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      this.rotateIfNeeded();
-      fs.appendFileSync(this.file, JSON.stringify(record) + "\n");
-    } catch {
-      // best-effort by design
-    }
+    appendJsonlLine(this.file, record);
   }
+}
 
-  private rotateIfNeeded(): void {
-    const file = this.file as string;
-    let size = 0;
+/**
+ * Append one JSON object as a line to `file`, rotating it first (5 MB, kept
+ * as file, file.1, file.2). Best-effort: never throws, never prints.
+ */
+export function appendJsonlLine(file: string, record: unknown): void {
+  try {
+    const line = JSON.stringify(record) + "\n";
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    rotateIfNeeded(file);
+    fs.appendFileSync(file, line);
+  } catch {
+    // best-effort by design
+  }
+}
+
+function rotateIfNeeded(file: string): void {
+  let size = 0;
+  try {
+    size = fs.statSync(file).size;
+  } catch {
+    return;
+  }
+  if (size < MAX_BYTES) return;
+  for (let i = GENERATIONS - 1; i >= 1; i--) {
+    const from = i === 1 ? file : `${file}.${i - 1}`;
     try {
-      size = fs.statSync(file).size;
+      fs.renameSync(from, `${file}.${i}`);
     } catch {
-      return;
-    }
-    if (size < MAX_BYTES) return;
-    for (let i = GENERATIONS - 1; i >= 1; i--) {
-      const from = i === 1 ? file : `${file}.${i - 1}`;
-      try {
-        fs.renameSync(from, `${file}.${i}`);
-      } catch {
-        // a missing generation is fine
-      }
+      // a missing generation is fine
     }
   }
 }
