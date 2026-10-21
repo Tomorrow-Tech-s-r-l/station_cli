@@ -32,11 +32,15 @@ const unpack = (w) => `${(w >>> 16) & 0xff}.${(w >>> 8) & 0xff}.${w & 0xff}`;
 class FakeStation {
   /**
    * @param {object} spec  { boards: { [addr]: { version, dead?, silent?, faults?, slots: [pack|null ×6] } } }
-   *   pack = { id, version, level, locked?=true, faults?, reportsVersion?, linkDead? }
+   *   pack = { id, version, level, locked?=true, faults?, reportsVersion?, linkDead?, blSilent? }
    *   dead      the board answers every frame with an error status
    *   silent    the board never answers: every frame times out (transport throws)
    *   linkDead  nothing comes back over the pogo link: the board answers every
    *             request for this pack with STATUS_TIMEOUT (0x01)
+   *   blSilent  while the pack is in its bootloader, application opcodes
+   *             (STATUS, FW_VER) get no answer on the pogo link and the board
+   *             reports STATUS_TIMEOUT, as P1TT2C's bootloader does; its FWU
+   *             opcodes still answer
    */
   constructor(spec, hooks = {}) {
     this.hooks = hooks;
@@ -98,6 +102,7 @@ class FakeStation {
     if (PACK_ROUTED.includes(command) || (command >= 0x10 && command <= 0x16)) {
       const target = board.slots[data[0]];
       if (target?.linkDead && board.device.mode !== "bl") return reply(STATUS_TIMEOUT);
+      if (target?.blSilent && target.device.mode === "bl" && command < 0x10) return reply(STATUS_TIMEOUT);
     }
 
     // Station FWU opcodes are answered by the board's own bootloader.

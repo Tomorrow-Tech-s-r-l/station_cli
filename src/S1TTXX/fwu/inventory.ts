@@ -9,7 +9,6 @@ import {
   MINIMUM_BOARD_ADDRESS,
   PB_STATUS_CHARGING,
   SLOT_LOCKED,
-  STATUS_TIMEOUT,
 } from "../../utils/constants";
 import { getMaximumBoardAddress } from "../../utils/model";
 import { parseVersion } from "./version";
@@ -344,15 +343,12 @@ async function enrichWithPackVersion(
     target.status = r.status;
     if (!r.success || !r.info) {
       target.error = `Powerbank did not return a version (status ${r.status})`;
-      // STATUS_TIMEOUT: nothing answered on the pogo link at all, through the
-      // board's retries and ours (9 tries). A pack bootloader would have
-      // answered — it rejects an application opcode at once, and replies
-      // ~15 ms after the request, outside the window older boards lose
-      // (S1TTXX 3aaa4f6) — so asking it HELLO would only wait out the same
-      // ~5.6 s of retries again.
-      if (r.status !== STATUS_TIMEOUT) {
-        await probeBootloader(new FwuWire(service, powerbankTarget(boardAddress, slotInBoard)), target);
-      }
+      // Probed on every failure, a pogo timeout (0x01) included: a pack
+      // resident in its bootloader does not answer the application's FW_VER
+      // at all, so the board reports a timeout, and HELLO is the only way to
+      // find it (F13) — skipping it leaves a pack whose flash was interrupted
+      // unrecoverable.
+      await probeBootloader(new FwuWire(service, powerbankTarget(boardAddress, slotInBoard)), target);
       return;
     }
     target.reachable = true;

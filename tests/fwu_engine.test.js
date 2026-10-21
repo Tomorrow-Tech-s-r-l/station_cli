@@ -814,15 +814,29 @@ test("fw-status still reads every docked pack's charge", async () => {
   assert.equal(report.inventory.powerbanks[1].slot.powerLevel, 85);
 });
 
-test("a pack that never answers on the pogo link is not probed again for a bootloader", async () => {
+test("a pack that never answers on the pogo link is reported unreachable", async () => {
   const station = new FakeStation({
     boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { linkDead: true })] } },
   });
   const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
   assert.equal(item(report, "powerbank slot 1").skipReason, "UNREACHABLE");
   assert.equal(station.framesOf(CMD_PB_FW_VER, 0, 0), 3, "FW_VER: BaseCommand's 3 tries");
-  assert.equal(station.framesOf(CMD_PB_FWU_HELLO, 0, 0), 0, "no HELLO probe on top");
   assert.equal(station.framesOf(CMD_STATUS, 0, 0), 0);
+});
+
+test("F13: a pack in its bootloader whose FW_VER times out is still found by HELLO and recovered", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.1.0", slots: [pack("PB0001", { blSilent: true, faults: { noValidApp: true } })] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(report.inventory.powerbanks[0].inBootloader, true);
+  assert.ok(station.framesOf(CMD_PB_FWU_HELLO, 0, 0) >= 1, "HELLO probe after the timeout");
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [["powerbank slot 1", true, "3.0.4"]]
+  );
 });
 
 test("a board that does not answer at all is not asked for its slots", async () => {
