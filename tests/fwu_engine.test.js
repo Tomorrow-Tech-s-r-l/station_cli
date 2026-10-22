@@ -1,0 +1,866 @@
+/**
+ * End-to-end tests of the firmware engine against a fake station.
+ *
+ * These exercise what only exists at execution time — the safety the pure
+ * planner cannot provide, because it happens minutes after the plan:
+ *
+ *   F3  a board whose own update failed does not have its packs attempted
+ *   F4  each pack is re-checked immediately before its flash
+ *   F5  a flash interrupted by a kill is counted as a failure next run
+ *   F8  no new device starts once the run's time budget is spent
+ *
+ * plus the happy path, read-back verification and the in-flight marker. Every
+ * flash goes through the real FWU session code against fake bootloaders.
+ */
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const { FakeStation } = require("./helpers/fake_station");
+const { runEngine, loadState, saveState } = require("../dist/S1TTXX/fwu/engine");
+const { defaultGates, emptyState, recordFailure } = require("../dist/S1TTXX/fwu/policy");
+const { parseVersion } = require("../dist/S1TTXX/fwu/version");
+const { JsonlLog } = require("../dist/utils/jsonl_log");
+const { setModel } = require("../dist/utils/model");
+
+setModel("S1TT30");
+
+function tmpDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "fwu-engine-"));
+}
+
+/** A catalog serving local images, so no network is involved. */
+function localCatalog(versions) {
+  const dir = tmpDir();
+  return {
+    async resolve(kind) {
+      const v = versions[kind];
+      if (!v) return null;
+      return {
+        kind,
+        tag: `v${v}`,
+        version: parseVersion(v),
+        prerelease: false,
+        assetName: `${kind}-${v}.bin`,
+        assetUrl: "local",
+        assetSizeBytes: 0,
+        minCliVersion: null,
+        digest: null,
+      };
+    },
+    async ensure(candidate) {
+      const p = path.join(dir, candidate.assetName);
+      const img = Buffer.alloc(200);
+      for (let i = 0; i < img.length; i++) img[i] = (i * 7) & 0xff;
+      fs.writeFileSync(p, img);
+      return p;
+    },
+  };
+}
+
+function options(overrides = {}) {
+  const dir = tmpDir();
+  const logFile = path.join(dir, "cli.jsonl");
+  return {
+    channel: "stable",
+    cliVersion: [0, 4, 0],
+    gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0 }),
+    filter: { boards: [0, 1], slots: [] },
+    online: true,
+    sources: {
+      interface: { provider: "github", repo: "acme/iface" },
+      powerbank: { provider: "github", repo: "acme/pack" },
+    },
+    token: null,
+    cacheDir: path.join(dir, "cache"),
+    cacheKeepPerKind: 2,
+    stateFile: path.join(dir, "state.json"),
+    apply: true,
+    dryRun: false,
+    attemptsPerTarget: 1,
+    maxDurationMs: 0,
+    verbose: false,
+    interChunkDelayMs: 0,
+    trace: "fwu-test01",
+    log: new JsonlLog(logFile, { cat: "firmware", svc: "fwu_engine", trace: "fwu-test01" }),
+    holdsLock: true,
+    postFlashSettleMs: 0,
+    dataResendBackoffMs: [0, 0, 0],
+    catalog: localCatalog({ interface: "3.1.0", powerbank: "3.0.4" }),
+    logFile,
+    ...overrides,
+  };
+}
+
+const pack = (id, extra = {}) => ({ id, version: "3.0.3", level: 85, ...extra });
+const item = (report, label) => report.plan.items.find((i) => i.label === label);
+
+test("happy path: board then pack are flashed, and each is verified by read-back", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001")] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+
+  assert.equal(report.success, true);
+  assert.equal(report.trace, "fwu-test01");
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [
+      ["interface board 0", true, "3.1.0"],
+      ["powerbank slot 1", true, "3.0.4"],
+    ]
+  );
+  assert.equal(report.summary.updatesPending, false);
+});
+
+test("the board is always flashed before its packs", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001")] } },
+  });
+  await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const firstBoardFrame = station.log.findIndex((e) => e.cmd >= 0x60 && e.cmd <= 0x66);
+  const firstPackFrame = station.log.findIndex((e) => e.cmd >= 0x10 && e.cmd <= 0x16);
+  assert.ok(firstBoardFrame >= 0 && firstPackFrame > firstBoardFrame);
+});
+
+test("F3: packs on a board whose update failed are not attempted", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", faults: { failDataAt: 2 }, slots: [pack("PB0001"), pack("PB0002")] },
+      1: { version: "3.1.0", slots: [pack("PB0007")] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options());
+
+  assert.equal(report.success, false);
+  assert.equal(item(report, "powerbank slot 1").skipReason, "BOARD_UPDATE_FAILED");
+  assert.equal(item(report, "powerbank slot 2").skipReason, "BOARD_UPDATE_FAILED");
+  // No pack frame was ever sent to the failed board …
+  assert.equal(station.fwuFramesTo(0, 0), 0);
+  assert.equal(station.fwuFramesTo(0, 1), 0);
+  // … while the healthy board's pack still got its update.
+  assert.equal(report.results.find((r) => r.label === "powerbank slot 7").success, true);
+});
+
+test("F3: innocent packs are not charged a quarantine strike for their board's failure", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { failDataAt: 2 }, slots: [pack("PB0001")] } },
+  });
+  await runEngine(station, "S1TT30", opts);
+  const state = loadState(opts.stateFile);
+  assert.ok(state.quarantine["interface:board0"], "the board's failure is recorded");
+  assert.equal(state.quarantine["powerbank:slot1"], undefined, "the pack is not blamed");
+});
+
+test("F4: a pack swapped between planning and flashing is not flashed", async () => {
+  const station = new FakeStation(
+    { boards: { 0: { version: "3.1.0", slots: [pack("PB0001")] } } },
+    {
+      // SLOTS #1 is the plan; SLOTS #2 is the re-check just before the flash.
+      beforeSlots: (board, n, st) => {
+        if (board === 0 && n === 2) st.dock(0, 0, pack("PB9999"));
+      },
+    }
+  );
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+
+  const it = item(report, "powerbank slot 1");
+  assert.equal(it.skipReason, "SLOT_CHANGED");
+  assert.match(it.detail, /PB9999/);
+  assert.equal(station.fwuFramesTo(0, 0), 0, "the unexpected pack was never touched");
+});
+
+test("F4: a pack taken out between planning and flashing is not flashed", async () => {
+  const station = new FakeStation(
+    { boards: { 0: { version: "3.1.0", slots: [pack("PB0001")] } } },
+    { beforeSlots: (b, n, st) => b === 0 && n === 2 && st.dock(0, 0, null) }
+  );
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const it = item(report, "powerbank slot 1");
+  assert.equal(it.skipReason, "SLOT_CHANGED");
+  assert.match(it.detail, /SLOT_EMPTY/);
+});
+
+test("F4: a pack drained below the floor since planning is not flashed", async () => {
+  const station = new FakeStation(
+    { boards: { 0: { version: "3.1.0", slots: [pack("PB0001")] } } },
+    { beforeSlots: (b, n, st) => b === 0 && n === 2 && st.dock(0, 0, pack("PB0001", { level: 10 })) }
+  );
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.match(item(report, "powerbank slot 1").detail, /BATTERY_TOO_LOW/);
+});
+
+test("F4: a pack mid-eject at flash time is not flashed", async () => {
+  const station = new FakeStation(
+    { boards: { 0: { version: "3.1.0", slots: [pack("PB0001")] } } },
+    { beforeSlots: (b, n, st) => b === 0 && n === 2 && st.dock(0, 0, pack("PB0001", { locked: false })) }
+  );
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.match(item(report, "powerbank slot 1").detail, /SLOT_UNLOCKED/);
+});
+
+test("F5: an interrupted flash is recorded as a failure by the next run that holds the lock", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const state = emptyState();
+  state.inFlight = {
+    target: { kind: "powerbank", boardAddress: 0, slotIndex: 1 },
+    version: "3.0.4",
+    startedAt: "2026-09-20T02:00:00.000Z",
+  };
+  saveState(opts.stateFile, state);
+
+  const station = new FakeStation({ boards: { 0: { version: "3.1.0", slots: [] } } });
+  const report = await runEngine(station, "S1TT30", opts);
+
+  assert.ok(report.warnings.some((w) => /interrupted while flashing powerbank slot 1/.test(w)));
+  const after = loadState(opts.stateFile);
+  assert.equal(after.inFlight, null);
+  assert.equal(after.quarantine["powerbank:slot1"].failures, 1);
+  assert.equal(after.quarantine["powerbank:slot1"].lastFailedVersion, "3.0.4");
+});
+
+test("F5: without the lock, an interrupted flash is reported but state is left alone", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] }, holdsLock: false, apply: false });
+  const state = emptyState();
+  state.inFlight = {
+    target: { kind: "interface", boardAddress: 0, slotIndex: null },
+    version: "3.1.0",
+    startedAt: "2026-09-20T02:00:00.000Z",
+  };
+  saveState(opts.stateFile, state);
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  const report = await runEngine(station, "S1TT30", opts);
+  assert.ok(report.warnings.some((w) => /interrupted/.test(w)));
+  assert.ok(loadState(opts.stateFile).inFlight, "a run without the lock must not rewrite state");
+});
+
+test("F5: the in-flight marker is cleared after every flash, success or failure", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { corruptCrc: true }, slots: [] } },
+  });
+  await runEngine(station, "S1TT30", opts);
+  assert.equal(loadState(opts.stateFile).inFlight, null);
+});
+
+test("F8: the device in progress finishes, but no new device starts past the budget", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001")] } },
+  });
+  // The board's flash alone takes ~1 s (bootloader settle times), so a 100 ms
+  // budget is spent by the time the pack's turn comes.
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, maxDurationMs: 100 })
+  );
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success]),
+    [["interface board 0", true]],
+    "the flash already underway is never cut short"
+  );
+  assert.equal(item(report, "powerbank slot 1").skipReason, "DEADLINE_REACHED");
+  assert.equal(station.fwuFramesTo(0, 0), 0, "the pack was never touched");
+  assert.equal(report.summary.updatesPending, true, "the pack is left for the next run");
+  assert.ok(report.warnings.some((w) => /time budget reached/.test(w)));
+});
+
+test("a device that reboots into the wrong version is a failure, not a success", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [] } },
+  });
+  station.boards.get(0).reportsVersion = "3.0.9";
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const r = report.results[0];
+  assert.equal(r.success, false);
+  assert.equal(r.error.stage, "VERIFY");
+  assert.match(r.error.message, /3\.0\.9/);
+});
+
+test("a missing source is reported as NO_SOURCE with the setting to fix", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, sources: {} })
+  );
+  const it = item(report, "interface board 0");
+  assert.equal(it.skipReason, "NO_SOURCE");
+  assert.match(it.detail, /firmware\.sources\.interface/);
+});
+
+test("the plan summary is recomputed after last-second skips", async () => {
+  const station = new FakeStation(
+    { boards: { 0: { version: "3.1.0", slots: [pack("PB0001")] } } },
+    { beforeSlots: (b, n, st) => b === 0 && n === 2 && st.dock(0, 0, null) }
+  );
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const counted = report.plan.items.filter((i) => i.update).length;
+  assert.equal(report.plan.summary.toUpdate, counted);
+});
+
+test("every run leaves a structured, traceable log", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  await runEngine(station, "S1TT30", opts);
+  const records = fs.readFileSync(opts.logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.ok(records.length >= 3);
+  for (const r of records) {
+    assert.equal(r.v, 1);
+    assert.equal(r.src, "station-cli");
+    assert.equal(r.trace, "fwu-test01");
+    assert.match(r.ts, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+  }
+  assert.ok(records.some((r) => /updated interface board 0/.test(r.msg)));
+});
+
+test("a quarantined device is skipped, and a fresh release lifts the quarantine", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const state = emptyState();
+  for (let i = 0; i < 3; i++) {
+    recordFailure(state, { kind: "interface", boardAddress: 0, slotIndex: null }, "3.1.0");
+  }
+  saveState(opts.stateFile, state);
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  let report = await runEngine(station, "S1TT30", opts);
+  assert.equal(item(report, "interface board 0").skipReason, "QUARANTINED");
+
+  report = await runEngine(
+    new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } }),
+    "S1TT30",
+    { ...opts, catalog: localCatalog({ interface: "3.2.0" }) }
+  );
+  assert.equal(report.results[0].success, true);
+});
+
+// --- F13: devices stuck in their bootloader -------------------------------
+
+test("F13: a board stuck in its bootloader is found and flashed back to life", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { noValidApp: true }, slots: [] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const inv = report.inventory.interfaces[0];
+  assert.equal(inv.inBootloader, true);
+  const it = item(report, "interface board 0");
+  assert.equal(it.update, true);
+  assert.equal(it.recovery, true, "planned as a recovery, not a routine update");
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [["interface board 0", true, "3.1.0"]]
+  );
+});
+
+test("F13: a pack stuck in its bootloader is recovered even though its charge cannot be read", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { faults: { noValidApp: true } })] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(report.inventory.powerbanks[0].inBootloader, true);
+  assert.equal(report.inventory.powerbanks[0].slot.powerLevel, null);
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [["powerbank slot 1", true, "3.0.4"]]
+  );
+});
+
+test("F13: a board with no bootloader either is still unreachable, and never flashed", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", dead: true, slots: [] } } });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(item(report, "interface board 0").skipReason, "UNREACHABLE");
+  assert.equal(report.results.length, 0);
+});
+
+test("F13: a recovery that keeps failing is quarantined like any other flash", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] }, gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0, maxFailures: 2 }) });
+  const faults = { noValidApp: true, corruptCrc: true };
+  for (let run = 0; run < 2; run++) {
+    await runEngine(new FakeStation({ boards: { 0: { version: "3.0.3", faults, slots: [] } } }), "S1TT30", opts);
+  }
+  const report = await runEngine(
+    new FakeStation({ boards: { 0: { version: "3.0.3", faults, slots: [] } } }),
+    "S1TT30",
+    opts
+  );
+  assert.equal(item(report, "interface board 0").skipReason, "QUARANTINED");
+});
+
+test("F5 + F13: an interrupted flash is counted, and the stranded device recovered, in one run", async () => {
+  const opts = options({ filter: { boards: [0], slots: [] } });
+  const state = emptyState();
+  state.inFlight = {
+    target: { kind: "interface", boardAddress: 0, slotIndex: null },
+    version: "3.1.0",
+    startedAt: "2026-09-20T02:00:00.000Z",
+  };
+  saveState(opts.stateFile, state);
+
+  // What the interrupted flash left behind: a board with an erased header.
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { noValidApp: true }, slots: [] } },
+  });
+  const report = await runEngine(station, "S1TT30", opts);
+
+  assert.ok(report.warnings.some((w) => /interrupted while flashing interface board 0/.test(w)));
+  assert.equal(report.results[0].success, true, "and the board is running again");
+  const after = loadState(opts.stateFile);
+  assert.equal(after.inFlight, null);
+  assert.equal(after.quarantine["interface:board0"], undefined, "a success clears the failure");
+});
+
+test("a board that stops answering mid-flash fails that device, not the whole run", async () => {
+  // Board 0 goes silent for good on its 3rd DATA chunk: the transport throws
+  // (5 s timeout) on that chunk and on every re-send of it. Before the fix
+  // this exception escaped runEngine, board 1 was never attempted and the
+  // kiosk got no report.
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", faults: { silentFromData: 3 }, slots: [] },
+      1: { version: "3.0.3", slots: [] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0, 1], slots: [] } }));
+
+  const b0 = report.results.find((r) => r.label === "interface board 0");
+  const b1 = report.results.find((r) => r.label === "interface board 1");
+  assert.equal(b0.success, false);
+  assert.equal(b0.error.stage, "TRANSPORT");
+  assert.match(b0.error.message, /stopped answering mid-flash/);
+  assert.match(b0.error.message, /at offset 64\/200, after 3 re-send\(s\)/);
+  assert.equal(b1.success, true, "the other board is still updated");
+  assert.equal(report.summary.failed, 1);
+  assert.equal(report.summary.succeeded, 1);
+});
+
+test("a device that lost power mid-flash is recovered by the next attempt", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", faults: { powerLossAt: 2 }, slots: [] } },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, attemptsPerTarget: 2 })
+  );
+  const b0 = report.results[0];
+  assert.equal(b0.success, true);
+  assert.equal(b0.attempts, 2);
+  assert.equal(b0.verifiedVersion, "3.1.0");
+  // The reset lost the bootloader's session: the first attempt says so, and
+  // the report keeps that reason even though the second attempt succeeded.
+  assert.equal(b0.attemptErrors.length, 1);
+  assert.equal(b0.attemptErrors[0].attempt, 1);
+  assert.equal(b0.attemptErrors[0].code, 0x13);
+  assert.match(b0.attemptErrors[0].message, /lost its session/);
+});
+
+test("devices left over by the per-run cap are still reported as pending", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", slots: [] },
+      1: { version: "3.0.3", slots: [] },
+    },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 1 }) })
+  );
+  assert.equal(report.summary.attempted, 1);
+  assert.equal(report.summary.succeeded, 1);
+  assert.equal(item(report, "interface board 1").skipReason, "MAX_TARGETS_REACHED");
+  assert.equal(report.summary.updatesPending, true, "board 1 still needs its update");
+});
+
+// ---------------------------------------------------------------------------
+// compatibility.json: loaded once per run, handed to the catalog with what is
+// installed, and reported in the JSON.
+// ---------------------------------------------------------------------------
+
+test("compatibility data and the installed set reach the catalog, and the report says which copy", async () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "compat", "compatibility.json"), "utf8"));
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  const base = localCatalog({ interface: "3.1.0", powerbank: "3.0.4" });
+  const catalog = {
+    async resolve(kind, opts) {
+      seen[kind] = opts.installed.map((i) => `${i.component}:${i.interpretations.map((x) => x.tag ?? "?").join("|")}`);
+      seen.compat = opts.compat.origin;
+      return base.resolve(kind);
+    },
+    ensure: base.ensure,
+  };
+  let loads = 0;
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({
+      filter: { boards: [0], slots: [] },
+      apply: false,
+      catalog,
+      compatLoader: async () => {
+        loads += 1;
+        return { doc, origin: "cache", location: "/x/compatibility.json", sequence: 42, generatedAt: doc.generated_at, error: "offline" };
+      },
+    })
+  );
+  assert.equal(loads, 1, "read once per run");
+  assert.equal(seen.compat, "cache");
+  assert.deepEqual(seen.interface.slice(1), ["S1TTXX:v3.0.3", "P1TT2C:v3.0.2"]);
+  assert.match(seen.interface[0], /^station_cli:/);
+  assert.deepEqual(
+    { origin: report.compatibility.origin, sequence: report.compatibility.sequence, error: report.compatibility.error },
+    { origin: "cache", sequence: 42, error: "offline" }
+  );
+  assert.equal(report.compatibility.channel, "production", "a stable station reads the production floors");
+});
+
+test("an injected catalog without a loader, or a dir source, never reads compatibility data", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [] } } });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] }, apply: false }));
+  assert.equal(report.compatibility, null);
+});
+
+/** A catalog recording the installed set each kind was judged against. */
+function recordingCatalog(seen, versions, withCompat = true) {
+  const base = localCatalog(versions);
+  return {
+    async resolve(kind, opts) {
+      seen[kind] = opts.installed.map((i) => `${i.component}:${i.interpretations.map((x) => x.tag ?? "?").join("|")}`);
+      const c = await base.resolve(kind);
+      return c && withCompat ? { ...c, compat: { sequence: 42, origin: "cache", requires: {} } } : c;
+    },
+    ensure: base.ensure,
+  };
+}
+
+const fixtureCompat = () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "compat", "compatibility.json"), "utf8"));
+  return async () => ({ doc, origin: "cache", location: "/x/compatibility.json", sequence: doc.sequence, generatedAt: doc.generated_at, error: null });
+};
+
+test("an interface-only run still judges board images against every docked pack", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  await runEngine(
+    station,
+    "S1TT30",
+    options({
+      gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0, kinds: ["interface"] }),
+      filter: { boards: [0], slots: [], skipPowerbanks: true },
+      apply: false,
+      catalog: recordingCatalog(seen, { interface: "3.1.0" }),
+      compatLoader: fixtureCompat(),
+    })
+  );
+  assert.ok(seen.interface.includes("P1TT2C:v3.0.2"), `docked pack read: ${seen.interface}`);
+});
+
+test("a pack image is also judged against the board release the same run installs", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [pack("PB0001", { version: "3.0.2" })] } },
+  });
+  const seen = {};
+  const calls = [];
+  const recording = recordingCatalog(seen, { interface: "3.1.0", powerbank: "3.0.4" });
+  await runEngine(
+    station,
+    "S1TT30",
+    options({
+      // powerbank listed first: the board release is still resolved first
+      gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 0, kinds: ["powerbank", "interface"] }),
+      filter: { boards: [0], slots: [] },
+      apply: false,
+      catalog: {
+        async resolve(kind, o) {
+          const c = await recording.resolve(kind, o);
+          if (kind === "powerbank") calls.push(seen.powerbank);
+          return c;
+        },
+        ensure: recording.ensure,
+      },
+      compatLoader: fixtureCompat(),
+    })
+  );
+  assert.ok(!seen.interface.some((s) => s.startsWith("S1TTXX:v3.1.0")));
+  // The release that stays safe if the board update does not complete …
+  assert.ok(calls[0].includes("S1TTXX:v3.0.3"), "the board as it runs now");
+  assert.ok(calls[0].includes("S1TTXX:v3.1.0"), "and as this run may leave it");
+  // … and, since this run updates the board, the one for the board as it will be.
+  assert.equal(calls.length, 2);
+  assert.ok(!calls[1].includes("S1TTXX:v3.0.3"), "the board being replaced is not held against the pack");
+  assert.ok(calls[1].includes("S1TTXX:v3.1.0"));
+  assert.ok(calls[1].includes("P1TT2C:v3.0.2"), "docked packs still count");
+});
+
+// ---------------------------------------------------------------------------
+// Packs once: the pack release is chosen for the boards as this run leaves
+// them, and falls back to the one that suits them as they run now whenever a
+// planned board update does not complete.
+// ---------------------------------------------------------------------------
+
+const atLeast = (v, [M, m, p]) =>
+  v.major !== M ? v.major > M : v.minor !== m ? v.minor > m : v.patch >= p;
+
+/**
+ * Release selection as compatibility.json has it for this chain: P1TT2C 3.1.1
+ * needs every S1TTXX board at >= 3.2.1; 3.1.0 works with any board.
+ */
+function chainCatalog(calls = []) {
+  const base = localCatalog({ interface: "3.2.1" });
+  const packs = { "3.1.1": localCatalog({ powerbank: "3.1.1" }), "3.1.0": localCatalog({ powerbank: "3.1.0" }) };
+  return {
+    async resolve(kind, o) {
+      if (kind === "interface") {
+        const c = await base.resolve("interface");
+        return { ...c, compat: { sequence: 42, origin: "cache", requires: {} } };
+      }
+      const boards = o.installed.filter((i) => i.component === "S1TTXX");
+      const v = boards.every((b) => b.interpretations.every((x) => atLeast(x.version, [3, 2, 1]))) ? "3.1.1" : "3.1.0";
+      calls.push(v);
+      return packs[v].resolve("powerbank");
+    },
+    ensure: base.ensure,
+  };
+}
+
+const chainPack = (id, extra = {}) => pack(id, { version: "3.0.2", ...extra });
+
+test("packs on a board this run updates get the release for that board, flashed once", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.0.3", slots: [chainPack("PB0001"), chainPack("PB0002")] } },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, catalog: chainCatalog(), compatLoader: fixtureCompat() })
+  );
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [
+      ["interface board 0", true, "3.2.1"],
+      ["powerbank slot 1", true, "3.1.1"],
+      ["powerbank slot 2", true, "3.1.1"],
+    ]
+  );
+  assert.equal(report.available.powerbank.version, "3.1.1");
+});
+
+test("fw-plan already shows the packs going straight to the newest release", async () => {
+  const station = new FakeStation({ boards: { 0: { version: "3.0.3", slots: [chainPack("PB0001")] } } });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, apply: false, catalog: chainCatalog(), compatLoader: fixtureCompat() })
+  );
+  assert.equal(item(report, "powerbank slot 1").candidateVersion, "3.1.1");
+  assert.equal(item(report, "powerbank slot 1").update, true);
+});
+
+test("a board update that fails sends the packs back to the release every board can talk to", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", slots: [chainPack("PB0001")] },
+      1: { version: "3.0.3", faults: { corruptCrc: true }, slots: [chainPack("PB0007")] },
+    },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ catalog: chainCatalog(), compatLoader: fixtureCompat() })
+  );
+  // Board 1 is still on 3.0.3, which 3.1.1 cannot talk to: a pack that moves
+  // there must still work, so no pack gets 3.1.1 this run.
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.toVersion]),
+    [
+      ["interface board 0", true, "3.2.1"],
+      ["interface board 1", false, "3.2.1"],
+      ["powerbank slot 1", true, "3.1.0"],
+    ]
+  );
+  assert.equal(item(report, "powerbank slot 7").skipReason, "BOARD_UPDATE_FAILED");
+  assert.equal(item(report, "powerbank slot 1").candidateVersion, "3.1.0");
+  assert.equal(report.available.powerbank.version, "3.1.0");
+  assert.ok(report.warnings.some((w) => /board\(s\) 1 did not complete their update/.test(w)));
+});
+
+test("a fallback that leaves nothing newer to install skips the pack instead", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", slots: [chainPack("PB0001", { version: "3.1.0" })] },
+      1: { version: "3.0.3", faults: { corruptCrc: true }, slots: [] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options({ catalog: chainCatalog(), compatLoader: fixtureCompat() }));
+  const it = item(report, "powerbank slot 1");
+  assert.equal(it.update, false);
+  assert.equal(it.skipReason, "UP_TO_DATE");
+  assert.match(it.detail, /board update incomplete/);
+  assert.equal(station.fwuFramesTo(0, 0), 0, "the pack was never touched");
+});
+
+test("a board the per-run cap leaves out still holds the packs to what it runs", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.0.3", slots: [chainPack("PB0001")] },
+      1: { version: "3.0.3", slots: [] },
+    },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({
+      gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 2 }),
+      catalog: chainCatalog(),
+      compatLoader: fixtureCompat(),
+    })
+  );
+  // Both boards fit the cap of 2; the pack does not. Had board 1 not fit, it
+  // would stay on 3.0.3 and the pack release would have to suit it.
+  assert.equal(item(report, "powerbank slot 1").skipReason, "MAX_TARGETS_REACHED");
+  assert.equal(item(report, "powerbank slot 1").candidateVersion, "3.1.1");
+
+  const capped = await runEngine(
+    new FakeStation({ boards: { 0: { version: "3.0.3", slots: [chainPack("PB0001")] }, 1: { version: "3.0.3", slots: [] } } }),
+    "S1TT30",
+    options({
+      gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 1 }),
+      apply: false,
+      catalog: chainCatalog(),
+      compatLoader: fixtureCompat(),
+    })
+  );
+  assert.equal(item(capped, "interface board 1").skipReason, "MAX_TARGETS_REACHED");
+  assert.equal(item(capped, "powerbank slot 1").candidateVersion, "3.1.0");
+});
+
+// ---------------------------------------------------------------------------
+// Planning cost: a pack's charge is read only when the plan may flash it.
+// ---------------------------------------------------------------------------
+
+const CMD_STATUS = 0x01;
+const CMD_SLOTS = 0x05;
+const CMD_PB_FW_VER = 0x0a;
+const CMD_PB_FWU_HELLO = 0x11;
+
+test("with the run capped, only the packs that fit the cap have their charge read", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [1, 2, 3, 4, 5, 6].map((n) => pack(`PB000${n}`)) } },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 2 }) })
+  );
+  assert.deepEqual(report.results.map((r) => [r.label, r.success]), [
+    ["powerbank slot 1", true],
+    ["powerbank slot 2", true],
+  ]);
+  // Slots 1-2: one read for the plan, one just before the flash. Slots 3-6:
+  // none — every one of them was past the cap whatever its charge.
+  for (const s of [0, 1]) assert.equal(station.framesOf(CMD_STATUS, 0, s), 2, `slot ${s + 1}`);
+  for (const s of [2, 3, 4, 5]) assert.equal(station.framesOf(CMD_STATUS, 0, s), 0, `slot ${s + 1}`);
+  // Every pack's version is still read: the catalog judges releases against all of them.
+  for (const s of [0, 1, 2, 3, 4, 5]) assert.ok(station.framesOf(CMD_PB_FW_VER, 0, s) >= 1);
+  assert.equal(item(report, "powerbank slot 3").skipReason, "MAX_TARGETS_REACHED");
+  assert.equal(report.inventory.powerbanks[2].slot.chargeRead, false);
+  assert.equal(report.inventory.powerbanks[0].slot.chargeRead, undefined);
+  assert.equal(report.summary.updatesPending, true);
+});
+
+test("a pack too low to flash frees its place in the cap for the next one", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { level: 10 }), pack("PB0002"), pack("PB0003")] } },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, gates: defaultGates({ cliVersion: [0, 4, 0], maxTargets: 1 }) })
+  );
+  assert.equal(item(report, "powerbank slot 1").skipReason, "BATTERY_TOO_LOW");
+  assert.deepEqual(report.results.map((r) => [r.label, r.success]), [["powerbank slot 2", true]]);
+  assert.equal(item(report, "powerbank slot 3").skipReason, "MAX_TARGETS_REACHED");
+  assert.equal(station.framesOf(CMD_STATUS, 0, 0), 1);
+  assert.equal(station.framesOf(CMD_STATUS, 0, 2), 0);
+});
+
+test("a pack already up to date costs no charge read at all", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { version: "3.0.4" }), pack("PB0002", { version: "3.0.4" })] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(item(report, "powerbank slot 1").skipReason, "UP_TO_DATE");
+  assert.equal(station.framesOf(CMD_STATUS, 0), 0);
+});
+
+test("fw-status still reads every docked pack's charge", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001"), pack("PB0002", { version: "3.0.4" })] } },
+  });
+  const report = await runEngine(
+    station,
+    "S1TT30",
+    options({ filter: { boards: [0], slots: [] }, online: false, apply: false })
+  );
+  assert.equal(station.framesOf(CMD_STATUS, 0), 2);
+  assert.equal(report.inventory.powerbanks[1].slot.powerLevel, 85);
+});
+
+test("a pack that never answers on the pogo link is reported unreachable", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { linkDead: true })] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(item(report, "powerbank slot 1").skipReason, "UNREACHABLE");
+  assert.equal(station.framesOf(CMD_PB_FW_VER, 0, 0), 3, "FW_VER: BaseCommand's 3 tries");
+  assert.equal(station.framesOf(CMD_STATUS, 0, 0), 0);
+});
+
+test("F13: a pack in its bootloader whose FW_VER times out is still found by HELLO and recovered", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.1.0", slots: [pack("PB0001", { blSilent: true, faults: { noValidApp: true } })] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  assert.equal(report.inventory.powerbanks[0].inBootloader, true);
+  assert.ok(station.framesOf(CMD_PB_FWU_HELLO, 0, 0) >= 1, "HELLO probe after the timeout");
+  assert.deepEqual(
+    report.results.map((r) => [r.label, r.success, r.verifiedVersion]),
+    [["powerbank slot 1", true, "3.0.4"]]
+  );
+});
+
+test("a board that does not answer at all is not asked for its slots", async () => {
+  const station = new FakeStation({
+    boards: {
+      0: { version: "3.1.0", slots: [] },
+      1: { version: "3.0.3", silent: true, slots: [pack("PB0007")] },
+    },
+  });
+  const report = await runEngine(station, "S1TT30", options());
+  assert.equal(item(report, "interface board 1").skipReason, "UNREACHABLE");
+  assert.equal(station.framesOf(CMD_SLOTS, 1), 0);
+  assert.ok(report.warnings.some((w) => /Board 1 application is not running/.test(w)));
+});
+
+test("a pack that loses frames mid-transfer is still flashed in one attempt", async () => {
+  const station = new FakeStation({
+    boards: { 0: { version: "3.1.0", slots: [pack("PB0001", { faults: { lostReplyAt: [2], lostRequestAt: [4] } })] } },
+  });
+  const report = await runEngine(station, "S1TT30", options({ filter: { boards: [0], slots: [] } }));
+  const r = report.results[0];
+  assert.equal(r.success, true, JSON.stringify(r.error));
+  assert.equal(r.attempts, 1);
+  assert.equal(r.attemptErrors, undefined);
+  assert.equal(r.verifiedVersion, "3.0.4");
+  assert.equal(r.chunkRetries, 3, "two re-sends and one resync, reported");
+});

@@ -24,6 +24,7 @@ import {
 } from "../protocol/types";
 import { debug } from "../../utils/debug";
 import { selectPort } from "../../utils/port_selector";
+import { isNoRetryMode } from "../../utils/test_modes";
 import { getStatusMessage, getStatusCode } from "../utils/status";
 import { calculatePowerLevel, isLowVoltage } from "../utils/power_level";
 import {
@@ -60,6 +61,8 @@ import { FwuHelloCommand, FwuHelloInfo } from "./commands/fwu_hello";
 import { FwuEnterCommand } from "./commands/fwu_enter";
 import { FwuExitCommand } from "./commands/fwu_exit";
 import { PbFirmwareCommand } from "./commands/pb_firmware";
+import { registerFwuCommands, withFirmwareLock } from "./commands/fwu_commands";
+import { resolveImageVersion } from "../fwu/image_version";
 import {
   cliInputValidatorEnable,
   cliInputValidatorIndex,
@@ -244,6 +247,9 @@ function parseInitializeOutcome(
  * Execute S1TTXX for all slots.
  */
 export async function runS1TTXXSlots(): Promise<void> {
+  // --no-retry (testing): read each slot once, so a failed read is reported
+  // instead of being retried away.
+  const statusReadAttempts = isNoRetryMode() ? 1 : STATUS_READ_ATTEMPTS;
   const startTime = Date.now();
   try {
     const slots: SlotsInfo[] = [];
@@ -295,10 +301,10 @@ export async function runS1TTXXSlots(): Promise<void> {
                 // attempt's failure is recorded.
                 for (
                   let attempt = 1;
-                  attempt <= STATUS_READ_ATTEMPTS && powerBankInfo === null;
+                  attempt <= statusReadAttempts && powerBankInfo === null;
                   attempt++
                 ) {
-                const isLastAttempt = attempt === STATUS_READ_ATTEMPTS;
+                const isLastAttempt = attempt === statusReadAttempts;
                 // Get status of powerbank
                 try {
                   const statusResponse = await statusCommand.execute(i, j);
@@ -369,13 +375,10 @@ export async function runS1TTXXSlots(): Promise<void> {
                       parseInt(powerBankInfo?.cutoffCharge) || 0;
                     packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
-                    const avgCapacity = powerBankInfo?.avgCapacity ?? 0;
                     powerLevel = calculatePowerLevel(
                       currentCharge,
                       totalCharge,
-                      cutoffCharge,
-                      avgCapacity,
-                      powerBankInfo?.status
+                      cutoffCharge
                     );
 
                     needsCharging = powerLevel < MAXIMUM_POWER_LEVEL;
@@ -600,6 +603,11 @@ export async function runS1TTXXSlots(): Promise<void> {
  * @param program - Commander program instance
  */
 export function registerS1TTXXCommands(program: Command): void {
+  // Headless firmware-update engine: fw-status / fw-plan / fw-apply.
+  // Kept in its own module so this file stays a flat list of one-shot
+  // device commands; the engine that composes them lives in ../../fwu.
+  registerFwuCommands(program);
+
   // Status command used to get the status of a powerbank in a specific board and slot
   program
     .command("status")
@@ -679,9 +687,7 @@ export function registerS1TTXXCommands(program: Command): void {
               const powerLevel = calculatePowerLevel(
                 powerBankInfo?.currentCharge,
                 powerBankInfo?.totalCharge,
-                powerBankInfo?.cutoffCharge,
-                powerBankInfo?.avgCapacity,
-                powerBankInfo?.status
+                powerBankInfo?.cutoffCharge
               );
               const packVoltageMv = powerBankInfo?.packVoltageMv ?? 0;
 
@@ -1046,7 +1052,7 @@ export function registerS1TTXXCommands(program: Command): void {
   program
     .command("firmware")
     .description("Get firmware version")
-    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .action(async (options: CommandOptions) => {
       const startTime = Date.now();
       const boardAddress = parseInt(options.board);
@@ -1169,7 +1175,7 @@ export function registerS1TTXXCommands(program: Command): void {
   program
     .command("pb-link-stats")
     .description("Get per-slot powerbank link retry telemetry")
-    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .option("--reset", "Clear counters after reading", false)
     .action(async (options: CommandOptions & { reset?: boolean }) => {
       try {
@@ -1222,12 +1228,80 @@ export function registerS1TTXXCommands(program: Command): void {
       }
     });
 
+  // Testing: read or lower the station's own powerbank-link attempts
+  // (HOST_CMD_PB_LINK_ATTEMPTS, host opcode 0x54; probed at run time, a
+  // firmware without it answers INVALID_CMD). RAM only on the
+  // station: a power cycle restores the default.
+  program
+    .command("pb-link-attempts")
+    .description(
+      "Read or set how many times the station tries each powerbank exchange (1 = no retry; needs station firmware with host opcode 0x54; RAM only, reboot restores)"
+    )
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
+    .option("--set <n>", "Attempts per powerbank exchange, 1-3 (1 = station retries off)")
+    .option("--reset", "Restore the firmware default", false)
+    .action(async (options: CommandOptions & { set?: string; reset?: boolean }) => {
+      const startTime = Date.now();
+      const boardAddress = parseInt(options.board);
+      let set = 0;
+      if (options.set !== undefined) {
+        set = Number(options.set);
+        if (!Number.isInteger(set) || set < 1 || set > 3) {
+          logger.error("--set must be 1, 2 or 3");
+          process.exit(1);
+        }
+      }
+      try {
+        const service = new SerialService(await selectPort());
+        await service.connect();
+        let result = await service.linkAttempts(boardAddress, set);
+        if (result !== null && options.reset && result[0] !== result[1]) {
+          result = await service.linkAttempts(boardAddress, result[1]);
+        }
+        await service.disconnect();
+        const out = {
+          success: result !== null,
+          executionTimeMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          boardAddress,
+          attempts: result ? result[0] : null,
+          defaultAttempts: result ? result[1] : null,
+          ...(result === null
+            ? {
+                error: {
+                  code: -1,
+                  message:
+                    "Not supported by this station firmware (it lacks host opcode 0x54, pb-link-attempts)",
+                },
+              }
+            : {}),
+        };
+        logger.log(JSON.stringify(out, null, 2));
+        if (result === null) process.exit(1);
+      } catch (error) {
+        logger.log(
+          JSON.stringify(
+            {
+              success: false,
+              executionTimeMs: Date.now() - startTime,
+              timestamp: new Date().toISOString(),
+              boardAddress,
+              error: { code: -1, message: error instanceof Error ? error.message : "Unknown error" },
+            },
+            null,
+            2
+          )
+        );
+        process.exit(1);
+      }
+    });
+
   // Lifetime per-slot solenoid trigger counters. Persisted to flash hourly.
   // Use --reset to read+clear+flush in one shot.
   program
     .command("stats")
     .description("Get per-slot solenoid usage counters")
-    .requiredOption("-b, --board <address>", "Board address (0-4)")
+    .requiredOption("-b, --board <address>", `Board address (${MINIMUM_BOARD_ADDRESS}-${getMaximumBoardAddress()})`)
     .option("--reset", "Clear counters after reading and flush to flash", false)
     .action(async (options: CommandOptions & { reset?: boolean }) => {
       try {
@@ -1433,8 +1507,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--app-version <hex>",
-      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Defaults to 0x00040000. (Not to be confused with the top-level CLI --version flag.)",
-      "0x00040000"
+      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Default: the image's own version, from the metadata.json next to it or its release asset name. (Not to be confused with the top-level CLI --version flag.)"
     )
     .option("--verbose", "Print per-chunk progress", false)
     .option(
@@ -1458,21 +1531,26 @@ export function registerS1TTXXCommands(program: Command): void {
           if (!options.image) {
             throw new Error("--image is required");
           }
-          const version = parseInt(options.appVersion ?? "0x00040000", 16) >>> 0;
+          const imageVersion = resolveImageVersion(options.image, options.appVersion);
+          const version = imageVersion.word;
           const interChunkDelayMs = parseInt(options.interChunkDelay ?? "0", 10);
 
           const port = await selectPort();
           const service = new SerialService(port);
           await service.connect();
 
-          const r = await runPbFirmwareUpdate(service, {
-            boardAddress: slotMapping.boardAddress,
-            slotInBoard: slotMapping.slotInBoard,
-            imagePath: options.image,
-            version,
-            verbose: options.verbose === true,
-            interChunkDelayMs,
-          });
+          // Held for the flash so the kiosk app stands down instead of
+          // killing this process when it finds the serial port busy.
+          const r = await withFirmwareLock(`pb-firmware-update -i ${index}`, () =>
+            runPbFirmwareUpdate(service, {
+              boardAddress: slotMapping.boardAddress,
+              slotInBoard: slotMapping.slotInBoard,
+              imagePath: options.image as string,
+              version,
+              verbose: options.verbose === true,
+              interChunkDelayMs,
+            })
+          );
 
           const out = {
             success: r.success,
@@ -1486,6 +1564,7 @@ export function registerS1TTXXCommands(program: Command): void {
               sizeBytes: r.imageSize,
               crc32: r.imageCrc32,
               version,
+              versionSource: imageVersion.source,
             },
             chunks: r.chunks,
             retries: r.retries,
@@ -1703,8 +1782,7 @@ export function registerS1TTXXCommands(program: Command): void {
     )
     .option(
       "--app-version <hex>",
-      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Defaults to 0x00000000.",
-      "0x00000000"
+      "App version stamped into the header as (major<<16)|(minor<<8)|patch. Default: the image's own version, from the metadata.json next to it or its release asset name."
     )
     .option("--verbose", "Print per-chunk progress", false)
     .option(
@@ -1719,20 +1797,25 @@ export function registerS1TTXXCommands(program: Command): void {
         if (!options.image) {
           throw new Error("--image is required");
         }
-        const version = parseInt(options.appVersion ?? "0x00000000", 16) >>> 0;
+        const imageVersion = resolveImageVersion(options.image, options.appVersion);
+        const version = imageVersion.word;
         const interChunkDelayMs = parseInt(options.interChunkDelay ?? "0", 10);
 
         const port = await selectPort();
         const service = new SerialService(port);
         await service.connect();
 
-        const r = await runStationFirmwareUpdate(service, {
-          boardAddress,
-          imagePath: options.image,
-          version,
-          verbose: options.verbose === true,
-          interChunkDelayMs,
-        });
+        // Held for the flash so the kiosk app stands down instead of
+        // killing this process when it finds the serial port busy.
+        const r = await withFirmwareLock(`firmware-update -b ${boardAddress}`, () =>
+          runStationFirmwareUpdate(service, {
+            boardAddress,
+            imagePath: options.image as string,
+            version,
+            verbose: options.verbose === true,
+            interChunkDelayMs,
+          })
+        );
 
         const out = {
           success: r.success,
@@ -1744,6 +1827,7 @@ export function registerS1TTXXCommands(program: Command): void {
             sizeBytes: r.imageSize,
             crc32: r.imageCrc32,
             version,
+            versionSource: imageVersion.source,
           },
           chunks: r.chunks,
           retries: r.retries,

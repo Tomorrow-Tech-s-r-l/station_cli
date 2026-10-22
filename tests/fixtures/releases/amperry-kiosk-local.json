@@ -1,0 +1,1520 @@
+[
+ {
+  "tagName": "v1.4.0-dev.23",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-18T11:51:14Z"
+ },
+ {
+  "tagName": "v1.4.0-dev.22",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-15T11:59:53Z"
+ },
+ {
+  "tagName": "v1.3.17",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-10-15T10:32:28Z"
+ },
+ {
+  "tagName": "v1.4.0-dev.21",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-15T10:26:15Z"
+ },
+ {
+  "tagName": "v1.4.0-dev.20",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-06T12:15:13Z"
+ },
+ {
+  "tagName": "v1.3.16",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-10-06T11:40:11Z"
+ },
+ {
+  "tagName": "v1.4.0-dev.19",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-02T07:55:37Z"
+ },
+ {
+  "tagName": "v1.4.0-dev.18",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-10-02T07:51:15Z"
+ },
+ {
+  "tagName": "v1.3.17-dev.16",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-09-11T19:24:24Z"
+ },
+ {
+  "tagName": "v1.3.16-dev.13",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-09-02T14:15:38Z"
+ },
+ {
+  "tagName": "v1.3.15-dev.12",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-09-02T11:45:47Z"
+ },
+ {
+  "tagName": "v1.3.14",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-26T07:08:08Z"
+ },
+ {
+  "tagName": "v1.3.13",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-26T06:16:54Z"
+ },
+ {
+  "tagName": "v1.3.12",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-25T16:43:03Z"
+ },
+ {
+  "tagName": "v1.3.11",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-25T15:25:27Z"
+ },
+ {
+  "tagName": "v1.3.10",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-24T16:08:08Z"
+ },
+ {
+  "tagName": "v1.3.10-dev.8",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-08-24T15:20:29Z"
+ },
+ {
+  "tagName": "v1.3.9",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-08-23T19:23:43Z"
+ },
+ {
+  "tagName": "v1.3.9-dev.8",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-08-23T18:57:04Z"
+ },
+ {
+  "tagName": "v1.3.8",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-07-24T08:14:04Z"
+ },
+ {
+  "tagName": "v1.3.8-dev.7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-07-12T09:22:38Z"
+ },
+ {
+  "tagName": "v1.3.7-dev.6",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-07-02T09:12:25Z"
+ },
+ {
+  "tagName": "v1.3.6-dev.5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-30T12:03:03Z"
+ },
+ {
+  "tagName": "v1.3.5",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-16T17:19:03Z"
+ },
+ {
+  "tagName": "v1.3.4",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-14T15:14:41Z"
+ },
+ {
+  "tagName": "v1.3.4-dev.3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-14T14:37:59Z"
+ },
+ {
+  "tagName": "v1.3.2-dev.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-13T10:17:02Z"
+ },
+ {
+  "tagName": "v1.3.1-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-13T09:08:19Z"
+ },
+ {
+  "tagName": "v1.2.10",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-07T13:39:27Z"
+ },
+ {
+  "tagName": "v1.2.9",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-07T11:18:09Z"
+ },
+ {
+  "tagName": "v1.2.8-dev.61",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-07T07:45:08Z"
+ },
+ {
+  "tagName": "v1.2.8",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-07T07:42:14Z"
+ },
+ {
+  "tagName": "v1.2.7",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-06T22:03:42Z"
+ },
+ {
+  "tagName": "v1.2.6",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-06T21:41:37Z"
+ },
+ {
+  "tagName": "v1.2.5",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-06T17:35:09Z"
+ },
+ {
+  "tagName": "v1.2.4",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-06T11:18:06Z"
+ },
+ {
+  "tagName": "v1.2.3",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-06-05T20:04:34Z"
+ },
+ {
+  "tagName": "v1.2.3-dev.56",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-05T19:45:06Z"
+ },
+ {
+  "tagName": "v1.2.3-dev.54",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-06-05T13:59:50Z"
+ },
+ {
+  "tagName": "v1.2.2-dev.53",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-31T15:18:02Z"
+ },
+ {
+  "tagName": "v1.2.0-dev.51",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-29T15:33:00Z"
+ },
+ {
+  "tagName": "v1.1.0-dev.50",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-27T21:06:09Z"
+ },
+ {
+  "tagName": "v1.0.49",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-05-27T20:40:14Z"
+ },
+ {
+  "tagName": "v1.0.49-dev.49",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-27T17:29:32Z"
+ },
+ {
+  "tagName": "v1.0.48-dev.48",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-18T12:14:08Z"
+ },
+ {
+  "tagName": "v1.0.46-dev.46",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-06T13:42:53Z"
+ },
+ {
+  "tagName": "v1.0.45-dev.45",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-05-06T11:48:44Z"
+ },
+ {
+  "tagName": "v1.0.44-dev.44",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-04-30T09:14:38Z"
+ },
+ {
+  "tagName": "v1.0.43-dev.43",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-04-15T12:04:56Z"
+ },
+ {
+  "tagName": "v1.0.43",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-04-15T11:44:57Z"
+ },
+ {
+  "tagName": "v1.0.42-dev.42",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-04-15T11:09:09Z"
+ },
+ {
+  "tagName": "v1.0.42",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-04-15T11:08:58Z"
+ },
+ {
+  "tagName": "v1.0.41",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-04-06T15:27:23Z"
+ },
+ {
+  "tagName": "v1.0.40",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-04-06T15:13:52Z"
+ },
+ {
+  "tagName": "v1.0.39",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-04-06T14:50:56Z"
+ },
+ {
+  "tagName": "v1.0.38",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-04-06T14:06:49Z"
+ },
+ {
+  "tagName": "v1.0.37",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T14:26:59Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.37",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T14:19:19Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.36",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T12:31:25Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.35",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T12:18:29Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.32",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T09:53:38Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.31",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T09:19:37Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.30",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-31T08:18:33Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.28",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-30T13:40:09Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.27",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-30T10:40:52Z"
+ },
+ {
+  "tagName": "v1.0.37-dev.26",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-27T08:52:18Z"
+ },
+ {
+  "tagName": "v1.0.36",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2026-03-27T07:39:26Z"
+ },
+ {
+  "tagName": "v1.0.36-dev.25",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-24T14:17:33Z"
+ },
+ {
+  "tagName": "v1.0.36-dev.22",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-23T13:52:20Z"
+ },
+ {
+  "tagName": "v1.0.35-dev.21",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-03-12T14:25:59Z"
+ },
+ {
+  "tagName": "v1.0.35-dev.4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-01-28T09:38:44Z"
+ },
+ {
+  "tagName": "v1.0.35-dev.3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-01-25T11:31:30Z"
+ },
+ {
+  "tagName": "v1.0.35-dev.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2026-01-24T16:21:37Z"
+ },
+ {
+  "tagName": "v1.0.35-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-25T15:47:20Z"
+ },
+ {
+  "tagName": "v1.0.34-dev.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-22T08:10:18Z"
+ },
+ {
+  "tagName": "v1.0.34-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-21T15:52:36Z"
+ },
+ {
+  "tagName": "v1.0.32",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-12-15T14:58:43Z"
+ },
+ {
+  "tagName": "v1.0.32-dev.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-15T14:54:26Z"
+ },
+ {
+  "tagName": "v1.0.32-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-15T14:43:02Z"
+ },
+ {
+  "tagName": "v1.0.31",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-12-15T14:05:31Z"
+ },
+ {
+  "tagName": "v1.0.31-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-12T14:40:42Z"
+ },
+ {
+  "tagName": "v1.0.30",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-12-11T13:56:08Z"
+ },
+ {
+  "tagName": "v1.0.30-dev.5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-11T13:54:36Z"
+ },
+ {
+  "tagName": "v1.0.29",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-12-09T22:33:22Z"
+ },
+ {
+  "tagName": "v1.0.29-dev.5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-09T22:11:54Z"
+ },
+ {
+  "tagName": "v1.0.29-dev.4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-07T11:19:05Z"
+ },
+ {
+  "tagName": "v1.0.29-dev.3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-07T10:36:12Z"
+ },
+ {
+  "tagName": "v1.0.29-dev.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-07T10:28:55Z"
+ },
+ {
+  "tagName": "v1.0.29-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-12-01T20:20:57Z"
+ },
+ {
+  "tagName": "v1.0.28",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-12-01T18:11:53Z"
+ },
+ {
+  "tagName": "v1.0.27-dev.5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-16T13:44:00Z"
+ },
+ {
+  "tagName": "v1.0.27-dev.4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-16T12:28:51Z"
+ },
+ {
+  "tagName": "v1.0.27-dev.3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-16T12:11:52Z"
+ },
+ {
+  "tagName": "v1.0.27-dev.2",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-16T12:02:35Z"
+ },
+ {
+  "tagName": "v1.0.27-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-16T11:45:13Z"
+ },
+ {
+  "tagName": "v1.0.27",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-11-11T22:37:56Z"
+ },
+ {
+  "tagName": "v1.0.26",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-11-10T08:43:03Z"
+ },
+ {
+  "tagName": "v1.0.26-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-10T07:33:42Z"
+ },
+ {
+  "tagName": "v1.0.25",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-11-03T20:06:52Z"
+ },
+ {
+  "tagName": "v1.0.25-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-11-03T20:05:20Z"
+ },
+ {
+  "tagName": "v1.0.24",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T13:07:42Z"
+ },
+ {
+  "tagName": "v1.0.24-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T13:06:06Z"
+ },
+ {
+  "tagName": "v1.0.23",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T11:24:58Z"
+ },
+ {
+  "tagName": "v1.0.23-dev.7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T10:59:22Z"
+ },
+ {
+  "tagName": "v1.0.23-dev.6",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T10:47:21Z"
+ },
+ {
+  "tagName": "v1.0.23-dev.5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T10:27:23Z"
+ },
+ {
+  "tagName": "v1.0.23-dev.4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T10:05:28Z"
+ },
+ {
+  "tagName": "v1.0.23-dev.3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T09:52:03Z"
+ },
+ {
+  "tagName": "v1.0.23-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T09:40:01Z"
+ },
+ {
+  "tagName": "v1.0.22-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T09:18:55Z"
+ },
+ {
+  "tagName": "v1.0.20-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-31T08:34:13Z"
+ },
+ {
+  "tagName": "v1.0.19-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-30T14:32:41Z"
+ },
+ {
+  "tagName": "v1.0.18-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-29T15:21:07Z"
+ },
+ {
+  "tagName": "v1.0.17-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T21:27:43Z"
+ },
+ {
+  "tagName": "v1.0.17",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T20:17:05Z"
+ },
+ {
+  "tagName": "v1.0.16",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T20:11:54Z"
+ },
+ {
+  "tagName": "v1.0.15",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T19:59:56Z"
+ },
+ {
+  "tagName": "v1.0.14",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T19:39:08Z"
+ },
+ {
+  "tagName": "v1.0.13",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T19:12:15Z"
+ },
+ {
+  "tagName": "v1.0.12",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T19:03:22Z"
+ },
+ {
+  "tagName": "v1.0.11",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T18:54:00Z"
+ },
+ {
+  "tagName": "v1.0.10",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T18:26:23Z"
+ },
+ {
+  "tagName": "v1.0.9",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T17:31:10Z"
+ },
+ {
+  "tagName": "v1.0.8",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T17:17:29Z"
+ },
+ {
+  "tagName": "v1.0.7",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T16:24:19Z"
+ },
+ {
+  "tagName": "v1.0.7-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T16:22:37Z"
+ },
+ {
+  "tagName": "v1.0.6-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T15:07:18Z"
+ },
+ {
+  "tagName": "v1.0.6",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T14:42:41Z"
+ },
+ {
+  "tagName": "v1.0.5",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T14:25:42Z"
+ },
+ {
+  "tagName": "v1.0.5-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-28T14:23:58Z"
+ },
+ {
+  "tagName": "v1.0.4",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-27T18:44:26Z"
+ },
+ {
+  "tagName": "v1.0.4-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-27T18:42:43Z"
+ },
+ {
+  "tagName": "v1.0.2",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-27T18:00:00Z"
+ },
+ {
+  "tagName": "v1.0.2-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-27T17:58:17Z"
+ },
+ {
+  "tagName": "v1.0.1",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-23T14:58:43Z"
+ },
+ {
+  "tagName": "v1.0.1-dev.1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-23T13:19:40Z"
+ },
+ {
+  "tagName": "v1.0.0",
+  "isPrerelease": false,
+  "isDraft": false,
+  "publishedAt": "2025-10-18T14:18:19Z"
+ },
+ {
+  "tagName": "20251008155508-18349902862-e6fa170",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-08T15:55:10Z"
+ },
+ {
+  "tagName": "20251007094518-18308097173-ff0219d",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-07T09:45:19Z"
+ },
+ {
+  "tagName": "20251007094323-18308051148-140b267",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-07T09:43:24Z"
+ },
+ {
+  "tagName": "20251006211718-18294145994-4e548e1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-06T21:17:19Z"
+ },
+ {
+  "tagName": "20251005091414-18256515168-69cc47f",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-05T09:14:15Z"
+ },
+ {
+  "tagName": "20251005084829-18256248474-38fd219",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-05T08:48:30Z"
+ },
+ {
+  "tagName": "20251005084448-18256211512-f4418e7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-05T08:44:49Z"
+ },
+ {
+  "tagName": "20251004155117-18246176390-3a67b95",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T15:51:18Z"
+ },
+ {
+  "tagName": "20251004132141-18244624174-9796403",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T13:21:43Z"
+ },
+ {
+  "tagName": "20251004132131-18244619163-2de25fc",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T13:21:32Z"
+ },
+ {
+  "tagName": "20251004131017-18244484663-53b0b41",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T13:10:18Z"
+ },
+ {
+  "tagName": "20251004123647-18244142926-e29a959",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T12:36:48Z"
+ },
+ {
+  "tagName": "20251004121715-18243958456-0c69458",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-04T12:17:16Z"
+ },
+ {
+  "tagName": "20251003152456-18225939296-6b45b61",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T15:24:57Z"
+ },
+ {
+  "tagName": "20251003151924-18225785736-3e58ff6",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T15:19:26Z"
+ },
+ {
+  "tagName": "20251003151144-18225639354-5dc2fac",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T15:11:45Z"
+ },
+ {
+  "tagName": "20251003144552-18224993389-a234c39",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T14:45:54Z"
+ },
+ {
+  "tagName": "20251003133942-18223358656-c48420e",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T13:39:43Z"
+ },
+ {
+  "tagName": "20251003130052-18222441132-32f7478",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T13:00:53Z"
+ },
+ {
+  "tagName": "20251003125102-18222229893-23638ef",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T12:51:03Z"
+ },
+ {
+  "tagName": "20251003124336-18222076101-57eba12",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T12:43:37Z"
+ },
+ {
+  "tagName": "20251003114717-18220774485-419c1a6",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T11:47:18Z"
+ },
+ {
+  "tagName": "20251003114135-18220802510-68f86af",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T11:41:37Z"
+ },
+ {
+  "tagName": "20251003112941-18220559688-a671345",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T11:29:42Z"
+ },
+ {
+  "tagName": "20251003112242-18220403664-36a9f14",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T11:22:43Z"
+ },
+ {
+  "tagName": "20251003111320-18220243754-9928c16",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T11:13:21Z"
+ },
+ {
+  "tagName": "20251003105105-18219792297-eaac274",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T10:51:06Z"
+ },
+ {
+  "tagName": "20251003103714-18219442168-23068e8",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T10:37:15Z"
+ },
+ {
+  "tagName": "20251003102145-18219148090-8452755",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T10:21:46Z"
+ },
+ {
+  "tagName": "20251003094416-18218328671-1e59497",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-10-03T09:44:17Z"
+ },
+ {
+  "tagName": "20250918161809-17834269899-3c88d92",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-18T16:18:10Z"
+ },
+ {
+  "tagName": "20250918161706-17834304521-34a909e",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-18T16:17:07Z"
+ },
+ {
+  "tagName": "20250917204238-17809659824-bff26b9",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-17T20:42:39Z"
+ },
+ {
+  "tagName": "20250917204016-17809587920-d2f57a4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-17T20:40:16Z"
+ },
+ {
+  "tagName": "20250917203811-17809528798-ae09d83",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-17T20:38:12Z"
+ },
+ {
+  "tagName": "20250917195942-17808675740-d81ee15",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-17T19:59:43Z"
+ },
+ {
+  "tagName": "20250916214344-17779352833-4137517",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T21:43:45Z"
+ },
+ {
+  "tagName": "20250916213134-17779065487-702c3d4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T21:31:35Z"
+ },
+ {
+  "tagName": "20250916210334-17778458506-ea0b8a9",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T21:03:36Z"
+ },
+ {
+  "tagName": "20250916180524-17774298529-878774f",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T18:05:25Z"
+ },
+ {
+  "tagName": "20250916174625-17773841067-9fe0725",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T17:46:26Z"
+ },
+ {
+  "tagName": "20250916171756-17773135463-3ac48ee",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T17:17:57Z"
+ },
+ {
+  "tagName": "20250916133933-17767023357-dc715e0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T13:39:35Z"
+ },
+ {
+  "tagName": "20250916075830-17758315431-d86afc5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T07:58:31Z"
+ },
+ {
+  "tagName": "20250916074249-17757929422-03cac85",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T07:42:51Z"
+ },
+ {
+  "tagName": "20250916072336-17757453348-7142568",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-16T07:23:37Z"
+ },
+ {
+  "tagName": "20250915220243-17747430958-09c59c7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-15T22:02:44Z"
+ },
+ {
+  "tagName": "20250915214914-17747118924-595d1c4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-15T21:49:15Z"
+ },
+ {
+  "tagName": "20250915212010-17746380548-becbb1d",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-15T21:20:12Z"
+ },
+ {
+  "tagName": "20250915175345-17741506213-ac8804a",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-15T17:53:46Z"
+ },
+ {
+  "tagName": "20250915174105-17741183137-9779eff",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-15T17:41:06Z"
+ },
+ {
+  "tagName": "20250915173335-17741000036-fb668ed",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-15T17:33:36Z"
+ },
+ {
+  "tagName": "20250908115427-17548878251-79acbf6",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:54:29Z"
+ },
+ {
+  "tagName": "20250908115248-17548801262-a1987ca",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:52:49Z"
+ },
+ {
+  "tagName": "20250908115057-17548786959-07214bb",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:50:58Z"
+ },
+ {
+  "tagName": "20250908111745-17547967645-c19d472",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:17:46Z"
+ },
+ {
+  "tagName": "20250908111133-17547792011-6af5a23",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:11:35Z"
+ },
+ {
+  "tagName": "20250908110249-17547589949-d5a7e2c",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:02:50Z"
+ },
+ {
+  "tagName": "20250908110234-17547561036-0573524",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T11:02:35Z"
+ },
+ {
+  "tagName": "20250908105534-17547395950-ee95f68",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T10:55:35Z"
+ },
+ {
+  "tagName": "20250908105153-17547315357-bce2f49",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T10:51:54Z"
+ },
+ {
+  "tagName": "20250908104619-17547144522-4af892d",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T10:46:20Z"
+ },
+ {
+  "tagName": "20250908102831-17546708819-1e8e4ea",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T10:28:32Z"
+ },
+ {
+  "tagName": "20250908100916-17546182705-aca39fa",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T10:09:17Z"
+ },
+ {
+  "tagName": "20250908095525-17545819837-d960d7c",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T09:55:26Z"
+ },
+ {
+  "tagName": "20250908094938-17545657842-5af1728",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T09:49:39Z"
+ },
+ {
+  "tagName": "20250908093706-17545350500-d680161",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T09:37:07Z"
+ },
+ {
+  "tagName": "20250908093444-17545238553-d8cdbc0",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T09:34:45Z"
+ },
+ {
+  "tagName": "20250908083547-17543795517-8c04bf4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T08:35:48Z"
+ },
+ {
+  "tagName": "20250908083239-17543566812-6a14826",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T08:32:41Z"
+ },
+ {
+  "tagName": "20250908075203-17542756305-76dcd57",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T07:52:04Z"
+ },
+ {
+  "tagName": "20250908074326-17542559617-4270250",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T07:43:27Z"
+ },
+ {
+  "tagName": "20250908073954-17542495593-c1ddea4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-08T07:39:55Z"
+ },
+ {
+  "tagName": "20250907215229-17533922088-e6647ea",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-07T21:52:30Z"
+ },
+ {
+  "tagName": "20250907210738-17533480928-bfcb670",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-07T21:07:40Z"
+ },
+ {
+  "tagName": "20250906182943-17517643234-8ab7b0a",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-06T18:29:44Z"
+ },
+ {
+  "tagName": "20250906181225-17517489470-e977754",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-06T18:12:26Z"
+ },
+ {
+  "tagName": "20250906175748-17517329794-c55865c",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-06T17:57:49Z"
+ },
+ {
+  "tagName": "20250906173926-17517144279-21ba621",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-06T17:39:26Z"
+ },
+ {
+  "tagName": "20250906163152-17516491116-c3cf88f",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-06T16:31:53Z"
+ },
+ {
+  "tagName": "20250905154757-17496914241-9734251",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-05T15:47:58Z"
+ },
+ {
+  "tagName": "20250905153304-17496608306-07aed4d",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-05T15:33:05Z"
+ },
+ {
+  "tagName": "20250905151046-17496092192-7c68a88",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-05T15:10:47Z"
+ },
+ {
+  "tagName": "20250905145114-17495543642-ed69fcc",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-05T14:51:15Z"
+ },
+ {
+  "tagName": "20250905134307-17493935364-08e18a7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-09-05T13:43:07Z"
+ },
+ {
+  "tagName": "20250830155559-17345369900-8d7c19d",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-30T15:56:00Z"
+ },
+ {
+  "tagName": "20250830145419-17344776864-a87655c",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-30T14:54:20Z"
+ },
+ {
+  "tagName": "20250830143719-17344614773-b5f9790",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-30T14:37:20Z"
+ },
+ {
+  "tagName": "20250827163114-17271836684-23745c3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-27T16:31:15Z"
+ },
+ {
+  "tagName": "20250821092310-17121787146-dc60afe",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-21T09:23:11Z"
+ },
+ {
+  "tagName": "20250821090612-17121411910-5314cfa",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-21T09:06:13Z"
+ },
+ {
+  "tagName": "20250821084548-17120964173-0a67cc4",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-21T08:45:49Z"
+ },
+ {
+  "tagName": "20250821084100-17120839354-a3f656a",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-21T08:41:01Z"
+ },
+ {
+  "tagName": "20250820225945-17111691688-d3c20b1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-20T22:59:45Z"
+ },
+ {
+  "tagName": "20250820223624-17111250908-3dab60d",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-20T22:36:25Z"
+ },
+ {
+  "tagName": "20250816223303-17013276807-e6ab12e",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T22:33:04Z"
+ },
+ {
+  "tagName": "20250816222549-17013222942-6fcc5f9",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T22:25:50Z"
+ },
+ {
+  "tagName": "20250816215923-17013009906-e9e31fd",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T21:59:24Z"
+ },
+ {
+  "tagName": "20250816153330-17009677465-ad6a57f",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T15:33:31Z"
+ },
+ {
+  "tagName": "20250816152403-17009623736-29e8881",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T15:24:04Z"
+ },
+ {
+  "tagName": "20250816151004-17009492462-14d6228",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T15:10:04Z"
+ },
+ {
+  "tagName": "20250816150806-17009457943-dd9f314",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T15:08:07Z"
+ },
+ {
+  "tagName": "20250816092825-17006525796-6753972",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T09:28:26Z"
+ },
+ {
+  "tagName": "20250816091903-17006437759-b8bfbea",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-16T09:19:03Z"
+ },
+ {
+  "tagName": "20250810075643-16858656628-cbd2262",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-08-10T07:56:44Z"
+ },
+ {
+  "tagName": "20250701153241-16002765152-d8fbfe1",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-07-01T15:32:42Z"
+ },
+ {
+  "tagName": "20250630151834-15975917092-224fa02",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-30T15:18:36Z"
+ },
+ {
+  "tagName": "20250627104707-15923743382-cdb0ec5",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-27T10:47:08Z"
+ },
+ {
+  "tagName": "20250627104624-15923714605-aa16179",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-27T10:46:25Z"
+ },
+ {
+  "tagName": "20250627104057-15923620941-ca1e7c7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-27T10:40:58Z"
+ },
+ {
+  "tagName": "20250627103316-15923485374-a13cae9",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-27T10:33:16Z"
+ },
+ {
+  "tagName": "20250627102320-15923294270-efe3c7c",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-27T10:23:21Z"
+ },
+ {
+  "tagName": "20250627102020-15923242245-48e55c9",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-27T10:20:21Z"
+ },
+ {
+  "tagName": "20250623121706-15823152805-eefdac3",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-23T12:17:07Z"
+ },
+ {
+  "tagName": "20250605101551-15463660942-35298db",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-05T10:15:52Z"
+ },
+ {
+  "tagName": "20250605091640-b69b7e7",
+  "isPrerelease": true,
+  "isDraft": false,
+  "publishedAt": "2025-06-05T09:16:41Z"
+ }
+]

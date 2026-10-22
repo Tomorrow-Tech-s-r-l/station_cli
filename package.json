@@ -1,8 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "station-cli",
-  "version": "0.3.1",
-  "minKioskAppVersion": "1.2.0",
+  "version": "0.5.2",
   "description": "CLI tool to control station board and powerbanks",
   "main": "dist/cli.js",
   "bin": {
@@ -23,6 +22,7 @@
   "pkg": {
     "assets": [
       "dist/**/*",
+      "bundle/**/*",
       "node_modules/@serialport/bindings-cpp/build/**/*",
       "node_modules/@serialport/bindings-cpp/prebuilds/**/*"
     ],
@@ -37,9 +37,11 @@
     "clean": "node scripts/clean.js",
     "test": "npm run build && node scripts/run-unit-tests.js",
     "build": "tsc && node scripts/mark-executable.js",
+    "lint": "tsc --noEmit -p . && node scripts/check-workflows.js",
     "prepublishOnly": "npm run test",
     "release": "node scripts/release.js",
     "start": "node dist/cli.js",
+    "test:unit": "npm run build && node scripts/gen-test-cert.js && NODE_EXTRA_CA_CERTS=\"${TMPDIR:-/tmp}/fwu-test-cert/cert.pem\" node --test tests/*.test.js",
     "dev": "ts-node src/cli.ts",
     "build:executable:macos": "npm run clean && npm ci && npm run test && npx pkg . --targets node18-macos-arm64 --output executables/station-cli-macos-arm64",
     "build:executable:linux": "npm run clean && npm ci && npm run test && npx pkg . --targets node18-linux-arm64 --output executables/station-cli-linux-arm64",

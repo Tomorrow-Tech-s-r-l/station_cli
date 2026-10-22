@@ -1,0 +1,92 @@
+{
+  "format": "compatibility/v1",
+  "sequence": 42,
+  "generated_at": "2026-10-18T10:00:00Z",
+  "edges": [["S1TTXX", "station_cli"], ["S1TTXX", "P1TT2C"], ["P1TT2C", "station_cli"], ["kiosk", "station_cli"]],
+  "components": {
+    "S1TTXX": {
+      "repo": "Tomorrow-Tech-s-r-l/S1TTXX-firmware",
+      "releases": {
+        "dev-v3.2.0": {
+          "version": "3.2.0-dev",
+          "channel": "development",
+          "requires": {
+            "station_cli": { "min": "0.4.0", "min_tag": "dev-v0.4.0", "no_compatible": false, "tested": ["v0.3.1", "dev-v0.4.0", "dev-v0.5.0"], "failed": ["v0.3.1"], "evidence": ["https://example.invalid/runs/1"] },
+            "P1TT2C": { "min": null, "min_tag": null, "no_compatible": true, "tested": ["v3.0.2", "dev-v3.1.0"], "failed": ["dev-v3.1.0"], "evidence": ["https://example.invalid/runs/2"] }
+          }
+        },
+        "v3.0.3": {
+          "version": "3.0.3",
+          "channel": "production",
+          "requires": {
+            "station_cli": { "min": "0.3.1", "min_tag": "v0.3.1", "no_compatible": false, "tested": ["v0.3.1", "dev-v0.4.0", "dev-v0.5.0"], "failed": [], "evidence": ["https://example.invalid/runs/1"] },
+            "P1TT2C": { "min": "3.0.0", "min_tag": "v3.0.0", "no_compatible": false, "tested": ["v3.0.0", "v3.0.2"], "failed": [], "evidence": ["https://example.invalid/runs/2"] }
+          }
+        },
+        "v3.0.1": {
+          "version": "3.0.1",
+          "channel": "production",
+          "requires": {
+            "station_cli": { "min": "0.3.1", "min_tag": "v0.3.1", "no_compatible": false, "tested": ["v0.3.1"], "failed": [], "evidence": [] },
+            "P1TT2C": { "min": "3.0.2", "min_tag": "v3.0.2", "no_compatible": false, "tested": ["v3.0.2"], "failed": [], "evidence": [] }
+          }
+        }
+      }
+    },
+    "P1TT2C": {
+      "repo": "Tomorrow-Tech-s-r-l/P1TT2C-firmware",
+      "releases": {
+        "dev-v3.1.0": {
+          "version": "3.1.0-dev",
+          "channel": "development",
+          "requires": {
+            "S1TTXX": { "min": "3.2.0-dev", "min_tag": "dev-v3.2.0", "no_compatible": false, "tested": ["v3.0.3", "dev-v3.2.0"], "failed": ["v3.0.3"], "evidence": [] },
+            "station_cli": { "min": "0.4.0", "min_tag": "dev-v0.4.0", "no_compatible": false, "tested": ["dev-v0.4.0", "dev-v0.5.0"], "failed": [], "evidence": [] }
+          }
+        },
+        "v3.0.2": {
+          "version": "3.0.2",
+          "channel": "production",
+          "requires": {
+            "S1TTXX": { "min": "3.0.3", "min_tag": "v3.0.3", "no_compatible": false, "tested": ["v3.0.3", "dev-v3.2.0"], "failed": [], "evidence": [] },
+            "station_cli": { "min": "0.3.1", "min_tag": "v0.3.1", "no_compatible": false, "tested": ["v0.3.1", "dev-v0.5.0"], "failed": [], "evidence": [] }
+          }
+        },
+        "v3.0.0": {
+          "version": "3.0.0",
+          "channel": "production",
+          "requires": {
+            "S1TTXX": { "min": "3.0.3", "min_tag": "v3.0.3", "no_compatible": false, "tested": ["v3.0.3"], "failed": [], "evidence": [] }
+          }
+        }
+      }
+    },
+    "station_cli": {
+      "repo": "Tomorrow-Tech-s-r-l/station_cli",
+      "releases": {
+        "dev-v0.5.0": {
+          "version": "0.5.0-dev",
+          "channel": "development",
+          "requires": {
+            "S1TTXX": { "min": "3.0.3", "min_tag": "v3.0.3", "no_compatible": false, "tested": ["v3.0.3", "dev-v3.2.0"], "failed": [], "evidence": [] },
+            "kiosk": { "min": "1.3.14", "min_tag": "v1.3.14", "no_compatible": false, "tested": ["v1.3.14", "v1.4.0-dev.23"], "failed": [], "evidence": [] }
+          }
+        },
+        "v0.3.1": {
+          "version": "0.3.1",
+          "channel": "production",
+          "requires": {
+            "S1TTXX": { "min": "3.0.1", "min_tag": "v3.0.1", "no_compatible": false, "tested": ["v3.0.1", "v3.0.3"], "failed": [], "evidence": [] }
+          }
+        },
+        "v0.3.0": {
+          "version": "0.3.0",
+          "channel": "production",
+          "requires": {
+            "S1TTXX": { "min": "3.0.3", "min_tag": "v3.0.3", "no_compatible": false, "tested": ["v3.0.3"], "failed": [], "evidence": [] }
+          }
+        }
+      }
+    }
+  }
+}

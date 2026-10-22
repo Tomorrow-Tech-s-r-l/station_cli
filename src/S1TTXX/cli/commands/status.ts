@@ -38,17 +38,7 @@ export class StatusCommand extends BaseCommand {
       //   18..19 cutoffCharge
       //   20..21 cycles
       //   22     status
-      //   23..24 avgCapacity (added with BF-260512 adaptive-capacity fix; 0 on old fw)
-      //
-      // packVoltageMv is NOT implemented by this S1TTXX-firmware checkout:
-      // that feature exists upstream (commit ceae8b3) behind a dedicated
-      // PB_CMD_INFO_EXT opcode, but this checkout was deliberately left
-      // un-synced (BF-260512 follow-up) and P1TT2C doesn't implement that
-      // opcode either. It's hardcoded to 0 rather than derived from length
-      // so it can't be mistaken for avgCapacity, which also lands at
-      // offset 23..24 and is what actually makes response.data.length hit
-      // 25 on current firmware.
-      const hasAvgCapacity = response.data.length >= 25;
+      //   23..24 packVoltageMv (INFO_EXT tail; absent on boards ≤ v3.0.1, 0 after the 0x01 fallback)
       const info: PowerbankInfo = {
         serial: response.data
           .subarray(0, 10)
@@ -61,8 +51,8 @@ export class StatusCommand extends BaseCommand {
         cutoffCharge: response.data.readUInt16LE(18),
         cycles: response.data.readUInt16LE(20),
         status: response.data.readUInt8(22),
-        packVoltageMv: 0,
-        avgCapacity: hasAvgCapacity ? response.data.readUInt16LE(23) : 0,
+        packVoltageMv:
+          response.data.length >= 25 ? response.data.readUInt16LE(23) : 0,
       };
       return { ...response, data: Buffer.from(JSON.stringify(info)) };
     }

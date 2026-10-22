@@ -1,0 +1,28 @@
+{
+  "schema": 2,
+  "component": "station_cli",
+  "tag": "dev-v0.5.1",
+  "version": "0.5.1-dev",
+  "channel": "development",
+  "requires": {},
+  "computed": {
+    "run_url": "https://github.com/Tomorrow-Tech-s-r-l/station_cli/actions/runs/1",
+    "suite_ref": "abc",
+    "at": "2026-10-18T12:00:00Z",
+    "carried_forward": [
+      "min_kiosk_app_version"
+    ],
+    "carried_from": {
+      "min_kiosk_app_version": {
+        "source": "compatibility.json",
+        "sequence": 2,
+        "tag": "dev-v0.5.0",
+        "evidence": [
+          "https://github.com/Tomorrow-Tech-s-r-l/amperry-kiosk-local/actions/runs/0"
+        ]
+      }
+    }
+  },
+  "cli_version": "0.5.1",
+  "min_kiosk_app_version": "1.3.17"
+}

@@ -56,16 +56,15 @@ if [ ! -f "$image" ]; then
 fi
 image_size=$(wc -c < "$image" | tr -d '[:space:]')
 
-read_input "App version hex (e.g. 0x00040001) [default: 0x00040000]: " version
-if [ -z "$version" ]; then
-    version="0x00040000"
-fi
+# Empty: the CLI takes the version from the image (metadata.json next to it,
+# or the release asset name) and refuses to flash when it cannot tell.
+read_input "App version hex (e.g. 0x00030200) [default: the image's own version]: " version
 
 echo ""
 echo "Firmware-update integration test"
 echo "  slot index: $index"
 echo "  image:      $image  (${image_size} B)"
-echo "  version:    $version"
+echo "  version:    ${version:-from the image}"
 echo ""
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -77,7 +76,7 @@ LOG_FILE="$SCRIPT_DIR/firmware_update_${TIMESTAMP}.log"
     echo "Slot:    $index"
     echo "Image:   $image"
     echo "Size:    $image_size"
-    echo "Version: $version"
+    echo "Version: ${version:-from the image}"
     echo ""
     echo "=========================================="
     echo "Step 1 — pb-firmware-update"
@@ -86,7 +85,7 @@ LOG_FILE="$SCRIPT_DIR/firmware_update_${TIMESTAMP}.log"
     update_output=$("$EXECUTABLE" pb-firmware-update \
         -i "$index" \
         --image "$image" \
-        --app-version "$version" \
+        ${version:+--app-version "$version"} \
         --verbose 2>&1)
     update_rc=$?
     echo "$update_output"

@@ -1,6 +1,7 @@
 import { SerialPort } from "serialport";
 import { debug } from "../../utils/debug";
 import { BAUD_RATE } from "../../utils/constants";
+import { serialTrace } from "../../utils/serial_trace";
 import { Envelope, parseEnvelopeLine } from "../protocol/envelope";
 
 /**
@@ -70,6 +71,7 @@ export class SerialService {
       const line = this.rxBuffer.slice(0, nl).trim();
       this.rxBuffer = this.rxBuffer.slice(nl + 1);
       if (!line) continue;
+      serialTrace("rx", this.portPath, Buffer.from(line, "ascii"));
       const env = parseEnvelopeLine(line);
       if (!env) {
         debug.log("Ignoring non-envelope line:", JSON.stringify(line));
@@ -107,6 +109,7 @@ export class SerialService {
     }
     const line = JSON.stringify(env) + "\n";
     debug.log("TX envelope:", JSON.stringify(line));
+    serialTrace("tx", this.portPath, Buffer.from(line, "ascii"));
     return new Promise((resolve, reject) => {
       this.port!.write(Buffer.from(line, "ascii"), (err: any) => {
         if (err) {

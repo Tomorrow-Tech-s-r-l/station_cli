@@ -59,7 +59,7 @@ export function registerS0TTXXCommands(program: Command): void {
     .command("s0ttxx-query")
     .alias("s0-query")
     .description("Get the slot map (sends cmd CQ → gateway forwards {0@CQ,0,0,<crc>})")
-    .option("-p, --port <port>", "Serial port (default: auto-detect / STATION_CLI_PORT)")
+    .option("-p, --port <port>", 'Serial port, e.g. COM3 or /dev/ttyUSB0 (default: STATION_CLI_PORT, else auto-detect; see "station-cli ports")')
     .action(async (options: CommandOptions) => {
       await runS0TTXXSlots(options.port);
     });
@@ -73,7 +73,7 @@ export function registerS0TTXXCommands(program: Command): void {
       `Slot index (${SLOT_INDEX_MINIMUM}-${getSlotIndexMaximum()})`,
       cliInputValidatorIndex
     )
-    .option("-p, --port <port>", "Serial port (default: auto-detect / STATION_CLI_PORT)")
+    .option("-p, --port <port>", 'Serial port, e.g. COM3 or /dev/ttyUSB0 (default: STATION_CLI_PORT, else auto-detect; see "station-cli ports")')
     .action(async (options: CommandOptions) => {
       await runS0TTXXUnlock(parseInt(options.index as string), options.port);
     });

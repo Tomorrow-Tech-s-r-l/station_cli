@@ -1,6 +1,10 @@
 import { BaseCommand } from "./base";
-import { SerialMessage, CommandResponse } from "../../protocol/types";
-import { CMD_FWU_BEGIN_CODE } from "../../../utils/constants";
+import { CommandResponse } from "../../protocol/types";
+import { FwuWire } from "../../fwu/session/wire";
+import { stationTarget } from "../../fwu/session/target";
+
+// Thin wrapper over FwuWire (fwu/session/wire.ts). Behaviour pinned by
+// tests/golden/fwu/ and tests/fwu_wire_validation.test.js.
 
 /**
  * CMD_FWU_BEGIN (0x62): bootloader-side. Tears down any previous
@@ -17,16 +21,6 @@ export class FwuBeginCommand extends BaseCommand {
     boardAddress: number,
     params: { imgSize: number; imgCrc32: number; version: number }
   ): Promise<CommandResponse> {
-    const data = Buffer.alloc(12);
-    data.writeUInt32LE(params.imgSize, 0);
-    data.writeUInt32LE(params.imgCrc32 >>> 0, 4);
-    data.writeUInt32LE(params.version >>> 0, 8);
-
-    const message: SerialMessage = {
-      boardAddress,
-      command: CMD_FWU_BEGIN_CODE,
-      data,
-    };
-    return this.executeCommand(message);
+    return new FwuWire(this.serialService, stationTarget(boardAddress)).begin(params);
   }
 }

@@ -7,29 +7,27 @@
  *
  * Steps:
  *   0. Git status check
- *   1. Read current versions (package.json + metadata.json)
+ *   1. Read the current version (package.json)
  *   2. Pick the release channel (main → vX.Y.Z, development → dev-vX.Y.Z)
  *   3. Set the CLI version (keep / patch / minor / major / custom)
  *   4. Verify the resulting tag is still free locally + on origin
- *   5. Set min_kiosk_app_version (the minimum kiosk that can auto-update to this CLI)
- *   6. Best-effort cross-repo compatibility check against the kiosk app
- *   7. Breaking-change reminder (kiosk minCliVersion)
- *   8. Commit message
- *   9. Pre-release checklist
- *  10. Summary + final confirm
- *  11. git add → commit → push branch  (CI builds the executables and CREATES the tag)
+ *   5. Commit message
+ *   6. Pre-release checklist
+ *   7. Summary + final confirm
+ *   8. git add → commit → push branch  (CI builds the executables and CREATES the tag)
  *
  * IMPORTANT — how releases actually trigger:
  *   The GitHub Actions workflow (.github/workflows/build.yml) runs on every push
  *   to `main` or `development`. It builds the executables and then CREATES the
- *   release tag itself (vX.Y.Z / dev-vX.Y.Z) and regenerates metadata.json from
- *   package.json. This script therefore does NOT create or push a git tag — it
- *   only commits the version bump and pushes the branch.
+ *   release tag itself (vX.Y.Z / dev-vX.Y.Z). This script therefore does NOT
+ *   create or push a git tag — it only commits the version bump and pushes
+ *   the branch.
  *
- *   The single source of truth is package.json:
- *     · version            → the CLI version → the release tag
- *     · minKioskAppVersion → written into the published metadata.json by CI
- *   package-lock.json and the local metadata.json are kept in sync for clarity.
+ * Compatibility is not decided here. Which kiosks and firmware this CLI works
+ * with is computed by CI from contract runs against the real releases
+ * (firmware_contract.yml here, kiosk_cli_contract.yml in the kiosk repo) and
+ * published by release-compatibility-cli as compatibility.json; the release job writes
+ * this release's metadata.json from it. Nothing to declare, nothing to scrape.
  *
  * Requires Node >= 18. No extra npm dependencies — Node built-ins only.
  */
@@ -45,16 +43,6 @@ const { execSync, spawnSync } = require("child_process");
 const ROOT = path.join(__dirname, "..");
 const PACKAGE_JSON = path.join(ROOT, "package.json");
 const PACKAGE_LOCK = path.join(ROOT, "package-lock.json");
-const METADATA = path.join(ROOT, "metadata.json");
-
-// Local checkout of the kiosk app, used for the best-effort compatibility check.
-// Override with KIOSK_REPO_PATH=/path/to/amperry_kiosk_local if it lives elsewhere.
-const KIOSK_REPO_PATH =
-  process.env.KIOSK_REPO_PATH ||
-  path.join(ROOT, "..", "..", "app", "amperry_kiosk_local");
-const KIOSK_PUBSPEC = path.join(KIOSK_REPO_PATH, "pubspec.yaml");
-const KIOSK_CONSTANTS = path.join(KIOSK_REPO_PATH, "lib", "constants.dart");
-
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
 const c = {
@@ -146,15 +134,6 @@ function parseSemver(raw) {
   return [x, y, z];
 }
 
-/** Returns true if a >= b (element-wise). */
-function gte(a, b) {
-  for (let i = 0; i < 3; i++) {
-    if (a[i] > b[i]) return true;
-    if (a[i] < b[i]) return false;
-  }
-  return true;
-}
-
 /** Negative if a < b, 0 if equal, positive if a > b. */
 function cmpSemver(a, b) {
   for (let i = 0; i < 3; i++) {
@@ -162,8 +141,6 @@ function cmpSemver(a, b) {
   }
   return 0;
 }
-
-const fmtVer = (arr) => arr.join(".");
 
 function bumpPatch(v) { const [x, y, z] = parseSemver(v); return `${x}.${y}.${z + 1}`; }
 function bumpMinor(v) { const [x, y]    = parseSemver(v); return `${x}.${y + 1}.0`; }
@@ -180,16 +157,10 @@ function writeJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n", "utf8");
 }
 
-/** Set package.json version (and minKioskAppVersion) — the source of truth. */
+/** Set package.json version — the source of truth for the release tag. */
 function writePackageVersion(version) {
   const pkg = readJson(PACKAGE_JSON);
   pkg.version = version;
-  writeJson(PACKAGE_JSON, pkg);
-}
-
-function writePackageMinKiosk(minKiosk) {
-  const pkg = readJson(PACKAGE_JSON);
-  pkg.minKioskAppVersion = minKiosk;
   writeJson(PACKAGE_JSON, pkg);
 }
 
@@ -205,30 +176,6 @@ function syncPackageLock(version) {
   }
   if (changed) writeJson(PACKAGE_LOCK, lock);
   return changed;
-}
-
-/** Mirror metadata.json locally (CI regenerates this from package.json at publish). */
-function writeMetadata(cliVersion, minKiosk) {
-  writeJson(METADATA, {
-    cli_version: cliVersion,
-    min_kiosk_app_version: minKiosk,
-  });
-}
-
-/** Read the kiosk's pubspec version → "X.Y.Z" (strips +build). null if absent. */
-function readKioskVersion() {
-  if (!fs.existsSync(KIOSK_PUBSPEC)) return null;
-  const m = fs.readFileSync(KIOSK_PUBSPEC, "utf8").match(/^version:\s*([^\s#]+)/m);
-  return m ? m[1].split("+")[0].trim() : null;
-}
-
-/** Read the kiosk's minCliVersion constant → "X.Y.Z". null if absent. */
-function readKioskMinCli() {
-  if (!fs.existsSync(KIOSK_CONSTANTS)) return null;
-  const m = fs
-    .readFileSync(KIOSK_CONSTANTS, "utf8")
-    .match(/const\s+String\s+minCliVersion\s*=\s*['"]([^'"]+)['"]/);
-  return m ? m[1].trim() : null;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -261,7 +208,7 @@ async function main() {
     if (dirty) {
       warn("Working tree has uncommitted changes:");
       dirty.split("\n").forEach((l) => info(c.dim(l)));
-      info("Only package.json, package-lock.json and metadata.json will be committed.");
+      info("Only package.json and package-lock.json will be committed.");
       if (!confirm("Proceed anyway?")) { fail("Aborted."); process.exit(1); }
     } else {
       ok("Working tree is clean.");
@@ -270,30 +217,16 @@ async function main() {
     warn("Could not check git status — continuing.");
   }
 
-  // ── 1. Current versions ──────────────────────────────────────────────────────
-  header("1 · Current versions");
+  // ── 1. Current version ───────────────────────────────────────────────────────
+  header("1 · Current version");
 
   const pkg = readJson(PACKAGE_JSON);
   const currentVersion = pkg.version;
-  let currentMinKiosk = pkg.minKioskAppVersion || "1.0.0";
-  ok(`CLI version (package.json):        ${c.bold(currentVersion)}`);
-  ok(`min_kiosk_app_version (package.json): ${c.bold(currentMinKiosk)}`);
+  ok(`CLI version (package.json): ${c.bold(currentVersion)}`);
 
   if (!isValidSemver(currentVersion)) {
     fail(`package.json version '${currentVersion}' is not valid semver (X.Y.Z).`);
     process.exit(1);
-  }
-
-  try {
-    const meta = readJson(METADATA);
-    if (meta.min_kiosk_app_version !== currentMinKiosk) {
-      warn(
-        `metadata.json min_kiosk_app_version (${c.bold(meta.min_kiosk_app_version)}) ` +
-        `differs from package.json (${c.bold(currentMinKiosk)}) — package.json wins; CI regenerates metadata.json.`
-      );
-    }
-  } catch {
-    info("metadata.json not found — it will be created.");
   }
 
   // ── 2. Release channel ───────────────────────────────────────────────────────
@@ -376,18 +309,15 @@ async function main() {
   if (newVersion !== currentVersion) {
     writePackageVersion(newVersion);
     const lockSynced = syncPackageLock(newVersion);
-    writeMetadata(newVersion, currentMinKiosk);
     ok(`package.json version → ${c.bold(newVersion)}`);
     if (lockSynced) ok("package-lock.json version synced.");
   } else {
     // Repair drift even when the version is unchanged.
     const lockSynced = syncPackageLock(newVersion);
-    writeMetadata(newVersion, currentMinKiosk);
     ok(`Keeping version: ${c.bold(newVersion)}`);
     if (lockSynced) ok("package-lock.json version re-synced (was out of date).");
   }
 
-  const cliVersion = parseSemver(newVersion);
   const expectedTag = `${tagPrefix}${newVersion}`;
 
   // ── 4. Tag availability ──────────────────────────────────────────────────────
@@ -404,119 +334,34 @@ async function main() {
         [localExists ? "locally" : null, remoteExists ? "on origin" : null]
           .filter(Boolean).join(" and ");
       fail(`Tag ${c.bold(expectedTag)} already exists ${where}.`);
-      fail("Re-pushing would re-publish over an existing release. Bump the version instead.");
-      if (!confirm("Proceed anyway? (overwrites the existing release)")) {
+      // build.yml publishes a dev release once per version (force_republish
+      // replaces it on purpose); main re-publishes over it.
+      const dev = targetBranch === "development";
+      fail(dev
+        ? "CI builds and tests it but publishes nothing over an existing dev release. Bump the version instead."
+        : "Re-pushing would re-publish over an existing release. Bump the version instead.");
+      if (!confirm(dev ? "Proceed anyway? (no new dev release)" : "Proceed anyway? (overwrites the existing release)")) {
         fail("Aborted.");
         process.exit(1);
       }
-      warn(`Proceeding — the existing ${expectedTag} release will be overwritten by CI.`);
+      warn(dev
+        ? `Proceeding — ${expectedTag} stays as it is (run build.yml with force_republish to replace it).`
+        : `Proceeding — the existing ${expectedTag} release will be overwritten by CI.`);
     } else {
       ok(`Tag ${c.bold(expectedTag)} is available.`);
     }
   }
 
-  // ── 5. min_kiosk_app_version ─────────────────────────────────────────────────
-  header("5 · Kiosk app compatibility  (min_kiosk_app_version)");
-
-  info(`Current min_kiosk_app_version: ${c.bold(currentMinKiosk)}`);
-  info("Lowest kiosk app version allowed to auto-update to this CLI.");
-  info("CI writes this into the published metadata.json from package.json.");
-
-  let minKiosk = currentMinKiosk;
-  if (!confirm(`Is ${c.bold(currentMinKiosk)} still correct?`, true)) {
-    while (true) {
-      const inp = prompt("Enter new min_kiosk_app_version (X.Y.Z, no leading v):");
-      if (isValidSemver(inp)) { minKiosk = inp.trim(); break; }
-      fail(`'${inp}' is not valid semver.`);
-    }
-    writePackageMinKiosk(minKiosk);
-    writeMetadata(newVersion, minKiosk);
-    ok(`min_kiosk_app_version → ${c.bold(minKiosk)}`);
-  } else {
-    writePackageMinKiosk(minKiosk); // ensure package.json holds the value
-    writeMetadata(newVersion, minKiosk);
-    ok(`min_kiosk_app_version confirmed: ${c.bold(minKiosk)}`);
-  }
-  currentMinKiosk = minKiosk;
-
-  // ── 6. Cross-repo compatibility (best-effort, local kiosk checkout) ──────────
-  header("6 · Cross-repo compatibility check  (kiosk app)");
-
-  const kioskVerStr = readKioskVersion();
-  const kioskMinCliStr = readKioskMinCli();
-
-  if (!kioskVerStr && !kioskMinCliStr) {
-    info(`No kiosk checkout found at ${c.dim(KIOSK_REPO_PATH)}.`);
-    info("Set KIOSK_REPO_PATH to enable this check — skipping for now.");
-  } else {
-    if (kioskVerStr) info(`Kiosk app version (pubspec):  ${c.bold(kioskVerStr)}`);
-    if (kioskMinCliStr) info(`Kiosk requires CLI >=:        ${c.bold(kioskMinCliStr)}`);
-
-    let blocking = false;
-
-    // (a) Will deployed kiosks accept this CLI? They reject CLI < minCliVersion.
-    const kioskMinCli = parseSemver(kioskMinCliStr);
-    if (kioskMinCli && cmpSemver(cliVersion, kioskMinCli) < 0) {
-      fail(
-        `This CLI (${c.bold(newVersion)}) is BELOW the kiosk's minCliVersion ` +
-        `(${c.bold(kioskMinCliStr)}) — kiosks would reject it at boot.`
-      );
-      blocking = true;
-    } else if (kioskMinCli) {
-      ok(`Kiosks running minCliVersion ${kioskMinCliStr} will accept this CLI.`);
-    }
-
-    // (b) Can the currently-released kiosk auto-update to this CLI?
-    const kioskVer = parseSemver(kioskVerStr);
-    const minKioskParsed = parseSemver(minKiosk);
-    if (kioskVer && minKioskParsed && cmpSemver(minKioskParsed, kioskVer) > 0) {
-      warn(
-        `min_kiosk_app_version (${c.bold(minKiosk)}) is higher than the current ` +
-        `kiosk app (${c.bold(kioskVerStr)}) — existing kiosks won't auto-update until they upgrade.`
-      );
-    } else if (kioskVer && minKioskParsed) {
-      ok(`Current kiosk app ${kioskVerStr} can auto-update to this CLI.`);
-    }
-
-    if (blocking) {
-      console.log();
-      if (!confirm("Compatibility check failed. Proceed anyway?")) {
-        fail("Aborted. Bump this CLI to satisfy the kiosk, or lower the kiosk's minCliVersion.");
-        process.exit(1);
-      }
-      warn("Proceeding despite a failed compatibility check.");
-    }
-  }
-
-  // ── 7. Breaking changes → kiosk minCliVersion ───────────────────────────────
-  header("7 · Breaking changes  (kiosk minCliVersion)");
-
-  info("If this CLI breaks the CLI↔kiosk contract, the kiosk must raise");
-  info("its minCliVersion so older CLIs are rejected at boot.");
-  info(`  → ${path.join("amperry_kiosk_local", "lib", "constants.dart")}`);
-  info(`  → const String minCliVersion = '…'   (currently ${c.bold(kioskMinCliStr || "unknown")})`);
-
-  if (confirm("Does this release contain breaking changes requiring a kiosk minCliVersion bump?")) {
-    warn(`ACTION REQUIRED → set minCliVersion to ${c.bold(newVersion)} in the kiosk repo.`);
-    if (!confirm("Have you already updated and pushed minCliVersion in the kiosk repo?")) {
-      fail("Update the kiosk repo first, then re-run this script. Aborted.");
-      process.exit(1);
-    }
-    ok("Breaking changes acknowledged — kiosk minCliVersion handled.");
-  } else {
-    ok("No breaking changes — kiosk minCliVersion unchanged.");
-  }
-
-  // ── 8. Commit message ────────────────────────────────────────────────────────
-  header("8 · Commit message");
+  // ── 5. Commit message ────────────────────────────────────────────────────────
+  header("5 · Commit message");
 
   info("Used as the git commit message and the GitHub release body.");
   const defaultMsg = `chore: release ${newVersion} → ${targetBranch}`;
   let commitMsg = prompt(`Commit message [${defaultMsg}]:`) || defaultMsg;
   ok(`Commit message: ${c.dim(commitMsg)}`);
 
-  // ── 9. Pre-release checklist ─────────────────────────────────────────────────
-  header("9 · Pre-release checklist");
+  // ── 6. Pre-release checklist ─────────────────────────────────────────────────
+  header("6 · Pre-release checklist");
 
   const checks = [
     "Tested locally with real hardware (slots + unlock)?",
@@ -541,12 +386,12 @@ async function main() {
     ok("All pre-release checks passed.");
   }
 
-  // ── 10. Summary + final confirm ──────────────────────────────────────────────
-  header("10 · Release summary");
+  // ── 7. Summary + final confirm ───────────────────────────────────────────────
+  header("7 · Release summary");
 
   console.log();
   console.log(`  ${c.bold("CLI version:")}            ${c.green(newVersion)}`);
-  console.log(`  ${c.bold("min_kiosk_app_version:")}  ${c.green(minKiosk)}`);
+  console.log(`  ${c.bold("Compatibility:")}          ${c.dim("computed by CI (compatibility.json)")}`);
   console.log(`  ${c.bold("Target branch:")}          ${c.green(targetBranch)}`);
   console.log(`  ${c.bold("Release tag (by CI):")}    ${c.green(buildsRelease ? expectedTag : "— none —")}`);
   console.log(`  ${c.bold("Commit message:")}         ${c.dim(commitMsg)}`);
@@ -557,12 +402,12 @@ async function main() {
     process.exit(0);
   }
 
-  // ── 11. Commit & push branch (CI builds + tags) ──────────────────────────────
-  header("11 · Commit & push");
+  // ── 8. Commit & push branch (CI builds + tags) ───────────────────────────────
+  header("8 · Commit & push");
 
   try {
-    run("git add package.json package-lock.json metadata.json");
-    ok("Staged: package.json, package-lock.json, metadata.json");
+    run("git add package.json package-lock.json");
+    ok("Staged: package.json, package-lock.json");
   } catch (e) {
     fail(`git add failed: ${e.message}`);
     process.exit(1);

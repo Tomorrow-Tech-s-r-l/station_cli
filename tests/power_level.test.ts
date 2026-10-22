@@ -8,7 +8,7 @@
  *   npx ts-node tests/power_level.test.ts
  */
 import assert from "node:assert";
-import { calculatePowerLevel } from "../src/S1TTXX/utils/power_level";
+import { calculatePowerLevel, isLowVoltage } from "../src/S1TTXX/utils/power_level";
 import { PB_STATUS_CHARGING, PB_STATUS_DISCHARGING } from "../src/utils/constants";
 
 let checks = 0;
@@ -33,7 +33,7 @@ console.log("\n=== station_cli power_level tests ===\n");
 // --- Inverted anchor pair: cutoff above total, so the span is negative ---
 {
   const [v] = withCapture(() =>
-    calculatePowerLevel(600, 500, 10625, 3500, PB_STATUS_DISCHARGING)
+    calculatePowerLevel(600, 500, 10625)
   );
   check("inverted-anchors", v === 0, `inverted pair must yield 0, got ${v}`);
   check("inverted-anchors", v >= 0, "must never go negative");
@@ -42,43 +42,45 @@ console.log("\n=== station_cli power_level tests ===\n");
 // --- Overshoot must be clamped AND reported ---
 {
   const [v, msgs] = withCapture(() =>
-    calculatePowerLevel(15000, 14125, 10625, 3500, PB_STATUS_CHARGING)
+    calculatePowerLevel(15000, 14125, 10625)
   );
   check("clamp-overshoot", v === 100, `overshoot must clamp to 100, got ${v}`);
   check("clamp-overshoot", msgs.length === 1, "the pre-clamp value must be logged, not hidden");
   check("clamp-overshoot", msgs[0].includes("raw=125"), `expected raw=125 in log, got: ${msgs[0]}`);
 }
 
-// --- Firmware that does not report avgCapacity (sends 0) ---
+// --- The calibrated span is the denominator ---
 {
-  const withAvg = calculatePowerLevel(12000, 14125, 10625, 0, PB_STATUS_CHARGING);
+  const v = calculatePowerLevel(12000, 14125, 10625);
   const expected = Math.trunc((100 * (12000 - 10625)) / (14125 - 10625)); // 39
-  check("legacy-firmware", withAvg === expected,
-    `avgCapacity=0 must reduce to measuredCap/prevCap: expected ${expected}, got ${withAvg}`);
-  check("legacy-firmware", withAvg === 39, "sanity: 1375/3500 truncates to 39");
+  check("span", v === expected,
+    `must be measuredCap/prevCap: expected ${expected}, got ${v}`);
+  check("span", v === 39, "sanity: 1375/3500 truncates to 39");
+  check("span", calculatePowerLevel(13000, 14125, 10625) === 67,
+    "a mid-charge pack must read 67 (a voltage at offset 23 once made it 15)");
+  check("span", calculatePowerLevel(14125, 14125, 10625) === 100, "a full pack must read 100");
 }
 
 // --- Zero denominator ---
 {
-  const v = calculatePowerLevel(10625, 10625, 10625, 0, PB_STATUS_DISCHARGING);
+  const v = calculatePowerLevel(10625, 10625, 10625);
   check("zero-denominator", v === 0, `zero span must give 0, got ${v}`);
   check("zero-denominator", Number.isFinite(v), "must never be NaN or Infinity");
 }
 
 // --- String / undefined inputs (real call sites pass parsed JSON) ---
 {
-  const v = calculatePowerLevel("12000", "14125", "10625", "3500", PB_STATUS_CHARGING);
+  const v = calculatePowerLevel("12000", "14125", "10625");
   check("coerced-inputs", v === 39, `string inputs must coerce, got ${v}`);
-  const u = calculatePowerLevel(undefined, undefined, undefined, undefined, undefined);
+  const u = calculatePowerLevel(undefined, undefined, undefined);
   check("coerced-inputs", u === 0, `undefined inputs must be safe, got ${u}`);
 }
 
-// --- The avgCapacity ceiling still applies while CHARGING ---
+// --- Pack voltage below the threshold flags low voltage in any state ---
 {
-  const v = calculatePowerLevel(12000, 12000, 10625, 3500, PB_STATUS_CHARGING);
-  // prevCap = 1375, avgCap = 3500 > prevCap, so socDenom = 3500 while CHARGING
-  check("avgcap-ceiling", v === Math.trunc((100 * 1375) / 3500),
-    `avgCap ceiling must apply while CHARGING, got ${v}`);
+  check("low-voltage", isLowVoltage(PB_STATUS_DISCHARGING, 11000), "11000 mV must be low");
+  check("low-voltage", !isLowVoltage(PB_STATUS_CHARGING, 15800), "15800 mV must not be low");
+  check("low-voltage", !isLowVoltage(PB_STATUS_DISCHARGING, 0), "0 mV means unknown, not low");
 }
 
 console.error = realError;
