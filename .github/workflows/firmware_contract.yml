@@ -120,10 +120,26 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       compat: ${{ steps.compat.outputs.ok }}
     steps:
+      # cli/ and harness/ used to be checked out sparse: a blobless clone in
+      # which a later full checkout finds files missing. Drop one an older
+      # run left on this runner.
+      - name: Drop sparse clones left by older runs
+        run: |
+          for d in cli harness; do
+            [ -e "$d/.git" ] || continue
+            if git -C "$d" config --get-regexp '^remote\..*\.promisor$' >/dev/null 2>&1 \
+              || [ "$(git -C "$d" config --get core.sparseCheckout 2>/dev/null)" = true ]; then
+              echo "::warning::$d was left as a sparse clone; removing it"
+              rm -rf "$d"
+            fi
+          done
+
+      # Full, not sparse: a sparse checkout is a blobless clone, and the
+      # contract job's full checkout into the same folder of this shared
+      # workspace then found files missing.
       - uses: actions/checkout@v4
         with:
           path: cli
-          sparse-checkout: scripts
 
       - uses: actions/setup-node@v4
         with:
@@ -198,6 +214,19 @@ jobs:
           matrix=$(node cli/scripts/contract-targets.js "${args[@]}" --fw-refs "$FW_REFS")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
+      # The self-hosted workspace persists between runs: leave it as fresh
+      # checkouts would — each checkout's .git and tracked files stay, for an
+      # incremental next fetch; build output, node_modules, downloaded trees
+      # and loose files go. Never fails the job.
+      - name: Clean the workspace
+        if: always() && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          shopt -s dotglob nullglob
+          tidy() { git -c core.longpaths=true -C "$1" clean -ffdxq || echo "::warning::git clean of $1 did not finish; the next checkout cleans it"; }
+          if [ -e .git ]; then tidy .
+          else for e in ./*; do if [ -e "$e/.git" ]; then tidy "$e"; else rm -rf "$e"; fi; done; fi
+
   contract:
     name: fw ${{ matrix.fw }} × pack ${{ matrix.pack }}
     needs: targets
@@ -219,6 +248,20 @@ jobs:
           echo "REPORTS=$RUNNER_TEMP/fw-contract/reports" >> "$GITHUB_ENV"
           rm -rf "$RUNNER_TEMP/fw-contract" && mkdir -p "$RUNNER_TEMP/fw-contract/reports"
           rm -rf fw pack pack-harness
+
+      # cli/ and harness/ used to be checked out sparse: a blobless clone in
+      # which a later full checkout finds files missing. Drop one an older
+      # run left on this runner.
+      - name: Drop sparse clones left by older runs
+        run: |
+          for d in cli harness; do
+            [ -e "$d/.git" ] || continue
+            if git -C "$d" config --get-regexp '^remote\..*\.promisor$' >/dev/null 2>&1 \
+              || [ "$(git -C "$d" config --get core.sparseCheckout 2>/dev/null)" = true ]; then
+              echo "::warning::$d was left as a sparse clone; removing it"
+              rm -rf "$d"
+            fi
+          done
 
       - name: Token available?
         id: token
@@ -443,6 +486,19 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # The self-hosted workspace persists between runs: leave it as fresh
+      # checkouts would — each checkout's .git and tracked files stay, for an
+      # incremental next fetch; build output, node_modules, downloaded trees
+      # and loose files go. Never fails the job.
+      - name: Clean the workspace
+        if: always() && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          shopt -s dotglob nullglob
+          tidy() { git -c core.longpaths=true -C "$1" clean -ffdxq || echo "::warning::git clean of $1 did not finish; the next checkout cleans it"; }
+          if [ -e .git ]; then tidy .
+          else for e in ./*; do if [ -e "$e/.git" ]; then tidy "$e"; else rm -rf "$e"; fi; done; fi
+
   report:
     needs: [targets, contract]
     if: always()
@@ -456,6 +512,20 @@ jobs:
       - name: Clean the previous run's files
         run: rm -rf reports evidence report.md gate.txt harness
 
+      # cli/ and harness/ used to be checked out sparse: a blobless clone in
+      # which a later full checkout finds files missing. Drop one an older
+      # run left on this runner.
+      - name: Drop sparse clones left by older runs
+        run: |
+          for d in cli harness; do
+            [ -e "$d/.git" ] || continue
+            if git -C "$d" config --get-regexp '^remote\..*\.promisor$' >/dev/null 2>&1 \
+              || [ "$(git -C "$d" config --get core.sparseCheckout 2>/dev/null)" = true ]; then
+              echo "::warning::$d was left as a sparse clone; removing it"
+              rm -rf "$d"
+            fi
+          done
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -466,10 +536,12 @@ jobs:
           RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: echo "ok=$([ -n "$RELEASE_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
+      # Full, not sparse: a sparse checkout is a blobless clone, and the
+      # contract job's full checkout into the same folder of this shared
+      # workspace then found files missing.
       - uses: actions/checkout@v4
         with:
           path: cli
-          sparse-checkout: scripts
 
       - uses: actions/checkout@v4
         if: steps.token.outputs.ok == 'true'
@@ -478,7 +550,6 @@ jobs:
           ref: ${{ env.HARNESS_REF }}
           path: harness
           token: ${{ secrets.RELEASE_TOKEN }}
-          sparse-checkout: tests/cli_contract
 
       - uses: actions/download-artifact@v4
         with:
@@ -563,3 +634,16 @@ jobs:
             while read -r line; do echo "::error::firmware contract: $line"; done < gate.txt
             exit 1
           fi
+
+      # The self-hosted workspace persists between runs: leave it as fresh
+      # checkouts would — each checkout's .git and tracked files stay, for an
+      # incremental next fetch; build output, node_modules, downloaded trees
+      # and loose files go. Never fails the job.
+      - name: Clean the workspace
+        if: always() && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          shopt -s dotglob nullglob
+          tidy() { git -c core.longpaths=true -C "$1" clean -ffdxq || echo "::warning::git clean of $1 did not finish; the next checkout cleans it"; }
+          if [ -e .git ]; then tidy .
+          else for e in ./*; do if [ -e "$e/.git" ]; then tidy "$e"; else rm -rf "$e"; fi; done; fi
