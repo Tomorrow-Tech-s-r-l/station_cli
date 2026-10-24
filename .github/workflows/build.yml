@@ -213,6 +213,19 @@ jobs:
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
+      # The self-hosted workspace persists between runs: leave it as fresh
+      # checkouts would — each checkout's .git and tracked files stay, for an
+      # incremental next fetch; build output, node_modules, downloaded trees
+      # and loose files go. Never fails the job.
+      - name: Clean the workspace
+        if: always() && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          shopt -s dotglob nullglob
+          tidy() { git -c core.longpaths=true -C "$1" clean -ffdxq || echo "::warning::git clean of $1 did not finish; the next checkout cleans it"; }
+          if [ -e .git ]; then tidy .
+          else for e in ./*; do if [ -e "$e/.git" ]; then tidy "$e"; else rm -rf "$e"; fi; done; fi
+
   # Release gate for the firmware engine: THIS build's fw-status / fw-plan /
   # fw-apply flash an emulated station (boards + packs down to their
   # bootloaders) with the current firmware releases — happy path, power loss
@@ -312,6 +325,19 @@ jobs:
           path: station_emulator/fwu-report/
           retention-days: 14
           if-no-files-found: ignore
+
+      # The self-hosted workspace persists between runs: leave it as fresh
+      # checkouts would — each checkout's .git and tracked files stay, for an
+      # incremental next fetch; build output, node_modules, downloaded trees
+      # and loose files go. Never fails the job.
+      - name: Clean the workspace
+        if: always() && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          shopt -s dotglob nullglob
+          tidy() { git -c core.longpaths=true -C "$1" clean -ffdxq || echo "::warning::git clean of $1 did not finish; the next checkout cleans it"; }
+          if [ -e .git ]; then tidy .
+          else for e in ./*; do if [ -e "$e/.git" ]; then tidy "$e"; else rm -rf "$e"; fi; done; fi
           
   # Release gate for the whole product flow: THIS build's linux-arm64 binary
   # becomes the station_cli the real kiosk execs, on emulated station hardware,
@@ -664,3 +690,16 @@ jobs:
               && echo "::notice::S1TTXX-firmware@$ref: station-cli contract re-run requested" \
               || echo "::warning::could not start S1TTXX-firmware@$ref cli_contract.yml (token needs actions:write there); the nightly run covers it"
           done
+
+      # The self-hosted workspace persists between runs: leave it as fresh
+      # checkouts would — each checkout's .git and tracked files stay, for an
+      # incremental next fetch; build output, node_modules, downloaded trees
+      # and loose files go. Never fails the job.
+      - name: Clean the workspace
+        if: always() && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          shopt -s dotglob nullglob
+          tidy() { git -c core.longpaths=true -C "$1" clean -ffdxq || echo "::warning::git clean of $1 did not finish; the next checkout cleans it"; }
+          if [ -e .git ]; then tidy .
+          else for e in ./*; do if [ -e "$e/.git" ]; then tidy "$e"; else rm -rf "$e"; fi; done; fi
