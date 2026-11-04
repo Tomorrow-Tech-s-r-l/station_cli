@@ -9,6 +9,9 @@ name: Nightly compat
 on:
   schedule:
     - cron: '37 3 * * *'
+    # Catch-up: dispatches again when the run above did not get everything
+    # out (GitHub down, a late or dropped schedule); does nothing when it did.
+    - cron: '37 9 * * *'
   workflow_dispatch:
 
 permissions:
@@ -21,7 +24,32 @@ jobs:
       - name: Dispatch the contract workflows on development
         env:
           GH_TOKEN: ${{ github.token }}
+          CATCH_UP: ${{ github.event.schedule == '37 9 * * *' }}
         run: |
-          for wf in firmware_contract.yml; do
-            gh workflow run "$wf" -R "$GITHUB_REPOSITORY" --ref development
-          done
+          # Retries GitHub 5xx / network errors with backoff (about 8 min in
+          # all); any other error is final.
+          retry() {
+            local d=10 i out
+            for i in 1 2 3 4 5 6 7; do
+              out="$("$@" 2>&1)" && { printf '%s\n' "$out"; return 0; }
+              printf '%s\n' "$out" >&2
+              grep -qiE 'HTTP (5[0-9][0-9]|429)|server error|bad gateway|unavailable|time-?out|timed out|connection (reset|refused|closed)|EOF|TLS handshake|could not resolve' <<<"$out" && [ "$i" -lt 7 ] || return 1
+              echo "::warning::GitHub looks unavailable; retry $i in ${d}s: $*" >&2
+              sleep "$d"; d=$(( d * 2 > 120 ? 120 : d * 2 ))
+            done
+          }
+
+          if [ "$CATCH_UP" = true ]; then
+            since="$(date -u -d '-12 hours' +%Y-%m-%dT%H:%M:%SZ)"
+            if ok="$(retry gh run list -R "$GITHUB_REPOSITORY" -w nightly-compat.yml -s success --created ">=$since" --json databaseId --jq length)" && [ "$ok" -gt 0 ]; then
+              echo "the nightly run dispatched everything: nothing to catch up"
+              exit 0
+            fi
+          fi
+          # One workflow that cannot be dispatched does not hold back the others.
+          failed=
+          retry gh workflow run firmware_contract.yml -R "$GITHUB_REPOSITORY" --ref development || failed="$failed firmware_contract.yml"
+          if [ -n "$failed" ]; then
+            echo "::error::could not dispatch:$failed (the catch-up schedule retries)"
+            exit 1
+          fi
