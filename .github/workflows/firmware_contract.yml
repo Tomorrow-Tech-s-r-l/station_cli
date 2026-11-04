@@ -613,7 +613,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.COMPAT_TOKEN }}
         run: |
-          gh api "repos/$COMPAT_REPO/dispatches" -f event_type=compat-evidence \
+          # Retries GitHub 5xx / network errors with backoff (about 8 min in
+          # all); any other error is final.
+          retry() {
+            local d=10 i out
+            for i in 1 2 3 4 5 6 7; do
+              out="$("$@" 2>&1)" && { printf '%s\n' "$out"; return 0; }
+              printf '%s\n' "$out" >&2
+              grep -qiE 'HTTP (5[0-9][0-9]|429)|server error|bad gateway|unavailable|time-?out|timed out|connection (reset|refused|closed)|EOF|TLS handshake|could not resolve' <<<"$out" && [ "$i" -lt 7 ] || return 1
+              echo "::warning::GitHub looks unavailable; retry $i in ${d}s: $*" >&2
+              sleep "$d"; d=$(( d * 2 > 120 ? 120 : d * 2 ))
+            done
+          }
+          retry gh api "repos/$COMPAT_REPO/dispatches" -f event_type=compat-evidence \
             -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[run_id]=$GITHUB_RUN_ID" \
             && echo "::notice::evidence of run $GITHUB_RUN_ID sent to $COMPAT_REPO" \
             || echo "::warning::could not notify $COMPAT_REPO (COMPAT_TOKEN needs contents:write there); re-run this job to send the evidence"
