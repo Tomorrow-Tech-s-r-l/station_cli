@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "station-cli",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "CLI tool to control station board and powerbanks",
   "main": "dist/cli.js",
   "bin": {
@@ -27,9 +27,9 @@
       "node_modules/@serialport/bindings-cpp/prebuilds/**/*"
     ],
     "targets": [
-      "node18-linux-arm",
-      "node18-macos-x64",
-      "node18-win-x64"
+      "node22-linux-arm",
+      "node22-macos-x64",
+      "node22-win-x64"
     ],
     "outputPath": "dist"
   },
@@ -43,10 +43,10 @@
     "start": "node dist/cli.js",
     "test:unit": "npm run build && node scripts/gen-test-cert.js && NODE_EXTRA_CA_CERTS=\"${TMPDIR:-/tmp}/fwu-test-cert/cert.pem\" node --test tests/*.test.js",
     "dev": "ts-node src/cli.ts",
-    "build:executable:macos": "npm run clean && npm ci && npm run test && npx pkg . --targets node18-macos-arm64 --output executables/station-cli-macos-arm64",
-    "build:executable:linux": "npm run clean && npm ci && npm run test && npx pkg . --targets node18-linux-arm64 --output executables/station-cli-linux-arm64",
-    "build:executable:linux-x64": "npm run clean && npm ci && npm run test && npx pkg . --targets node18-linux-x64 --output executables/station-cli-linux-x64",
-    "build:executable:windows": "npm run clean && npm ci && npm run test && npx pkg . --targets node18-win-x64 --output executables/station-cli-windows-x64.exe"
+    "build:executable:macos": "npm run clean && npm ci && npm run test && npx pkg . --targets node22-macos-arm64 --output executables/station-cli-macos-arm64",
+    "build:executable:linux": "npm run clean && npm ci && npm run test && npx pkg . --targets node22-linux-arm64 --output executables/station-cli-linux-arm64",
+    "build:executable:linux-x64": "npm run clean && npm ci && npm run test && npx pkg . --targets node22-linux-x64 --output executables/station-cli-linux-x64",
+    "build:executable:windows": "npm run clean && npm ci && npm run test && npx pkg . --targets node22-win-x64 --output executables/station-cli-windows-x64.exe"
   },
   "keywords": [
     "cli",
@@ -58,7 +58,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^22.15.21",
-    "pkg": "^5.8.1",
+    "@yao-pkg/pkg": "^6.25.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
