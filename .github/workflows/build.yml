@@ -78,7 +78,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
 
       # No actions/setup-python step for this leg: the arm64 builder is Debian 13,
@@ -258,7 +258,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.token.outputs.ok == 'true'
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
 
       - name: Build this CLI
