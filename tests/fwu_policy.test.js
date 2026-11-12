@@ -283,6 +283,54 @@ test("a pack reporting low voltage is skipped regardless of its reported percent
   assert.equal(reasonFor(result, "powerbank slot 6"), "LOW_VOLTAGE");
 });
 
+// IR-2026-015: packs on P1TT2C >= 3.1.0 whose gauge was never configured
+// report 0 mV and a meaningless 0% / 29% (or CUTOFF). Only the firmware this
+// run installs cures them, so they must not be held to the battery floor.
+test("IR-2026-015: a 3.1.x pack reporting 0 mV is updated despite 0%", () => {
+  const result = plan([], [pack(6, "3.1.1", { powerLevel: 0, packVoltageMv: 0 })], {
+    powerbank: candidate("powerbank", "3.1.2"),
+  });
+  assert.equal(itemFor(result, "powerbank slot 6").update, true);
+});
+
+test("IR-2026-015: ...and despite the CUTOFF its 0 V reading caused", () => {
+  const result = plan(
+    [],
+    [pack(6, "3.1.1", { powerLevel: 29, lowVoltage: true, packVoltageMv: 0 })],
+    { powerbank: candidate("powerbank", "3.1.2") }
+  );
+  assert.equal(itemFor(result, "powerbank slot 6").update, true);
+});
+
+test("IR-2026-015: a legacy pack (< 3.1.0, no voltage field) keeps the battery floor", () => {
+  const result = plan([], [pack(6, "3.0.2", { powerLevel: 12, packVoltageMv: 0 })], {
+    powerbank: candidate("powerbank", "3.1.2"),
+  });
+  assert.equal(reasonFor(result, "powerbank slot 6"), "BATTERY_TOO_LOW");
+});
+
+test("IR-2026-015: a 3.1.x pack with a real voltage keeps the battery floor", () => {
+  const result = plan([], [pack(6, "3.1.1", { powerLevel: 12, packVoltageMv: 12400 })], {
+    powerbank: candidate("powerbank", "3.1.2"),
+  });
+  assert.equal(reasonFor(result, "powerbank slot 6"), "BATTERY_TOO_LOW");
+});
+
+test("IR-2026-015: the exemption never bypasses availability or a failed read", () => {
+  const unlocked = plan(
+    [],
+    [pack(6, "3.1.1", { powerLevel: 0, packVoltageMv: 0, locked: false })],
+    { powerbank: candidate("powerbank", "3.1.2") }
+  );
+  assert.equal(reasonFor(unlocked, "powerbank slot 6"), "SLOT_UNLOCKED");
+  const unread = plan(
+    [],
+    [pack(6, "3.1.1", { powerLevel: null, packVoltageMv: 0 })],
+    { powerbank: candidate("powerbank", "3.1.2") }
+  );
+  assert.equal(reasonFor(unread, "powerbank slot 6"), "BATTERY_UNKNOWN");
+});
+
 test("a charging pack above the floor is still eligible", () => {
   const result = plan([], [pack(6, "1.0.0", { charging: true, powerLevel: 80 })], {
     powerbank: candidate("powerbank", "1.1.0"),

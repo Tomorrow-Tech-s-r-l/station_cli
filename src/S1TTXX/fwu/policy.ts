@@ -14,6 +14,7 @@ import {
   Version,
   compareVersions,
   formatVersion,
+  isAtLeast,
   overflowsHeaderWord,
 } from "./version";
 
@@ -119,7 +120,7 @@ export interface GateVerdict {
 export function slotGateVerdict(
   slot: SlotCondition | undefined,
   gates: PolicyGates,
-  options: { recovery?: boolean } = {}
+  options: { recovery?: boolean; installedVersion?: Version | null } = {}
 ): GateVerdict | null {
   if (!slot || !slot.present) {
     return { reason: "SLOT_EMPTY", detail: "no powerbank docked" };
@@ -135,6 +136,18 @@ export function slotGateVerdict(
     // be flashed this run. buildPlan never lets such a pack update (it asks
     // for the read instead, see `chargeNeeded`), and the check immediately
     // before a flash always works on a fresh reading, where this is unset.
+    return null;
+  }
+  if (isGaugeUnconfigured(slot, options.installedVersion ?? null)) {
+    // IR-2026-015: the pack answers but its fuel gauge was never configured
+    // (P1TT2C 3.1.x, drained pack docked). Its charge level and low-voltage
+    // flag are artefacts of that fault — the "0%" packs measured in the field
+    // were full — and the only cure is the firmware this run installs. Holding
+    // it to the battery floor would keep every affected pack broken for good.
+    // The floor exists against a brown-out mid-write; a docked pack's MCU runs
+    // from the dock supply (V_SYS = battery or charger input), and the
+    // availability, lock and identity checks above and in the re-check still
+    // apply.
     return null;
   }
   if (slot.lowVoltage) {
@@ -160,6 +173,29 @@ export function slotGateVerdict(
     };
   }
   return null;
+}
+
+/** First P1TT2C release whose STATUS carries the pack voltage (STATUS_EXT). */
+export const PACK_VOLTAGE_FIELD_SINCE: Version = [3, 1, 0];
+
+/**
+ * True when a docked pack's gauge is provably unconfigured: it answered STATUS
+ * (so a charge level was computed), it runs firmware that reports the pack
+ * voltage, and that voltage is 0 — the LTC2943's power-on register value,
+ * never a measurement (a 4S pack cannot be at 0 V and answer). Packs older
+ * than PACK_VOLTAGE_FIELD_SINCE always report 0 and are NOT matched: they keep
+ * every battery gate.
+ */
+export function isGaugeUnconfigured(
+  slot: SlotCondition,
+  installedVersion: Version | null
+): boolean {
+  return (
+    slot.powerLevel !== null &&
+    slot.packVoltageMv === 0 &&
+    installedVersion !== null &&
+    isAtLeast(installedVersion, PACK_VOLTAGE_FIELD_SINCE)
+  );
 }
 
 /**
@@ -298,7 +334,10 @@ function evaluate(
   const recovery = installed.inBootloader === true;
 
   if (installed.kind === "powerbank") {
-    const verdict = slotGateVerdict(installed.slot, gates, { recovery });
+    const verdict = slotGateVerdict(installed.slot, gates, {
+      recovery,
+      installedVersion: installed.version,
+    });
     if (verdict) return skip(verdict.reason, verdict.detail);
   }
 

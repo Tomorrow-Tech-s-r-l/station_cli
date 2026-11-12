@@ -14,6 +14,7 @@ const {
   PACK_USABLE_CAPACITY_MAH,
   CHARGE_OVERSHOOT_TOLERANCE_MAH,
   MIN_CHARGE_SPAN_MAH,
+  MIN_PLAUSIBLE_CHARGE_SPAN_MAH,
 } = require("../../dist/S1TTXX/utils/battery_info");
 
 const { calculatePowerLevel } = require("../../dist/S1TTXX/utils/power_level");
@@ -109,14 +110,14 @@ test("gauge wobble around the full anchor is tolerated, gross overshoot is not",
   assert.equal(at(CHARGE_OVERSHOOT_TOLERANCE_MAH + 1), false);
 });
 
-test("a usable window narrower than the firmware minimum fails", () => {
-  // The pack itself rejects a CMD_SET_BINFO this narrow and repairs such a
-  // pair at boot, so a pack reporting one has a nameplate worth rewriting.
+test("a reported usable window narrower than the plausibility floor fails", () => {
+  // Stricter than the firmware's 100 mAh write floor: no healthy 3500 mAh
+  // pack reports full and empty anchors within 1000 mAh of each other.
   assert.equal(
     isBatteryInfoValid({
       totalCharge: 14125,
       currentCharge: 14000,
-      cutoffCharge: 14125 - (MIN_CHARGE_SPAN_MAH - 1),
+      cutoffCharge: 14125 - (MIN_PLAUSIBLE_CHARGE_SPAN_MAH - 1),
     }),
     false
   );
@@ -124,10 +125,20 @@ test("a usable window narrower than the firmware minimum fails", () => {
     isBatteryInfoValid({
       totalCharge: 14125,
       currentCharge: 14000,
-      cutoffCharge: 14125 - MIN_CHARGE_SPAN_MAH,
+      cutoffCharge: 14125 - MIN_PLAUSIBLE_CHARGE_SPAN_MAH,
     }),
     true
   );
+});
+
+test("IR-2026-015: anchors 181 mAh apart (RMKZTARUMW) are not accepted", () => {
+  // Passed the old 100 mAh check while swinging 0% <-> 100% on a few mAh.
+  assert.equal(
+    isBatteryInfoValid({ totalCharge: 11856, currentCharge: 11700, cutoffCharge: 11675 }),
+    false
+  );
+  // The write floor itself is unchanged: we may still SEND a 100 mAh span.
+  assert.equal(MIN_CHARGE_SPAN_MAH, 100);
 });
 
 test("validateBatteryParams passes the factory defaults", () => {

@@ -77,6 +77,14 @@ export interface PowerBankServer {
   // skipped by the `slots` auto-charge logic (which only charges plugged-in
   // packs), so recovery is started manually via `station_cli charge`.
   lowVoltage?: boolean;
+  // Raw gauge bookkeeping from the pack's STATUS (mAh, coulomb-counter
+  // scale; see utils/battery_info.ts). Diagnostic only.
+  currentCharge?: number;
+  totalCharge?: number;
+  cutoffCharge?: number;
+  // Charge cycles as the pack counts them (P1TT2C < the IR-2026-015 fix
+  // counts every charge enable, each one a flash page erase).
+  cycles?: number;
 }
 
 export interface SlotsInfo {

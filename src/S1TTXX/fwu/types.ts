@@ -71,6 +71,12 @@ export interface SlotCondition {
   charging: boolean;
   /** Pack reported a low-voltage condition; never flash one of these. */
   lowVoltage: boolean;
+  /**
+   * Pack voltage from STATUS (LTC2943 vtr), mV. 0 means not measured: either
+   * the pack predates the voltage field (P1TT2C < 3.1.0) or its gauge is
+   * unconfigured (IR-2026-015). Absent when the status was not read.
+   */
+  packVoltageMv?: number;
   /** Pack serial, when known. */
   powerbankId: string | null;
   /**
