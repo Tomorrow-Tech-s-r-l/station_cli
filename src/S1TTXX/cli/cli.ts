@@ -478,7 +478,7 @@ export async function runS1TTXXSlots(): Promise<void> {
             // a coulomb-counter value relative to each pack's OWN anchors, so
             // comparing it across packs is meaningless. Ranking on it let a
             // healthy pack at 10647 mAh (a few %) beat packs frozen at 11674
-            // reading 0% every scan, which then never got a turn (IR-2026-015).
+            // reading 0% every scan, which then never got a turn.
             if (chargingSlotIndex === -1) {
               let lowestChargeSlot: {
                 slotIndex: number;

@@ -82,7 +82,7 @@ export interface PowerBankServer {
   currentCharge?: number;
   totalCharge?: number;
   cutoffCharge?: number;
-  // Charge cycles as the pack counts them (P1TT2C < the IR-2026-015 fix
+  // Charge cycles as the pack counts them (P1TT2C < 3.1.2
   // counts every charge enable, each one a flash page erase).
   cycles?: number;
 }
