@@ -50,9 +50,9 @@ export const MIN_CHARGE_SPAN_MAH = 100;
 // Smallest usable window we accept as REAL in what a pack reports. Far
 // stricter than MIN_CHARGE_SPAN_MAH (the firmware's write floor, used for what
 // we send): no healthy 3500 mAh pack ends up with its full and empty anchors
-// within 1000 mAh of each other. Field case (IR-2026-015): RMKZTARUMW sat with
-// anchors 181 mAh apart, passed the 100 mAh check, and swung between 0% and
-// 100% on a few mAh. A window this small is a broken nameplate: reset it.
+// within 1000 mAh of each other. A pack seen in the field sat with anchors
+// 181 mAh apart, passed the 100 mAh check, and swung between 0% and 100% on a
+// few mAh. A window this small is a broken nameplate: reset it.
 export const MIN_PLAUSIBLE_CHARGE_SPAN_MAH = 1000;
 
 // How far above totalCharge a *reported* currentCharge may sit before we call

@@ -131,7 +131,7 @@ test("a reported usable window narrower than the plausibility floor fails", () =
   );
 });
 
-test("IR-2026-015: anchors 181 mAh apart (RMKZTARUMW) are not accepted", () => {
+test("anchors 181 mAh apart (seen in the field) are not accepted", () => {
   // Passed the old 100 mAh check while swinging 0% <-> 100% on a few mAh.
   assert.equal(
     isBatteryInfoValid({ totalCharge: 11856, currentCharge: 11700, cutoffCharge: 11675 }),

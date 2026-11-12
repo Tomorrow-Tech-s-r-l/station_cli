@@ -139,7 +139,7 @@ export function slotGateVerdict(
     return null;
   }
   if (isGaugeUnconfigured(slot, options.installedVersion ?? null)) {
-    // IR-2026-015: the pack answers but its fuel gauge was never configured
+    // The pack answers but its fuel gauge was never configured
     // (P1TT2C 3.1.x, drained pack docked). Its charge level and low-voltage
     // flag are artefacts of that fault — the "0%" packs measured in the field
     // were full — and the only cure is the firmware this run installs. Holding
