@@ -325,6 +325,7 @@ async function enrichWithPackStatus(
     );
     target.slot.charging = info?.status === PB_STATUS_CHARGING;
     target.slot.lowVoltage = isLowVoltage(info?.status, packVoltageMv);
+    target.slot.packVoltageMv = packVoltageMv;
     target.slot.powerbankId = info?.serial ?? null;
   } catch {
     // Leave powerLevel null — the planner reports BATTERY_UNKNOWN and skips.

@@ -761,7 +761,10 @@ async function reverifyPowerbank(
   }
   if (!now) return { reason: "UNREACHABLE", detail: "board did not answer the re-check" };
 
-  const verdict = slotGateVerdict(now, gates, { recovery });
+  const verdict = slotGateVerdict(now, gates, {
+    recovery,
+    installedVersion: planned?.version ?? null,
+  });
   if (verdict) return verdict;
 
   const plannedId = planned?.slot?.powerbankId ?? null;

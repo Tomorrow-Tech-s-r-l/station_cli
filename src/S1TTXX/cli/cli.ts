@@ -470,11 +470,19 @@ export async function runS1TTXXSlots(): Promise<void> {
               }
             }
 
-            // If no powerbank is charging, find the one with lowest currentCharge among PB_STATUS_PLUGGED_IN
+            // If no powerbank is charging, charge the emptiest PB_STATUS_PLUGGED_IN pack:
+            // lowest powerLevel, ties broken by the lowest raw currentCharge.
             // Exclude powerbanks that are in PB_STATUS_IDLE (finished charging) - they should not be charged again
+            //
+            // Ranked by the percentage, not the raw counter: currentCharge is
+            // a coulomb-counter value relative to each pack's OWN anchors, so
+            // comparing it across packs is meaningless. Ranking on it let a
+            // healthy pack at 10647 mAh (a few %) beat packs frozen at 11674
+            // reading 0% every scan, which then never got a turn (IR-2026-015).
             if (chargingSlotIndex === -1) {
               let lowestChargeSlot: {
                 slotIndex: number;
+                powerLevel: number;
                 currentCharge: number;
               } | null = null;
 
@@ -484,14 +492,18 @@ export async function runS1TTXXSlots(): Promise<void> {
                   slot.powerBankInfo &&
                   slot.powerBankInfo.status === PB_STATUS_PLUGGED_IN
                 ) {
+                  const powerLevel = slot.powerLevel;
                   const currentCharge = slot.powerBankInfo.currentCharge || 0;
                   if (
                     lowestChargeSlot === null ||
-                    currentCharge < lowestChargeSlot.currentCharge
+                    powerLevel < lowestChargeSlot.powerLevel ||
+                    (powerLevel === lowestChargeSlot.powerLevel &&
+                      currentCharge < lowestChargeSlot.currentCharge)
                   ) {
                     lowestChargeSlot = {
                       slotIndex: slot.slotIndex,
-                      currentCharge: currentCharge,
+                      powerLevel,
+                      currentCharge,
                     };
                   }
                 }
@@ -525,6 +537,14 @@ export async function runS1TTXXSlots(): Promise<void> {
                         slot.powerBankInfo?.status,
                         slot.packVoltageMv
                       ),
+                      // Raw gauge bookkeeping, so a fleet fault (frozen
+                      // counter, collapsed or inverted anchors, flash wear via
+                      // cycles) is visible without SSH. Additive: consumers
+                      // that do not know these keys ignore them.
+                      currentCharge: parseInt(slot.powerBankInfo?.currentCharge) || 0,
+                      totalCharge: parseInt(slot.powerBankInfo?.totalCharge) || 0,
+                      cutoffCharge: parseInt(slot.powerBankInfo?.cutoffCharge) || 0,
+                      cycles: parseInt(slot.powerBankInfo?.cycles) || 0,
                     }
                   : null,
                 isPowerbankPresent: slot.isPowerbankPresent,
