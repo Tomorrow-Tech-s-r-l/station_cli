@@ -114,17 +114,31 @@ registerCapabilitiesCommand(program);
 interface RoutedOptions {
   index?: string;
   port?: string;
+  /** Commander's `--no-charge`: false when the flag is given. */
+  charge?: boolean;
 }
 
 // Slots command
 program
   .command("slots")
   .description("Get slots information")
+  .option(
+    "--no-charge",
+    "Switch charging off: send charge-off to every docked powerbank instead of arming one per board (the station keeps working; the kiosk passes this while the station's chargingEnabled setting is off)"
+  )
   .action(async (options: RoutedOptions) => {
+    const chargingEnabled = options.charge !== false;
     if (isS0TTModel(getModel())) {
+      if (!chargingEnabled) {
+        // S0TTXX gateways run their own charge control; this CLI has no
+        // charge command for them, so the switch cannot be enforced here.
+        process.stderr.write(
+          "Warning: --no-charge is not supported on S0TTXX models; charging is unchanged\n"
+        );
+      }
       await runS0TTXXSlots(options.port);
     } else {
-      await runS1TTXXSlots();
+      await runS1TTXXSlots({ chargingEnabled });
     }
   });
 

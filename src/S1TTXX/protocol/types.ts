@@ -139,4 +139,9 @@ export interface SlotsResponse {
   errors: SlotErrorInfo[];
   executionTimeMs: number;
   timestamp: string;
+  // Whether this scan was allowed to arm chargers. False after
+  // `slots --no-charge`: every docked pack was sent CMD_SET_CHARGE=0 and every
+  // slot reports isCharging=false. Additive — older CLIs omit it, which a
+  // consumer reads as true.
+  chargingEnabled: boolean;
 }

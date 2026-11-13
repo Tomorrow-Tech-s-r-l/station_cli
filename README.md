@@ -14,6 +14,8 @@ station-cli ports           # list serial ports and the one auto-detect picks
 station-cli slots -p COM3   # use a specific port (or set STATION_CLI_PORT)
 ```
 
+`slots` also runs the charge schedule: after reading each board it arms the charger of at most one docked powerbank per board and sends charge-off to the rest. Pass `--no-charge` to switch charging off — every docked powerbank is sent charge-off, every slot reports `isCharging: false`, and the JSON carries `"chargingEnabled": false`; the station otherwise keeps working (unlocks, returns, slot reporting). Charging resumes at the next scan run without the flag. Supported on S1TTXX models; on S0TTXX the flag only prints a warning. Callers can probe for it in `station-cli capabilities --json` (`slots` lists `--no-charge`).
+
 The model is `S1TT30` (default), `S1TT6`, `S0TT6`, `S0TT12` or `S0TT18`; `station-cli --help` lists them and `station-cli <command> --help` shows the ranges for the selected one. On Windows run `station-cli-windows-x64.exe ports` to find the station's COM port, then pass it with `-p`.
 
 Add `--log` to any command to save output to a timestamped file. For build-from-source steps or additional models (including S0TTXX), the serial port options and Windows usage, follow the wiki.
